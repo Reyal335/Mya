@@ -864,9 +864,10 @@ The text comes from a model and can hold anything.
 
 ## Agent icons
 
-- PNG, exactly 16x16. Reject anything else: "Icon must be exactly 16x16."
-  Do not auto-resize.
-- Displayed at 2x (inbox rows), 3x (cards, headers), 4x (edit form preview).
+- PNG, square, 16x16 to 32x32. Reject anything else: "Icon must be a square
+  PNG from 16x16 to 32x32." Do not auto-resize.
+- Displayed at 16px (chips, bubbles), 32px (inbox rows), 48px (cards,
+  headers), or 64px (edit form preview), whatever the source size.
 - Agents without an icon get the default question-mark icon.
 - The icons in the mockups are placeholders drawn as inline SVG.
 
@@ -875,7 +876,7 @@ The text comes from a model and can hold anything.
 - Small frameless, always-on-top window in the bottom-right screen corner.
 - About 340px wide, 140px tall. The approval variant is taller to fit its buttons.
 - Layout: mascot on the left, speech bubble on the right with the agent's
-  16x16 icon and name in the bubble header.
+  icon and name in the bubble header.
 - Border color follows the variant: text color for finished, waiting color
   for approval, error color for error.
 - Approval variant has Approve, Deny, and Open buttons.

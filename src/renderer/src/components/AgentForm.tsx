@@ -360,7 +360,7 @@ function AgentFields({
               className="button button--icon-upload"
               onClick={() => void chooseIcon()}
             >
-              UPLOAD 16x16 PNG
+              UPLOAD 16x16 TO 32x32 PNG
             </button>
             {values.iconSrc && (
               <button
@@ -373,7 +373,7 @@ function AgentFields({
             )}
           </div>
           <div className="agent-form__note">
-            Preview is 4x. Only exact 16x16 PNG files are accepted.
+            Preview is up to 4x. Only square PNG files from 16x16 to 32x32 are accepted.
           </div>
         </div>
       </div>

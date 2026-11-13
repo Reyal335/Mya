@@ -223,9 +223,9 @@ Notes on agent fields:
   Inside an agent, only `Read`, `Grep`, and `Glob` run without asking.
 - A **role** is an optional label of up to 40 characters, such as
   `code-reader`. Mya stores it in `agent-roles.json`, not in the agent file.
-- An **icon** is optional. It must be a PNG that is exactly 16x16 pixels. Mya
-  rejects any other size and does not resize it. Agents without an icon show a
-  placeholder.
+- An **icon** is optional. It must be a square PNG from 16x16 to 32x32 pixels.
+  Mya rejects any other size and does not resize it. Agents without an icon
+  show a placeholder.
 
 ## Mascot spritesheets
 

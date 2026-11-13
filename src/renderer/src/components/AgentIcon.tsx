@@ -1,7 +1,7 @@
 import './AgentIcon.css'
 
 type AgentIconProps = {
-  // A 16x16 PNG data URL, or null for the default question-mark icon.
+  // A 16x16 to 32x32 PNG data URL, or null for the default question-mark icon.
   src: string | null
   // Whole-number scales of 16 only.
   size: 16 | 32 | 48 | 64
