@@ -122,6 +122,8 @@ const api: MyaApi = {
     getPopups: () => ipcRenderer.invoke(IpcChannel.UiGetPopups),
     setPopups: (on) => ipcRenderer.invoke(IpcChannel.UiSetPopups, on),
     testPopup: () => ipcRenderer.invoke(IpcChannel.UiTestPopup),
+    getOpenInEditor: () => ipcRenderer.invoke(IpcChannel.UiGetOpenInEditor),
+    setOpenInEditor: (on) => ipcRenderer.invoke(IpcChannel.UiSetOpenInEditor, on),
     onOpen: (callback) => {
       const listener = (_event: IpcRendererEvent, target: PopupOpenTarget): void => callback(target)
       ipcRenderer.on(IpcChannel.UiOpen, listener)

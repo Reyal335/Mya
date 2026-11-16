@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MascotSummary } from '../../../shared/ipc'
 import { DEFAULT_MASCOT_ID } from '../../../shared/mascotRules'
 import { useMascots } from '../hooks/useMascots'
+import { useOpenInEditorSetting } from '../hooks/useOpenInEditorSetting'
 import { usePopupsSetting } from '../hooks/usePopupsSetting'
 import { DEFAULT_MASCOT, withDefaultEdits } from '../mascots/defaultMascot'
 import MascotCard from '../components/MascotCard'
@@ -25,6 +26,7 @@ type ConfirmState =
 function MascotsScreen({ setLeaveGuard }: MascotsScreenProps): React.JSX.Element {
   const { mascots, defaultMascot, activeId, loaded, error, reload } = useMascots()
   const popups = usePopupsSetting()
+  const openInEditor = useOpenInEditorSetting()
   // Broken edits are not shown: the bundled mascot is used until they are reset.
   const shownDefault = defaultMascot.problem
     ? DEFAULT_MASCOT
@@ -133,6 +135,15 @@ function MascotsScreen({ setLeaveGuard }: MascotsScreenProps): React.JSX.Element
             onClick={() => popups.test()}
           >
             TEST POPUP
+          </button>
+          <button
+            type="button"
+            className="button button--small"
+            aria-pressed={openInEditor.on}
+            disabled={!openInEditor.loaded}
+            onClick={() => openInEditor.toggle()}
+          >
+            EDITOR {openInEditor.on ? 'ON' : 'OFF'}
           </button>
         </div>
       </div>

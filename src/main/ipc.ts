@@ -8,6 +8,7 @@ import {
   type ProjectInfo
 } from '../shared/ipc'
 import { accountData, checkAccount, openUsagePage } from './account'
+import { openInEditor } from './editor'
 import { chatChoice, listModels, saveChoice } from './modelChoice'
 import { prefetchModels } from './models'
 import { registerWindowIpc } from './windowControls'
@@ -30,9 +31,11 @@ import {
 } from './agent'
 import { readPastedImages } from './pastedImages'
 import {
+  getOpenInEditor,
   getPartyPanel,
   getPopups,
   getProject,
+  setOpenInEditor,
   setPartyPanel,
   setPopups,
   setProject
@@ -77,6 +80,7 @@ export function registerIpc(): void {
     const opened = await setProject(result.filePaths[0])
     // The new folder's model list starts loading now.
     prefetchModels(opened.path)
+    if (await getOpenInEditor()) openInEditor(opened.path)
     return opened
   })
 
@@ -269,4 +273,17 @@ export function registerIpc(): void {
     }
   })
   ipcMain.handle(IpcChannel.UiTestPopup, () => showTestPopup())
+
+  // OPEN IN EDITOR on or off, kept in settings.json. Takes effect on the next OPEN/CHANGE.
+  ipcMain.handle(IpcChannel.UiGetOpenInEditor, () => getOpenInEditor())
+  ipcMain.handle(IpcChannel.UiSetOpenInEditor, async (_event, on: unknown) => {
+    if (typeof on !== 'boolean') return { ok: false }
+    try {
+      await setOpenInEditor(on)
+      return { ok: true }
+    } catch (err) {
+      console.error('Could not save settings:', err instanceof Error ? err.message : err)
+      return { ok: false }
+    }
+  })
 }

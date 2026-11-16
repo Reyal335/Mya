@@ -143,3 +143,13 @@ export async function getPopups(): Promise<boolean> {
 export function setPopups(on: boolean): Promise<void> {
   return updateSettings({ popups: on })
 }
+
+// OPEN IN EDITOR is off until I turn it on.
+export async function getOpenInEditor(): Promise<boolean> {
+  const { openInEditor } = await readSettings()
+  return openInEditor === true
+}
+
+export function setOpenInEditor(on: boolean): Promise<void> {
+  return updateSettings({ openInEditor: on })
+}

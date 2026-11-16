@@ -71,6 +71,8 @@ export const IpcChannel = {
   UiGetPopups: 'ui:get-popups',
   UiSetPopups: 'ui:set-popups',
   UiTestPopup: 'ui:test-popup',
+  UiGetOpenInEditor: 'ui:get-open-in-editor',
+  UiSetOpenInEditor: 'ui:set-open-in-editor',
   // Main to the main window: OPEN on a popup, with the screen to show.
   UiOpen: 'ui:open',
   // The popup window's own channels. Main answers them only from the popup.
@@ -664,6 +666,9 @@ export type MyaApi = {
     setPopups: (on: boolean) => Promise<{ ok: boolean }>
     // A sample finished popup for 6 seconds, even with popups off or the app in front.
     testPopup: () => Promise<void>
+    // Launch VS Code on OPEN/CHANGE, on or off, kept in settings.json. Off when never set.
+    getOpenInEditor: () => Promise<boolean>
+    setOpenInEditor: (on: boolean) => Promise<{ ok: boolean }>
     // OPEN on a popup: the screen the main window should show.
     onOpen: (callback: (target: PopupOpenTarget) => void) => () => void
   }
