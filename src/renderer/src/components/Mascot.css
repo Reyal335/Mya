@@ -26,3 +26,16 @@
     animation: none;
   }
 }
+
+/* An equipped accessory over the mascot, at the mascot's whole-number scale. */
+.mascot-dressed {
+  position: relative;
+  flex: none;
+}
+
+.mascot__accessory {
+  position: absolute;
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+}

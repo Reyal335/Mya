@@ -2,7 +2,15 @@
 // Electron and no clock of its own, so it can be tested with fake events and a
 // fake time. popupWindow.ts feeds it and draws its view.
 
-import type { PopupAction, PopupOpenTarget, PopupView, PopupWho, ToolInput } from '../shared/ipc'
+import type { Reward } from '../shared/achievements'
+import type {
+  PopupAction,
+  PopupLoot,
+  PopupOpenTarget,
+  PopupView,
+  PopupWho,
+  ToolInput
+} from '../shared/ipc'
 
 export const FINISHED_MS = 6_000
 export const ERROR_MS = 10_000
@@ -22,14 +30,18 @@ export type PopupRequest = {
   fits: boolean
 }
 
-// A finished or error popup.
-export type PopupNotice = {
-  id: string
-  kind: 'finished' | 'error'
-  who: PopupWho
-  text: string
-  open: PopupOpenTarget
-}
+// A finished or error popup, or an achievement unlocked. All three queue the same way.
+export type PopupNotice =
+  | {
+      id: string
+      kind: 'finished' | 'error'
+      who: PopupWho
+      text: string
+      open: PopupOpenTarget
+      // An agent's finished task: what it changed and the XP it earned.
+      loot?: PopupLoot | null
+    }
+  | { id: string; kind: 'achievement'; name: string; reward: Reward; open: PopupOpenTarget }
 
 type Shown =
   | { kind: 'approval'; permissionId: string }
@@ -72,6 +84,8 @@ export type PopupEvent =
   | { type: 'hover'; over: boolean }
   | { type: 'timer' }
   | { type: 'test'; notice: PopupNotice }
+  // An achievement unlocked. Queued like a finished popup.
+  | { type: 'achievement'; notice: PopupNotice }
   // Acts main already checked with actAllowed. approve and deny change nothing
   // here: the request_closed that follows does.
   | { type: 'act'; id: string; action: PopupAction }
@@ -170,6 +184,9 @@ function apply(state: PopupState, event: PopupEvent, now: number): void {
       }
       return
     }
+    case 'achievement':
+      if (canShow(state)) enqueue(state, event.notice)
+      return
     case 'test': {
       const shown = state.shown
       if (shown?.kind === 'notice' && !shown.test) state.queue.unshift(shown.notice)
@@ -189,7 +206,10 @@ function apply(state: PopupState, event: PopupEvent, now: number): void {
         if (!state.detailsOpened.includes(shown.permissionId)) {
           state.detailsOpened.push(shown.permissionId)
         }
-      } else if (event.action === 'dismiss' && shown.kind === 'notice') {
+      } else if (
+        (event.action === 'dismiss' || event.action === 'equip') &&
+        shown.kind === 'notice'
+      ) {
         state.shown = null
       } else if (event.action === 'open') {
         state.shown = null
@@ -256,8 +276,12 @@ export function viewOf(state: PopupState): PopupView | null {
   const shown = state.shown
   if (!shown) return null
   if (shown.kind === 'notice') {
-    const { id, kind, who, text } = shown.notice
-    return { id, kind, who, text }
+    const notice = shown.notice
+    if (notice.kind === 'achievement') {
+      return { id: notice.id, kind: 'achievement', name: notice.name, reward: notice.reward }
+    }
+    const { id, kind, who, text, loot } = notice
+    return loot ? { id, kind, who, text, loot } : { id, kind, who, text }
   }
   const index = state.requests.findIndex((r) => r.permissionId === shown.permissionId)
   if (index < 0) return null
@@ -281,6 +305,7 @@ export function viewOf(state: PopupState): PopupView | null {
 
 // The buttons a popup offers. APPROVE only once the whole request has been shown.
 export function offeredActions(view: PopupView): PopupAction[] {
+  if (view.kind === 'achievement') return ['equip', 'dismiss']
   if (view.kind !== 'approval') return ['open', 'dismiss']
   return ['deny', 'open', view.fits || view.detailsOpen ? 'approve' : 'details']
 }

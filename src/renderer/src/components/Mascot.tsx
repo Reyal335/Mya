@@ -5,6 +5,7 @@ import './Mascot.css'
 
 const FRAME = 64
 const MAX_FRAMES = 16
+const ACCESSORY = 16
 
 type MascotProps = {
   // A horizontal strip of 64x64 frames.
@@ -16,6 +17,9 @@ type MascotProps = {
   // Whole-number display scale: the mascot is drawn at 64 * scale pixels square.
   scale?: number
   label: string
+  // An equipped accessory: a 16x16 picture drawn over the frame with its top-left
+  // corner at (x, y) in 64px frame pixels, at the mascot's scale.
+  accessory?: { src: string; x: number; y: number } | null
 }
 
 // Draws one frame of a spritesheet at a time and loops through the frames.
@@ -32,7 +36,8 @@ function Mascot({
   fps,
   reverse = false,
   scale = 2,
-  label
+  label,
+  accessory = null
 }: MascotProps): React.JSX.Element {
   const count = Math.min(MAX_FRAMES, Math.max(1, Math.floor(frames)))
   const size = FRAME * Math.max(1, Math.round(scale))
@@ -75,7 +80,7 @@ function Mascot({
 
   // The key restarts the animation from frame 0 when the sheet, frames, fps, or
   // direction change.
-  return (
+  const sheet = (
     <div
       key={`${src}|${count}|${fps}|${bounces}`}
       ref={ref}
@@ -84,6 +89,23 @@ function Mascot({
       aria-label={label}
       style={style}
     />
+  )
+  if (!accessory) return sheet
+  const factor = size / FRAME
+  // Decorative: the mascot's own label already names it.
+  return (
+    <div className="mascot-dressed" style={{ width: size, height: size }}>
+      {sheet}
+      <img
+        className="mascot__accessory"
+        src={accessory.src}
+        alt=""
+        aria-hidden="true"
+        width={ACCESSORY * factor}
+        height={ACCESSORY * factor}
+        style={{ left: accessory.x * factor, top: accessory.y * factor }}
+      />
+    </div>
   )
 }
 

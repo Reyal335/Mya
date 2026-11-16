@@ -41,6 +41,8 @@ import {
   setProject
 } from './settings'
 import { setPopupsEnabled, showTestPopup } from './popupWindow'
+import { agentStats, agentsSummary } from './progression'
+import { achievementsData, equip, markAllSeen } from './progressionStore'
 import { clearFinishedTasks, getTask, listTasks, markTaskSeen, removeTask } from './tasks'
 import { createAgent, listAgents, readAgent, removeAgent, updateAgent } from './agents'
 import { discardIcon, pickIcon } from './agentIcons'
@@ -273,6 +275,18 @@ export function registerIpc(): void {
     }
   })
   ipcMain.handle(IpcChannel.UiTestPopup, () => showTestPopup())
+
+  // Progression. The window names an agent by a listed file path only; progression.ts
+  // checks it against the list, and equip checks the reward is unlocked.
+  ipcMain.handle(IpcChannel.ProgressionAgentsSummary, () => agentsSummary())
+  ipcMain.handle(IpcChannel.ProgressionAgentStats, (_event, filePath: unknown) =>
+    agentStats(filePath)
+  )
+  ipcMain.handle(IpcChannel.ProgressionAchievements, () => achievementsData())
+  ipcMain.handle(IpcChannel.ProgressionEquip, async (_event, change: unknown) => ({
+    ok: await equip(change)
+  }))
+  ipcMain.handle(IpcChannel.ProgressionMarkSeen, () => markAllSeen())
 
   // OPEN IN EDITOR on or off, kept in settings.json. Takes effect on the next OPEN/CHANGE.
   ipcMain.handle(IpcChannel.UiGetOpenInEditor, () => getOpenInEditor())

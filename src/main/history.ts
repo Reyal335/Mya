@@ -1,4 +1,5 @@
 import type { HistoryItem, TaskAgent, TaskStatus, ToolState } from '../shared/ipc'
+import type { TaskLoot, TaskXp } from '../shared/progression'
 import { parseCall } from '../shared/callAgent.ts'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput.ts'
 
@@ -18,6 +19,9 @@ export type SavedTask = {
   description: string
   status: TaskStatus
   report: string | null
+  // A QUEST CLEAR card's loot and XP, saved when the task ended as done.
+  loot?: TaskLoot | null
+  xp?: TaskXp | null
 }
 
 export type HistoryContext = {
@@ -151,7 +155,9 @@ export function historyItems(messages: RecordedMessage[], context: HistoryContex
             // No result yet means the run ended first.
             status: saved?.status ?? 'stopped',
             activity: null,
-            report: saved?.report ?? null
+            report: saved?.report ?? null,
+            loot: saved?.loot ?? null,
+            xp: saved?.xp ?? null
           })
         } else {
           const shown = forIpc(input)

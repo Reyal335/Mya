@@ -13,10 +13,21 @@ import {
   type ToolState
 } from '../shared/ipc'
 import { toPlainText } from '../shared/plainText'
+import {
+  CLASS_NAMES,
+  type ClassId,
+  type Level,
+  type LootItem,
+  type TaskLoot,
+  type TaskXp,
+  type XpLine
+} from '../shared/progression'
 import { labelText } from '../shared/toolLabel'
 import { loadIcons } from './agentIcons'
 import { loadRoles } from './agentRoles'
 import { isObject, readJsonFile, serialQueue, writeJsonFile } from './jsonFile'
+import { lootFor, type TaskCall } from './loot'
+import { recordTaskEnd } from './progressionStore'
 
 // Tasks: one Agent tool call each, kept in userData/tasks.json as
 // { version: 1, tasks }. Main is the one source: the inbox lists what is here, and
@@ -27,6 +38,8 @@ const MAX_TEXT = 20_000
 const MAX_ACTIVITY = 100
 const MAX_PER_PROJECT = 200
 const PREVIEW_LENGTH = 80
+// Tool calls kept per task for its loot. Far above what a task makes.
+const MAX_CALLS = 2_000
 const NOTIFY_MS = 100
 export const INTERRUPTED_REPORT = 'Interrupted when Mya closed.'
 
@@ -47,6 +60,11 @@ type TaskRecord = {
   startedAt: number
   endedAt: number | null
   seen: boolean
+  // The task's tool calls, for its loot. In memory only, while it runs.
+  calls: TaskCall[]
+  // Saved when the task ends as done, so its QUEST CLEAR card survives a restart.
+  loot: TaskLoot | null
+  xp: TaskXp | null
 }
 
 let tasks: TaskRecord[] | null = null
@@ -82,6 +100,56 @@ function readActivity(raw: unknown): TaskActivity[] {
   })
 }
 
+function num(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+}
+
+function readLoot(raw: unknown): TaskLoot | null {
+  if (!isObject(raw) || !Array.isArray(raw.items)) return null
+  const items: LootItem[] = raw.items.flatMap((item) =>
+    isObject(item) && typeof item.path === 'string'
+      ? [
+          {
+            path: item.path,
+            added: num(item.added),
+            removed: num(item.removed),
+            isNew: item.isNew === true
+          }
+        ]
+      : []
+  )
+  const found = Array.isArray(raw.found)
+    ? raw.found.filter((path): path is string => typeof path === 'string')
+    : []
+  return {
+    items,
+    added: num(raw.added),
+    removed: num(raw.removed),
+    found,
+    foundCount: num(raw.foundCount) || found.length
+  }
+}
+
+function readLevel(raw: unknown): Level | null {
+  if (!isObject(raw) || typeof raw.level !== 'number') return null
+  return { level: num(raw.level), intoLevel: num(raw.intoLevel), toNext: num(raw.toNext) }
+}
+
+function readXp(raw: unknown): TaskXp | null {
+  if (!isObject(raw) || typeof raw.total !== 'number' || !Array.isArray(raw.lines)) return null
+  const before = readLevel(raw.before)
+  const after = readLevel(raw.after)
+  if (!before || !after || typeof raw.classId !== 'string' || !(raw.classId in CLASS_NAMES)) {
+    return null
+  }
+  const lines: XpLine[] = raw.lines.flatMap((line) =>
+    isObject(line) && typeof line.label === 'string'
+      ? [{ label: line.label, xp: num(line.xp) }]
+      : []
+  )
+  return { total: num(raw.total), lines, classId: raw.classId as ClassId, before, after }
+}
+
 function readRecord(raw: unknown): TaskRecord | null {
   if (!isObject(raw) || !isObject(raw.agent)) return null
   const { id, projectPath, description, prompt, status, startedAt } = raw
@@ -111,12 +179,20 @@ function readRecord(raw: unknown): TaskRecord | null {
     activity: readActivity(raw.activity),
     startedAt,
     endedAt: typeof raw.endedAt === 'number' ? raw.endedAt : null,
-    seen: raw.seen === true
+    seen: raw.seen === true,
+    calls: [],
+    loot: readLoot(raw.loot),
+    xp: readXp(raw.xp)
   }
 }
 
 function save(): Promise<void> {
-  const snapshot = { version: VERSION, tasks: tasks ?? [] }
+  // The calls are for the loot only and stay in memory.
+  // An undefined field is left out of the JSON.
+  const snapshot = {
+    version: VERSION,
+    tasks: (tasks ?? []).map((task) => ({ ...task, calls: undefined }))
+  }
   return queue(async () => {
     try {
       await writeJsonFile(tasksPath(), snapshot)
@@ -225,7 +301,9 @@ async function summary(task: TaskRecord, look: Look): Promise<TaskSummary> {
     preview: preview(task),
     startedAt: task.startedAt,
     endedAt: task.endedAt,
-    seen: task.seen
+    seen: task.seen,
+    loot: task.loot,
+    xp: task.xp
   }
 }
 
@@ -254,7 +332,10 @@ export async function startTask(input: NewTask): Promise<void> {
     activity: [],
     startedAt: Date.now(),
     endedAt: null,
-    seen: false
+    seen: false,
+    calls: [],
+    loot: null,
+    xp: null
   })
   // Keep the newest tasks of each project. Running or waiting ones always stay.
   const mine = list
@@ -280,6 +361,8 @@ export function taskActivity(
 ): void {
   const task = find(taskId)
   if (!task) return
+  const call = task.calls.find((entry) => entry.toolId === toolId)
+  if (call) call.state = state
   const index = task.activity.findIndex((entry) => entry.toolId === toolId)
   if (index >= 0) {
     const entry = task.activity[index]
@@ -290,6 +373,13 @@ export function taskActivity(
       task.activity.splice(0, task.activity.length - MAX_ACTIVITY)
   }
   notify()
+}
+
+// A tool call inside the task, with what its loot needs. Its state follows taskActivity.
+export function taskCall(taskId: string, call: TaskCall): void {
+  const task = find(taskId)
+  if (!task || task.calls.some((entry) => entry.toolId === call.toolId)) return
+  if (task.calls.length < MAX_CALLS) task.calls.push({ ...call })
 }
 
 function refreshWaiting(task: TaskRecord): void {
@@ -316,13 +406,17 @@ export function taskRequestClosed(taskId: string, toolId: string): void {
   notify()
 }
 
+// The agent's file and its tools line, or null for a built-in agent. Only a file earns XP.
+export type TaskAgentFile = { filePath: string; tools: string[] | null } | null
+
 export async function endTask(
   taskId: string,
   status: TaskEndStatus,
-  report: string | null
-): Promise<void> {
+  report: string | null,
+  agentFile: TaskAgentFile = null
+): Promise<{ loot: TaskLoot | null; xp: TaskXp | null }> {
   const task = find(taskId)
-  if (!task) return
+  if (!task) return { loot: null, xp: null }
   pending.delete(taskId)
   const text = report === null ? null : cut(report)
   task.status = status
@@ -332,8 +426,21 @@ export async function endTask(
   task.activity = task.activity.map((entry) =>
     entry.state === 'running' || entry.state === 'waiting' ? { ...entry, state: 'stopped' } : entry
   )
+  // Loot and XP only for a task that ended as done. Nothing here can fail the task.
+  task.loot = status === 'done' ? lootFor(task.calls, task.projectPath) : null
+  task.xp = await recordTaskEnd({
+    status,
+    agent: agentFile,
+    projectPath: task.projectPath,
+    calls: task.calls,
+    loot: task.loot,
+    startedAt: task.startedAt,
+    endedAt: task.endedAt
+  })
+  task.calls = []
   await save()
   notify()
+  return { loot: task.loot, xp: task.xp }
 }
 
 export function isOpenTask(taskId: string): boolean {

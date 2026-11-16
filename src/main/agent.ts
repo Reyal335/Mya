@@ -1,6 +1,7 @@
 // Runs the conversation on the Claude Agent SDK. The renderer and preload never import it.
 import { randomUUID, type UUID } from 'crypto'
 import type { WebContents } from 'electron'
+import { access } from 'fs/promises'
 import type {
   CanUseTool,
   HookCallback,
@@ -23,6 +24,7 @@ import {
   type TaskEndStatus,
   type ToolInput
 } from '../shared/ipc'
+import type { TaskLoot, TaskXp } from '../shared/progression'
 import { callBlock, hookBlock, winningAgent } from '../shared/agentGate'
 import { withCall } from '../shared/callAgent'
 import { labelText, toolLabel } from '../shared/toolLabel'
@@ -31,9 +33,11 @@ import { listAgents } from './agents'
 import { getChatSession, setChatChoice, setChatSession, setChatTheme } from './chats'
 import { historyItems, type RecordedMessage, type SavedTask } from './history'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
+import { callFacts } from './loot'
 import { getActiveVoice } from './mascots'
 import { choiceForRun } from './modelChoice'
 import { userContent, type SendImage } from './pastedImages'
+import { recordRunEnd, recordTaskStart } from './progressionStore'
 import { childEnv, claudeExecutable, loadSdk, type Sdk } from './sdk'
 import { getDefaultChoice } from './settings'
 import { voiceAppend } from './voice'
@@ -49,8 +53,10 @@ import {
 import {
   endTask,
   savedTasks,
+  type TaskAgentFile,
   startTask,
   taskActivity,
+  taskCall,
   taskRequestClosed,
   taskRequestOpened
 } from './tasks'
@@ -142,6 +148,8 @@ export type RunWatcher = {
     status: TaskEndStatus
     report: string
     agent: TaskAgent
+    loot: TaskLoot | null
+    xp: TaskXp | null
   }) => void
   runEnded: (run: {
     runId: string
@@ -211,6 +219,22 @@ function lookOf(agents: AgentSummary[], name: string): TaskAgent {
   return file
     ? { name, scope: file.scope, filePath: file.filePath, icon: file.icon, role: file.role }
     : { name, scope: null, filePath: null, icon: null, role: null }
+}
+
+// The agent file behind an agent name, for XP. null for a built-in agent.
+function agentFileOf(agents: AgentSummary[], name: string): TaskAgentFile {
+  const file = winningAgent(agents, name)
+  return file ? { filePath: file.filePath, tools: file.tools } : null
+}
+
+// Whether a file is there. Asked before a Write runs, for the NEW mark on its loot.
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Answers one pending request. Returns false for an unknown or already answered id.
@@ -603,22 +627,32 @@ async function endRunTask(
   if (agentName === undefined) return
   run.openTasks.delete(taskId)
   const shown = report.length > 20_000
+  // The loot and XP are worked out and saved first, so the card has them at once.
+  const { loot, xp } = await endTask(
+    taskId,
+    status,
+    status === 'stopped' ? null : report,
+    agentFileOf(run.agents, agentName)
+  )
   emit(run, {
     requestId: run.requestId,
     type: 'task_end',
     taskId,
     status,
     report: shown ? report.slice(0, 20_000) : report,
-    truncated: shown
+    truncated: shown,
+    loot,
+    xp
   })
-  await endTask(taskId, status, status === 'stopped' ? null : report)
   notify((w) =>
     w.taskEnded({
       runId: run.requestId,
       taskId,
       status,
       report,
-      agent: lookOf(run.agents, agentName)
+      agent: lookOf(run.agents, agentName),
+      loot,
+      xp
     })
   )
 }
@@ -850,6 +884,18 @@ async function execute(run: Run): Promise<void> {
                 taskId
               })
               taskActivity(taskId, block.id, toolLabel(block.name, input, run.cwd), 'running')
+              // What the loot needs, from the full input. A Write's file is checked now,
+              // before the tool runs: Write waits for my approval.
+              const facts = callFacts(block.name, input, run.cwd)
+              const existed =
+                block.name === 'Write' && facts.path !== null ? await fileExists(facts.path) : null
+              taskCall(taskId, {
+                toolId: block.id,
+                name: block.name,
+                ...facts,
+                existed,
+                state: 'running'
+              })
             }
             break
           }
@@ -887,6 +933,7 @@ async function execute(run: Run): Promise<void> {
                 description,
                 prompt: typeof input.prompt === 'string' ? input.prompt : ''
               })
+              void recordTaskStart(agent.filePath, run.agents)
               continue
             }
             const shown = forIpc(input)
@@ -1007,6 +1054,7 @@ async function execute(run: Run): Promise<void> {
       emit(run, { requestId: run.requestId, type: 'error', ...ended })
     }
     notify((w) => w.runEnded({ runId: run.requestId, outcome: ended, reply: run.reply }))
+    void recordRunEnd(ended === 'done')
     // Last: a message waiting to start a new run goes ahead only after this run's events.
     run.settleDone()
   }

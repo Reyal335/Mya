@@ -1,29 +1,35 @@
 import { useState } from 'react'
-import type { MyaPopupApi, PopupAction, PopupView, PopupWho } from '../../../shared/ipc'
+import type { MyaPopupApi, PopupAction, PopupLoot, PopupView, PopupWho } from '../../../shared/ipc'
+import { rewardText } from '../../../shared/achievements'
 import type { MascotStateName } from '../../../shared/mascotRules'
 import AgentIcon from '../components/AgentIcon'
 import Mascot from '../components/Mascot'
 import { PermissionDetails } from '../components/PermissionRow'
 import { AGENT_NAME } from '../conversation/agentName'
 import { loopFor, type Mascot as MascotData } from '../mascots/types'
+import type { Accessory } from '../progression/accessories'
 import './PopupCard.css'
 
 type PopupCardProps = {
   view: PopupView
   mascot: MascotData
   api: MyaPopupApi
+  // The equipped accessory, drawn over the mascot.
+  accessory: Accessory | null
 }
 
 const MASCOT_STATES: Record<PopupView['kind'], MascotStateName> = {
   approval: 'asking',
   finished: 'talking',
-  error: 'idle'
+  error: 'idle',
+  achievement: 'talking'
 }
 
 const MASCOT_LABELS: Record<PopupView['kind'], string> = {
   approval: 'asking permission',
   finished: 'talking',
-  error: 'idle'
+  error: 'idle',
+  achievement: 'talking'
 }
 
 function nameOf(who: PopupWho): string {
@@ -51,9 +57,59 @@ function Header({
   )
 }
 
+function count(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// The bubble's line for an agent's finished task with loot: what it got.
+function lootLine(name: string, loot: PopupLoot, text: string): string {
+  if (loot.items > 0) return `${name} got ${count(loot.items, 'item', 'items')}.`
+  if (loot.found > 0) return `${name} found ${count(loot.found, 'file', 'files')}.`
+  return text
+}
+
+// The two loot lines under the mascot row: the line counts and the XP, then the first
+// two items (NEW marked) and how many more.
+function LootLines({ loot }: { loot: PopupLoot }): React.JSX.Element {
+  const more = loot.items - loot.first.length
+  return (
+    <div className="popup-card__loot">
+      <span className="popup-card__loot-line">
+        {loot.items > 0 ? (
+          <span>
+            <span className="popup-card__add">+{loot.added}</span>{' '}
+            <span className="popup-card__remove">−{loot.removed}</span> lines
+          </span>
+        ) : (
+          <span className="popup-card__muted">Nothing changed</span>
+        )}
+        {loot.xp !== null && (
+          <span className="popup-card__xp">
+            +{loot.xp} XP{loot.levelUp && <span className="popup-card__lvup"> LV UP!</span>}
+          </span>
+        )}
+      </span>
+      {loot.first.length > 0 && (
+        <span className="popup-card__loot-line">
+          <span className="popup-card__items">
+            {loot.first.map((item, i) => (
+              <span key={item.path}>
+                {i > 0 && ', '}
+                {item.path}
+                {item.isNew && <span className="popup-card__new"> NEW</span>}
+              </span>
+            ))}
+          </span>
+          {more > 0 && <span className="popup-card__muted">+{more} more</span>}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // One popup from designs/5-popup-notifications.html: the mascot on the left and
 // the bubble on the right, with buttons below for an approval.
-function PopupCard({ view, mascot, api }: PopupCardProps): React.JSX.Element {
+function PopupCard({ view, mascot, api, accessory }: PopupCardProps): React.JSX.Element {
   // APPROVE and DENY are disabled after one click until the popup changes. The
   // card is keyed by the popup's id, so this starts false for each popup.
   const [answered, setAnswered] = useState(false)
@@ -77,15 +133,45 @@ function PopupCard({ view, mascot, api }: PopupCardProps): React.JSX.Element {
         reverse={loop.reverse}
         scale={2}
         label={`${mascot.name}, ${MASCOT_LABELS[view.kind]}`}
+        accessory={accessory}
       />
     </span>
   )
 
-  if (view.kind !== 'approval') {
-    const error = view.kind === 'error'
+  if (view.kind === 'achievement') {
     return (
       <div
-        className={`popup-card popup-card--${view.kind}`}
+        className="popup-card popup-card--achievement"
+        role="status"
+        aria-label={`Achievement unlocked: ${view.name}`}
+        {...hover}
+      >
+        <div className="popup-card__top">
+          {mascotFrame}
+          <div className="popup-card__bubble">
+            <span className="popup-card__unlocked">ACHIEVEMENT UNLOCKED</span>
+            <span className="popup-card__achievement">{view.name}</span>
+            <span className="popup-card__reward">Reward: {rewardText(view.reward)}</span>
+          </div>
+        </div>
+        <div className="popup-card__actions" role="group" aria-label="Achievement">
+          <button type="button" className="button button--primary" onClick={() => act('equip')}>
+            EQUIP
+          </button>
+          <button type="button" className="button button--secondary" onClick={() => act('dismiss')}>
+            LATER
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (view.kind !== 'approval') {
+    const error = view.kind === 'error'
+    const loot = view.loot ?? null
+    return (
+      <div
+        className={`popup-card popup-card--${view.kind}${loot ? ' popup-card--loot' : ''}`}
         role={error ? 'alert' : 'status'}
         {...hover}
       >
@@ -94,7 +180,9 @@ function PopupCard({ view, mascot, api }: PopupCardProps): React.JSX.Element {
           {mascotFrame}
           <span className="popup-card__bubble">
             <Header who={view.who} />
-            <span className="popup-card__text">{view.text}</span>
+            <span className="popup-card__text">
+              {loot ? lootLine(nameOf(view.who), loot, view.text) : view.text}
+            </span>
             <span className={`popup-card__status popup-card__status--${view.kind}`}>
               <span className="popup-card__square" aria-hidden="true" />
               {error ? 'ERROR' : 'DONE'}
@@ -109,6 +197,7 @@ function PopupCard({ view, mascot, api }: PopupCardProps): React.JSX.Element {
         >
           X
         </button>
+        {loot && <LootLines loot={loot} />}
       </div>
     )
   }
