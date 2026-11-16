@@ -28,6 +28,9 @@ import { getActiveMascot } from './mascots'
 import { getPopups } from './settings'
 import * as popups from './popups'
 
+// The ISO time that starts every diagnostic log line.
+const stamp = (): string => new Date().toISOString()
+
 // The card is 340 wide like the mockup. The window is transparent and 6px larger
 // each way for the card's hard shadow. Fixed heights per state, never measured.
 const SHADOW = 6
@@ -94,6 +97,9 @@ function render(): void {
     } else if (popup.isVisible()) {
       popup.hide()
     }
+    console.log(
+      `${stamp()} [popup] render: success, view=${JSON.stringify(view).substring(0, 100)}`
+    )
   }
 
   const flash = popups.flashOf(state)
@@ -113,9 +119,17 @@ function schedule(): void {
 
 function dispatch(event: popups.PopupEvent): void {
   if (closing) return
-  state = popups.step(state, event, Date.now())
-  render()
-  schedule()
+  try {
+    state = popups.step(state, event, Date.now())
+    render()
+    schedule()
+    console.log(`${stamp()} [popup] dispatch: success`)
+  } catch (err) {
+    console.error(
+      `${stamp()} [popup] dispatch failed: ${err instanceof Error ? err.message : String(err)}`
+    )
+    throw err
+  }
 }
 
 function isBackground(): boolean {
@@ -156,7 +170,13 @@ function runNotice(outcome: 'done' | AgentError, reply: string): popups.PopupNot
 
 function watch(): void {
   watchRuns({
-    requestOpened: (request) =>
+    requestOpened: (request) => {
+      // canShow is popups.ts's rule (enabled and background), worked out here from the state.
+      const canShow = state.enabled && state.background
+      const focused = alive(mainWindow) ? mainWindow.isFocused() : 'no window'
+      console.log(
+        `${stamp()} [popup] request_opened: agent=${request.agent?.name ?? 'claude'}, canShow=${canShow}, background=${state.background}, enabled=${state.enabled}, isFocused=${focused}, requests=${state.requests.length}`
+      )
       dispatch({
         type: 'request_opened',
         request: {
@@ -169,7 +189,8 @@ function watch(): void {
           projectPath: request.cwd,
           fits: fitsPopup(request.name, request.input, request.truncated, request.cwd)
         }
-      }),
+      })
+    },
     requestClosed: (permissionId) => dispatch({ type: 'request_closed', permissionId }),
     taskEnded: (task) => {
       if (task.status === 'stopped') return
@@ -358,7 +379,7 @@ export function setupPopups(main: BrowserWindow): void {
 
   getPopups()
     .then((on) => dispatch({ type: 'enabled', enabled: on }))
-    .catch((err: unknown) => console.error('Could not read the popups setting:', err))
+    .catch((err: unknown) => console.error(`${stamp()} Could not read the popups setting:`, err))
 }
 
 // The main window is gone: the popup goes with it, so nothing keeps the app running.

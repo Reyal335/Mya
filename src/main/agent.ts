@@ -55,6 +55,9 @@ import {
   taskRequestOpened
 } from './tasks'
 
+// The ISO time that starts every diagnostic log line.
+const stamp = (): string => new Date().toISOString()
+
 // Reading never asks. Editing, writing, shell commands, and web access wait for the user's
 // Approve or Deny through canUseTool. `tools` limits which built-ins exist at all.
 // Agent lets Claude bring in my agents. It is not in allowedTools, and the agent
@@ -159,7 +162,11 @@ function notify(call: (watcher: RunWatcher) => void): void {
   try {
     call(watcher)
   } catch (err) {
-    console.error('[agent] A run watcher failed:', err)
+    console.error(
+      `${stamp()} [agent] A run watcher failed in requestOpened:`,
+      errorMessage(err),
+      err instanceof Error ? err.stack : undefined
+    )
   }
 }
 
@@ -498,6 +505,10 @@ function permissionHandler(run: Run): CanUseTool {
           cwd: run.cwd
         })
       )
+      // notify returns nothing, so log whether a watcher was there to hear the request.
+      console.log(
+        `${stamp()} [agent] permission_request: who=${agentName ?? 'claude'}, agentID=${agentID ?? 'none'}, tool=${toolName}, watcher=${watcher !== null}`
+      )
     })
 }
 
@@ -678,7 +689,7 @@ async function execute(run: Run): Promise<void> {
     try {
       voice = await getActiveVoice()
     } catch (err) {
-      console.error('[agent] Could not read the active mascot voice:', errorMessage(err))
+      console.error(`${stamp()} [agent] Could not read the active mascot voice:`, errorMessage(err))
       voice = { name: null, voice: null }
     }
     const append = voiceAppend(voice.name, voice.voice)
@@ -727,7 +738,7 @@ async function execute(run: Run): Promise<void> {
         case 'system':
           if (message.subtype === 'init') {
             // Not a secret: it names where the credential came from, not the credential.
-            console.log(`[agent] apiKeySource: ${message.apiKeySource}`)
+            console.log(`${stamp()} [agent] apiKeySource: ${message.apiKeySource}`)
             if (message.apiKeySource !== ACCOUNT_LOGIN_SOURCE) {
               run.failure = {
                 code: 'api_key_in_use',
@@ -965,7 +976,7 @@ async function execute(run: Run): Promise<void> {
     denyAllPending()
     for (const taskId of [...run.openTasks.keys()]) {
       await endRunTask(run, taskId, 'stopped', '').catch((err: unknown) =>
-        console.error('[agent] Could not stop a task:', err)
+        console.error(`${stamp()} [agent] Could not stop a task:`, err)
       )
     }
     // A resumed session that Claude Code could not find: start fresh next time.
@@ -1041,7 +1052,10 @@ export async function applyChoiceToRun(next: ModelChoice): Promise<void> {
       })
     }
   } catch (err) {
-    console.error('[agent] Could not apply the model choice to the run:', errorMessage(err))
+    console.error(
+      `${stamp()} [agent] Could not apply the model choice to the run:`,
+      errorMessage(err)
+    )
   }
 }
 
@@ -1076,7 +1090,7 @@ export async function loadChatHistory(cwd: string): Promise<ChatHistory> {
     })
     return { items, truncated: messages.length > HISTORY_LIMIT, unavailable: false }
   } catch (err) {
-    console.error('[agent] Could not load the conversation history:', errorMessage(err))
+    console.error(`${stamp()} [agent] Could not load the conversation history:`, errorMessage(err))
     return { ...empty, unavailable: true }
   }
 }
