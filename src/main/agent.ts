@@ -55,12 +55,12 @@ import {
   taskRequestOpened
 } from './tasks'
 
-// Reading never asks. Editing, writing, and shell commands wait for the user's
+// Reading never asks. Editing, writing, shell commands, and web access wait for the user's
 // Approve or Deny through canUseTool. `tools` limits which built-ins exist at all.
 // Agent lets Claude bring in my agents. It is not in allowedTools, and the agent
 // gate below decides which ones may run.
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob']
-const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'Agent']
+const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch', 'Agent']
 
 const NOT_FOUND_NOTICE =
   'The saved conversation was not found. This reply starts from a fresh context.'
