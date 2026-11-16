@@ -28,6 +28,7 @@ import {
   sendMessage,
   stopRun
 } from './agent'
+import { readPastedImages } from './pastedImages'
 import {
   getPartyPanel,
   getPopups,
@@ -81,10 +82,22 @@ export function registerIpc(): void {
 
   // `call` is { scope, filePath } of an agent from the list; agent.ts checks it again.
   // `messageId` is the window's UUID for this message; agent.ts checks its shape.
+  // `images` are pasted images as { bytes }; they are checked here. A message needs text
+  // that is not blank or at least one image.
   ipcMain.handle(
     IpcChannel.AgentSend,
-    async (event, prompt: unknown, call: unknown, messageId: unknown): Promise<AgentSendResult> => {
-      if (typeof prompt !== 'string' || prompt.trim() === '') {
+    async (
+      event,
+      prompt: unknown,
+      call: unknown,
+      messageId: unknown,
+      images: unknown
+    ): Promise<AgentSendResult> => {
+      const pasted = readPastedImages(images)
+      if (!pasted.ok) {
+        return { ok: false, error: { code: 'invalid_image', message: pasted.message } }
+      }
+      if (typeof prompt !== 'string' || (prompt.trim() === '' && pasted.images.length === 0)) {
         return {
           ok: false,
           error: { code: 'invalid_prompt', message: 'The prompt must be non-empty text.' }
@@ -94,7 +107,7 @@ export function registerIpc(): void {
       if (!project) {
         return { ok: false, error: { code: 'no_project', message: 'No project is open.' } }
       }
-      return sendMessage(prompt, call, messageId, project.path, event.sender)
+      return sendMessage(prompt, call, messageId, project.path, event.sender, pasted.images)
     }
   )
 

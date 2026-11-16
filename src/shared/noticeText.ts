@@ -11,6 +11,9 @@ export function errorText(error: AgentError): string {
       return "You've reached your Claude plan's usage limit, or Claude is busy. Try again later."
     case 'overloaded':
       return 'Claude is busy or rate limited. Try again in a moment.'
+    // The exact image error, as the design words it.
+    case 'invalid_image':
+      return error.message
     default:
       return `The request failed: ${error.message}`
   }

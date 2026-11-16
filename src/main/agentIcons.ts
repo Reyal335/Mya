@@ -11,7 +11,8 @@ import { PendingFiles } from './pendingFiles'
 // Icons live in userData, never in the agent files: icon images in agent-icons/
 // and the map from agent file path to icon filename in agent-icons.json.
 
-const ICON_SIZE = 16
+const ICON_MIN = 16
+const ICON_MAX = 32
 const NOT_PNG = 'Icon must be a PNG file.'
 const ICON_FILE = /^[0-9a-f]{32}\.png$/
 
@@ -54,18 +55,19 @@ export async function loadIcons(): Promise<(agentPath: string) => Promise<string
 // Picked icons wait here until the agent is saved. There is one form, so one pick at a time.
 const pendingIcons = new PendingFiles<Buffer>(1)
 
-// Returns the message to show, or null if the header is a 16x16 PNG.
+// Returns the message to show, or null if the header is a square PNG from
+// 16x16 to 32x32.
 function iconProblem(header: Buffer): string | null {
   const size = pngSize(header)
   if (!size) return NOT_PNG
   const { width, height } = size
-  if (width === ICON_SIZE && height === ICON_SIZE) return null
-  return `Icon must be exactly 16x16. This one is ${width}x${height}.`
+  if (width === height && width >= ICON_MIN && width <= ICON_MAX) return null
+  return `Icon must be a square PNG from ${ICON_MIN}x${ICON_MIN} to ${ICON_MAX}x${ICON_MAX}. This one is ${width}x${height}.`
 }
 
 export async function pickIcon(window: BrowserWindow | null): Promise<PickIconResult> {
   const options: Electron.OpenDialogOptions = {
-    title: 'Choose a 16x16 PNG icon',
+    title: 'Choose a 16x16 to 32x32 PNG icon',
     properties: ['openFile'],
     filters: [{ name: 'PNG image', extensions: ['png'] }]
   }

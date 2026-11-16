@@ -15,8 +15,8 @@ const api: MyaApi = {
     open: () => ipcRenderer.invoke(IpcChannel.ProjectOpen)
   },
   agent: {
-    send: (prompt, call, messageId) =>
-      ipcRenderer.invoke(IpcChannel.AgentSend, prompt, call ?? null, messageId),
+    send: (prompt, call, messageId, images) =>
+      ipcRenderer.invoke(IpcChannel.AgentSend, prompt, call ?? null, messageId, images ?? []),
     stop: () => ipcRenderer.invoke(IpcChannel.AgentStop),
     answerPermission: (permissionId, decision) =>
       ipcRenderer.invoke(IpcChannel.AgentPermission, permissionId, decision),

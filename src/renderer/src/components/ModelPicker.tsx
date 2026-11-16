@@ -71,7 +71,8 @@ function Bars({
 }
 
 // The model and thinking picker from designs/10-model-picker.html: a control at the
-// left of the input row, and a dialog above the row. Picking applies at once.
+// left of the input box's toolbar, and a dialog above the box, placed against it (its
+// parent must be positioned). Picking applies at once.
 function ModelPicker({
   lists,
   listFailed,
@@ -134,6 +135,11 @@ function ModelPicker({
       close(true)
       return
     }
+    // The picker sits inside the input box's form: Enter on its checkbox must not submit it.
+    if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+      event.preventDefault()
+      return
+    }
     // Arrow keys move through the model rows (up and down) and the level buttons
     // (left and right). Tab moves through everything too.
     const target = event.target as HTMLElement
@@ -165,6 +171,10 @@ function ModelPicker({
         className={`model-picker__control${open ? ' model-picker__control--open' : ''}`}
         aria-expanded={open}
         aria-haspopup="dialog"
+        // The name stays whole when a narrow input hides the text.
+        aria-label={`Model: ${label.model} · THINK ${label.level}`}
+        // The full text, for when the label is cut short or hidden.
+        title={`${label.model} · THINK ${label.level}`}
         onClick={() => (open ? close(false) : openPicker())}
         onKeyDown={(event) => {
           if (open && event.key === 'Escape') {
@@ -174,11 +184,12 @@ function ModelPicker({
         }}
       >
         <Meter effort={choice.effort} size="small" />
-        <span>{label.model}</span>
-        <span className="model-picker__dot">·</span>
-        <span className="model-picker__dot">THINK {label.level}</span>
+        <span className="model-picker__label">
+          {label.model} <span className="model-picker__dot">· THINK {label.level}</span>
+        </span>
+        {/* The dialog opens upward, so the caret points up while it is closed. */}
         <span className="model-picker__caret" aria-hidden="true">
-          v
+          {open ? 'v' : '^'}
         </span>
       </button>
 

@@ -1,6 +1,6 @@
 import type { HistoryItem, TaskAgent, TaskStatus, ToolState } from '../shared/ipc'
-import { parseCall } from '../shared/callAgent'
-import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
+import { parseCall } from '../shared/callAgent.ts'
+import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput.ts'
 
 // Turns the main conversation's saved messages (from the SDK's getSessionMessages)
 // into the items the conversation shows. Pure: no file access. Anything that is
@@ -63,13 +63,14 @@ function str(value: unknown): string {
 export function historyItems(messages: RecordedMessage[], context: HistoryContext): HistoryItem[] {
   const items: HistoryItem[] = []
 
-  const addUserText = (text: string): void => {
-    if (text.trim() === '' || INJECTED.test(text)) return
+  // A message with no text but images is still my message: it shows its images.
+  const addUserText = (text: string, imageCount: number): void => {
+    if ((text.trim() === '' && imageCount === 0) || INJECTED.test(text)) return
     const call = parseCall(text)
     items.push(
       call
-        ? { kind: 'user', text: call.text, call: context.agentFor(call.agentName) }
-        : { kind: 'user', text, call: null }
+        ? { kind: 'user', text: call.text, call: context.agentFor(call.agentName), imageCount }
+        : { kind: 'user', text, call: null, imageCount }
     )
   }
 
@@ -107,14 +108,23 @@ export function historyItems(messages: RecordedMessage[], context: HistoryContex
 
     if (recorded.type === 'user') {
       if (typeof blocks === 'string') {
-        addUserText(blocks)
+        addUserText(blocks, 0)
         continue
       }
       const text = blocks
         .filter((block) => block.type === 'text')
         .map((block) => str(block.text))
         .join('\n')
-      addUserText(text)
+      // Images I pasted are top-level blocks. A message that carries tool results is the
+      // tools' answer, so its images are not mine, and a block with no source is not counted.
+      const toolAnswer = blocks.some((block) => block.type === 'tool_result')
+      const imageCount = toolAnswer
+        ? 0
+        : blocks.filter(
+            (block) =>
+              block.type === 'image' && typeof block.source === 'object' && block.source !== null
+          ).length
+      addUserText(text, imageCount)
       for (const block of blocks) if (block.type === 'tool_result') settle(block)
       continue
     }

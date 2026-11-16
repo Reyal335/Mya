@@ -18,6 +18,10 @@ export type { ToolState }
 
 export type ConversationStatus = 'idle' | 'running' | 'waiting' | 'done' | 'error'
 
+// An image I pasted, on its way out: the bytes main gets, and the blob: URL the composer
+// made to show it. The composer makes and revokes the URL; this hook only passes it on.
+export type OutgoingImage = { bytes: Uint8Array; url: string }
+
 export type PermissionRequest = {
   permissionId: string
   input: ToolInput
@@ -30,6 +34,8 @@ export type ConversationItem =
   // `call` is the agent I called for this message, shown as a chip. `messageId` is
   // the id main reports its delivery under (null for loaded history). `delivery` is
   // queued only for a message sent while a run was going, until Claude takes it in.
+  // `images` are the blob: URLs of the images sent with it, only while the app is open.
+  // `imageCount` is how many it had, also for a message loaded from history.
   | {
       kind: 'user'
       id: number
@@ -37,6 +43,8 @@ export type ConversationItem =
       call: TaskAgent | null
       messageId: string | null
       delivery: MessageDelivery
+      images: string[]
+      imageCount: number
     }
   // `instant` text came from loaded history and never types out. `meta` is what the
   // reply was made with, for its tag: null when not known.
@@ -93,7 +101,14 @@ type State = {
 
 type Action =
   // `queued`: the message is sent while a run is going, so it waits for Claude.
-  | { type: 'start'; prompt: string; call: TaskAgent | null; messageId: string; queued: boolean }
+  | {
+      type: 'start'
+      prompt: string
+      call: TaskAgent | null
+      messageId: string
+      queued: boolean
+      images: string[]
+    }
   // The send started a new run, so its message did not queue behind anything.
   | { type: 'began'; messageId: string }
   | { type: 'event'; event: AgentEvent }
@@ -345,7 +360,7 @@ function applyEvent(state: State, event: AgentEvent): State {
 function fromHistory(item: HistoryItem): DistributiveOmit<ConversationItem, 'id'> {
   switch (item.kind) {
     case 'user':
-      return { ...item, messageId: null, delivery: 'received' }
+      return { ...item, messageId: null, delivery: 'received', images: [] }
     case 'text':
       return {
         kind: 'text',
@@ -377,7 +392,9 @@ function reducer(state: State, action: Action): State {
           text: action.prompt,
           call: action.call,
           messageId: action.messageId,
-          delivery: action.queued ? 'queued' : 'received'
+          delivery: action.queued ? 'queued' : 'received',
+          images: action.images,
+          imageCount: action.images.length
         }),
         status: 'running'
       }
@@ -441,7 +458,7 @@ export type Conversation = {
   // True while a run is in progress, waiting for approval or not.
   running: boolean
   historyNote: 'truncated' | 'unavailable' | null
-  send: (prompt: string, call?: CallTarget | null) => void
+  send: (prompt: string, call?: CallTarget | null, images?: OutgoingImage[]) => void
   stop: () => void
   answerPermission: (permissionId: string, decision: PermissionDecision) => void
   // Loads the project's saved conversation once, if nothing is in memory.
@@ -466,6 +483,38 @@ export function useConversation(): Conversation {
   const sendsOut = useRef(0)
   const early = useRef<AgentEvent[]>([])
   const historyRequested = useRef<string | null>(null)
+
+  // The blob URLs of images sent with my messages work for as long as an item shows
+  // them. The reducer is pure, so it cannot revoke anything: this effect keeps the set
+  // of URLs the items held last time, and revokes the ones that are gone from
+  // `state.items` (NEW CHAT, a project switch, any reset). A URL still in the items is
+  // never revoked, so running it twice (Strict Mode) is harmless. Sending revokes
+  // nothing: the history keeps showing them.
+  const liveUrls = useRef(new Set<string>())
+  useEffect(() => {
+    const held = new Set<string>()
+    for (const item of state.items) {
+      if (item.kind === 'user') for (const url of item.images) held.add(url)
+    }
+    for (const url of liveUrls.current) if (!held.has(url)) URL.revokeObjectURL(url)
+    liveUrls.current = held
+  }, [state.items])
+
+  // When the hook goes away, the rest are revoked. Strict Mode runs this cleanup and the
+  // effect again straight away on mount, with the items still there: the microtask lets
+  // that pass, and only a real unmount, where `mounted` stays false, revokes.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      queueMicrotask(() => {
+        if (mounted.current) return
+        for (const url of liveUrls.current) URL.revokeObjectURL(url)
+        liveUrls.current = new Set()
+      })
+    }
+  }, [])
 
   const apply = useCallback((event: AgentEvent): void => {
     if (event.requestId !== liveRun.current) return
@@ -493,15 +542,22 @@ export function useConversation(): Conversation {
   )
 
   const send = useCallback(
-    (prompt: string, call?: CallTarget | null): void => {
-      if (prompt.trim() === '') return
+    (prompt: string, call?: CallTarget | null, images?: OutgoingImage[]): void => {
+      if (prompt.trim() === '' && !(images && images.length > 0)) return
 
       // A message sent while a run is going goes into that run. Main decides: if
       // the run has just ended, the answer says the message started a new one.
       const messageId = crypto.randomUUID()
       const queued = liveRun.current !== null || sendsOut.current > 0
       sendsOut.current++
-      dispatch({ type: 'start', prompt, call: call?.agent ?? null, messageId, queued })
+      dispatch({
+        type: 'start',
+        prompt,
+        call: call?.agent ?? null,
+        messageId,
+        queued,
+        images: images?.map((image) => image.url) ?? []
+      })
 
       const finish = (): void => {
         sendsOut.current--
@@ -514,7 +570,12 @@ export function useConversation(): Conversation {
       }
 
       window.mya.agent
-        .send(prompt, call?.ref ?? null, messageId)
+        .send(
+          prompt,
+          call?.ref ?? null,
+          messageId,
+          images?.map((image) => ({ bytes: image.bytes }))
+        )
         .then((result) => {
           if (!result.ok) {
             finish()

@@ -2,6 +2,7 @@
 // Our own small types only: never raw Agent SDK messages.
 
 import type { AccountData } from './account'
+import type { PastedImage } from './images'
 import type { MascotStateName, MascotVoice } from './mascotRules'
 import type { ModelChoice, ModelLists } from './models'
 import type { ThemeChoice, ThemeInfo } from './themes'
@@ -90,6 +91,7 @@ export type AgentErrorCode =
   | 'no_project'
   | 'busy'
   | 'invalid_prompt'
+  | 'invalid_image'
   | 'not_signed_in'
   | 'api_key_in_use'
   | 'rate_limit'
@@ -237,7 +239,8 @@ export type TasksResult<T extends object = object> =
 // The main conversation as loaded from its session: the same item kinds the
 // conversation builds from events, without ids.
 export type HistoryItem =
-  | { kind: 'user'; text: string; call: TaskAgent | null }
+  // `imageCount` is how many images the message had. The images themselves are not sent.
+  | { kind: 'user'; text: string; call: TaskAgent | null; imageCount: number }
   // `model` is the exact model that answered, from the saved session, or null.
   | { kind: 'text'; text: string; model: string | null }
   | {
@@ -533,8 +536,14 @@ export type MyaApi = {
     // `call` names an agent for this message. Main checks it and adds the sentence.
     // `messageId` is a lowercase UUID the window makes up: main sends it to Claude
     // Code as the message's id and reports its delivery under it. While a run is
-    // going the message goes into that run; otherwise it starts one.
-    send: (prompt: string, call: AgentCallRef | null, messageId: string) => Promise<AgentSendResult>
+    // going the message goes into that run; otherwise it starts one. `images` are pasted
+    // images, bytes only: main reads each one's type from its bytes and checks it again.
+    send: (
+      prompt: string,
+      call: AgentCallRef | null,
+      messageId: string,
+      images?: PastedImage[]
+    ) => Promise<AgentSendResult>
     stop: () => Promise<void>
     answerPermission: (
       permissionId: string,

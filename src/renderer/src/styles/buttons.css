@@ -25,6 +25,19 @@
   border-color: var(--line);
 }
 
+/* Hover. No gradients: a crisp border highlight reads as "hover" in this flat style.
+   The :where() keeps these as weak as a plain class, and they sit before the danger
+   variant, so DANGER keeps its red border and no shadow, and a component's own rule
+   (like the popup's buttons, which have no shadow) still wins. */
+.button:where(:hover:not(:disabled)) {
+  border-color: var(--text);
+}
+
+.button--primary:where(:hover:not(:disabled)) {
+  border-color: var(--accent);
+  box-shadow: 4px 4px 0 var(--accent);
+}
+
 /* Destructive action, like DELETE in the agent form mockup: no shadow. */
 .button--danger {
   background: var(--bg);
