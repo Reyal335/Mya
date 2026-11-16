@@ -4,12 +4,12 @@ import './AgentChip.css'
 
 type AgentChipProps = {
   agent: Pick<TaskAgent, 'name' | 'icon'>
-  // Shown in the input row with a remove button; in the history without one.
+  // Shown in the input box's toolbar with a remove button; in the history without one.
   onRemove?: () => void
 }
 
 // The agent I called for a message: its icon and name, as in
-// designs/8-chat-party.html (on my message) and 8b (in the input row).
+// designs/8-chat-party.html (on my message) and 8b (in the input box).
 function AgentChip({ agent, onRemove }: AgentChipProps): React.JSX.Element {
   if (!onRemove) {
     return (
@@ -20,7 +20,13 @@ function AgentChip({ agent, onRemove }: AgentChipProps): React.JSX.Element {
     )
   }
   return (
-    <div className="agent-chip agent-chip--input">
+    // The name can be hidden in a narrow input box, so the group carries it whole.
+    <div
+      className="agent-chip agent-chip--input"
+      role="group"
+      aria-label={`Agent: ${agent.name}`}
+      title={agent.name}
+    >
       <AgentIcon src={agent.icon} size={16} label="" />
       <span className="agent-chip__name">{agent.name}</span>
       <button
@@ -29,7 +35,7 @@ function AgentChip({ agent, onRemove }: AgentChipProps): React.JSX.Element {
         aria-label={`Stop calling ${agent.name}`}
         onClick={onRemove}
       >
-        X
+        <span aria-hidden="true">X</span>
       </button>
     </div>
   )

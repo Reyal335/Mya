@@ -1,7 +1,8 @@
 /* The CHAT screen from designs/8-chat-party.html. Under the header, two columns:
-   the frame (history over the stage) with the input row under it, and the party
+   the frame (history over the stage) with the input box under it, and the party
    panel. The history takes the free space and scrolls; it gives up space first,
-   so the stage and input stay fully visible at the minimum window size. */
+   then the text in the input box, so the stage and the box's buttons stay fully
+   visible and the page never scrolls because of the input. */
 .conversation {
   display: flex;
   flex-direction: column;
@@ -119,13 +120,14 @@
   gap: 16px;
 }
 
-/* No min-height: 0 here. The history has a flex basis of 0 and a minimum, so the
-   frame's automatic minimum is that minimum plus the stage. A tall input row
-   cannot squeeze the history out of the frame. */
+/* The frame takes whatever the input box leaves. No min-height: 0 here: the history
+   has none, so the frame's automatic minimum is the stage plus the frame's padding
+   and border. The history gives up its height first, and a tall input box cannot
+   squeeze the stage out of the frame. */
 .conversation__frame {
   /* The chat theme fills the frame. The history and the stage sit above it. */
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -135,15 +137,22 @@
 }
 
 /* History */
+/* It may shrink to nothing and scrolls, so it is the first thing to give way when the
+   window is short or the input box has grown. */
 .conversation__history {
   position: relative;
   flex: 1 1 0;
-  min-height: 96px;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+  /* The same thin scrollbar as the other scrolling panels, not the default white one.
+     My bubbles sit against the right edge, so they get a little room from it. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--bg);
+  padding-right: 4px;
 }
 
 .conversation__mine,
@@ -200,6 +209,55 @@
 
 .conversation__reply > * {
   min-width: 0;
+}
+
+/* A pasted code block in my message: the reply's code box, kept inside the bubble. Its
+   lines do not wrap; the box scrolls sideways, so the bubble never grows past its max
+   width. A message with code in it may use the whole row, and a long block scrolls
+   inside itself instead of making the bubble tall. */
+.conversation__code {
+  align-self: stretch;
+  min-width: 0;
+}
+
+.conversation__mine:has(.conversation__code) {
+  max-width: 100%;
+}
+
+/* The bubble is filled with the line color, so the box's own line border would vanish
+   into it: the muted color shows its edge. */
+.conversation__mine .md .md__code {
+  border-color: var(--muted);
+}
+
+.conversation__mine .md .md__pre {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Pictures I pasted, above the text of my message: at most 160x120, scaled to fit, not
+   clickable. The border is muted for the same reason as the code box's. */
+.conversation__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conversation__image {
+  display: block;
+  max-width: 160px;
+  max-height: 120px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--muted);
+  border-radius: 0;
+  object-fit: contain;
+}
+
+/* A saved conversation keeps how many pictures a message had, not the pictures. Text
+   color, like QUEUED: muted is too faint on the bubble. */
+.conversation__attached {
+  font-size: 12px;
+  color: var(--text);
 }
 
 /* The model and level that answered, above the reply text. */
@@ -312,42 +370,4 @@
 
 .stage__tag--asking {
   background: var(--waiting);
-}
-
-/* Input row. The textarea grows with its text up to a cap, then scrolls. The
-   buttons and the agent chip stay at the bottom, at their own height. */
-.conversation__input-row {
-  /* The model picker's dialog opens above the row, anchored to it. */
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  margin: 0;
-}
-
-.conversation__input-row > .button {
-  min-height: 48px;
-}
-
-.conversation__input {
-  flex: 1 1 auto;
-  min-width: 0;
-  field-sizing: content;
-  min-height: 48px;
-  max-height: min(40vh, 12lh);
-  overflow-y: auto;
-  padding: 12px 14px;
-  resize: none;
-  background: var(--bg);
-  color: var(--text);
-  border: var(--border) solid var(--line);
-  border-radius: 0;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.conversation__input:disabled {
-  color: var(--muted);
 }

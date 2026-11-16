@@ -252,15 +252,15 @@ ACCOUNT (see Account and usage).
   for your next message". The panel is open at 1200px and wider and a rail below
   that, until the collapse button is pressed; that choice is kept in
   settings.json.
-- With an agent called, the input row shows its chip (icon, name, and a remove
-  button) and the placeholder "Message for <agent>...". Otherwise the
+- With an agent called, the composer's toolbar shows its chip (icon, name, and a
+  remove button) and the placeholder "Message for <agent>...". Otherwise the
   placeholder is "Message <name>...", where <name> is the speaker name below.
-- The message box grows with its text, from 48px up to 12 lines or 40% of the
-  window height, then scrolls. SEND, STOP, and the chip stay at the bottom of
-  the row. The history keeps at least 96px, so the stage stays visible.
-- The input stays enabled during a run. SEND stays, and STOP is its own button
-  beside it, shown only while a run is going. With nobody called, the
-  placeholder during a run is "Message <name> or call an agent...".
+- The message box is the composer (see Composer). It grows one line at a time up to
+  10 lines, then scrolls. SEND and STOP sit at the right end of its toolbar. The
+  history gives up height first, so the stage stays visible (see Composer).
+- The input stays enabled during a run. SEND stays, and STOP is its own text button
+  beside it, shown only while a run is going. With nobody called, the placeholder
+  during a run is "Message <name> or call an agent...".
 
 ### The speaker name
 
@@ -331,7 +331,7 @@ inbox are not changed.
 
 ## Model and thinking
 
-See `10-model-picker.html`. A control at the left of the CHAT input row picks
+See `10-model-picker.html`. A control at the left of the Composer's toolbar picks
 the model and the thinking level for the main conversation, each one AUTO or a
 choice. The mockup's backdrop picture and its nav label are not part of the
 build.
@@ -396,9 +396,11 @@ the choice.
 ### The control and the picker
 
 - The control reads "<MODEL> · THINK <LEVEL>" in the pixel font, with the
-  4-block meter before it and a caret after, at the left of the input row,
-  before the agent chip. It has `aria-expanded` and `aria-haspopup="dialog"`.
-- It opens the picker above the input row. Escape, DONE, and a click outside
+  4-block meter before it and a caret after, at the left of the composer's
+  toolbar, before the agent chip. It has `aria-expanded` and `aria-haspopup="dialog"`.
+- Below 520px of composer width, or with an agent called, a run going, and the composer
+  at 760px or narrower, it shows only the meter and caret (see Composer).
+- It opens the picker above the composer. Escape, DONE, and a click outside
   close it. Focus moves onto the selected model when it opens, and back to the
   control after Escape or DONE. Arrow keys move through the models (up and
   down) and the levels (left and right); Tab moves through everything.
@@ -556,6 +558,270 @@ A modal dialog over CHAT.
 - Focus moves into the dialog on open, stays inside while it is open, and returns to
   the THEME button on close. At the minimum window size (960x600) the whole dialog fits,
   and the grid scrolls if needed.
+
+## Composer
+
+The CHAT input is one bordered box, called the composer. It holds the text I type,
+the paste chips (text and images), and a toolbar with the model control, the agent chip, and the
+SEND and STOP buttons. Nothing else in CHAT sits beside it on the same row.
+
+### Structure
+
+- `.composer` is the box. It has the border, the fill, and the shadow.
+- `.composer-attachments` holds the paste chips. It is there only when there are chips.
+- A visually hidden `<label>` and the `<textarea>`.
+- `.composer-toolbar`, in DOM order: ModelPicker, AgentChip (only while an agent is
+  called), `.spacer`, STOP, SEND. The meta and the hint sit inside `.spacer`.
+
+### Layout
+
+- `.composer` is a flex column with the `bg` fill, a 3px `line` border, and the
+  `4px 4px 0` hard shadow in `shadow` that the other panels use. Corners are square.
+  It sets `container-type: inline-size`.
+- `.composer:focus-within` turns the border `accent`.
+- A click on the empty part of the box (padding, toolbar gaps) puts the cursor in the
+  textarea.
+- The textarea has no outline of its own.
+- The box never sets `overflow`, so the picker popover can open above it. Only the
+  textarea scrolls.
+- Textarea: full width, no border, transparent background, `resize: none`. IBM Plex
+  Mono 14px with a 22px line height, padding `14px 16px 6px`. It is at least 44px
+  tall (one line) and at most 240px (10 lines). Past that it scrolls inside, with its
+  scrollbar styled like the other scrolling panels.
+- `overflow-wrap: anywhere` and `white-space: pre-wrap` let long paths and log lines
+  wrap, so they never widen the box.
+- It grows with its text through `field-sizing: content`. Electron's Chrome is 152,
+  which supports it.
+- `.composer-toolbar`: flex, centered, 8px gap, padding `6px 8px 8px`. Its height never
+  changes. `.spacer` is `flex: 1` with `min-width: 0`. It holds the meta and the hint,
+  and each of them shows only when it fits whole.
+- ModelPicker and AgentChip keep their behavior from steps 10 and 7. They are restyled
+  as toolbar chips: 36px tall, 2px border, `panel` fill, Press Start 2P 12px. A label
+  that does not fit is cut with an ellipsis. It never wraps.
+- The ModelPicker's caret is `^` when the picker is closed (it opens upward) and `v`
+  when it is open. Its `title` holds its full text.
+- The AgentChip's `title` holds the agent's name.
+- STOP and SEND: 36px tall, padding `0 14px`, Press Start 2P 13px, `flex: none`.
+  - SEND with text: `accent` fill, dark text (`bg`), `3px 3px 0` hard shadow in `shadow`.
+  - SEND with nothing to send: transparent, `muted` text, `line` border, disabled.
+  - STOP: transparent, `error` text and border. It is a text button reading "STOP".
+    During a run it sits left of SEND, and both show side by side.
+- meta: when the message has more than 3 lines, "<n> LINES" in Press Start 2P 11px,
+  `muted`. Lines are split by newline in the text, not by wrapping. It needs room for
+  its digits, so a very long count may not show.
+- hint: "⏎ send · ⇧⏎ newline" in IBM Plex Mono 11px, `muted` (see Sizes that differ
+  from the shape rules). It shows only when the message has 3 lines or fewer, the
+  composer is a box of 520px or more (see Narrow), and there are 136px free in
+  `.spacer`. It is hidden from screen readers.
+- The picker popover opens above the composer. Its height limit follows the composer's
+  height, so it is fully visible at 1 line and at 10 lines.
+- Chat column: the frame (history and stage) takes the leftover height. It is never
+  shorter than the stage needs: the mascot, the dialogue box, and the frame's padding
+  and border. The history gives up height first, and may shrink to nothing (it scrolls).
+  The composer gives up last, through its textarea, which scrolls sooner on a short
+  window. The page never scrolls, and SEND is never pushed out of view. At 960x600 the
+  textarea shows about 6 lines. 10 lines need a window about 680px tall or more.
+
+### Narrow
+
+"Narrow" means the composer is narrower than 520px, measured as its outer width,
+including its two 3px borders. The container query on `.composer` reads the content
+box, which is 6px less, so the switch happens at 514px of content.
+
+When the composer is narrow (a container query on `.composer`):
+
+- ModelPicker shows only its thinking meter and caret.
+- AgentChip shows only its avatar and its remove button. The remove button stays, so
+  an agent can still be uncalled from the composer.
+- The hint is hidden.
+
+ModelPicker also shows only its meter and caret when an agent is called, a run is going,
+and the composer is 760px or narrower.
+
+Both chips keep their full names in `aria-label` at every width:
+
+- The model control reads "Model: <model name> · THINK <level>". Its visible text is
+  part of that name, so a voice-control user can say what they see.
+- The agent chip is a group that reads "Agent: <name>". Its remove button keeps
+  "Stop calling <name>".
+
+Example: with the party panel open at the minimum window (960x600), the composer is
+436px wide, so it is narrow. With the panel collapsed to the rail, it is 616px, so it
+is wide.
+
+### Keyboard and focus
+
+- Enter sends. Shift+Enter adds a new line. Enter during IME composition does nothing.
+- Enter on the picker's checkbox does nothing. It never sends the draft.
+- Tab order follows the DOM: the paste chips' remove buttons come first, since the
+  chips sit above the textarea. Then the textarea, model picker, the agent chip's remove
+  button (only while an agent is called), STOP (while running), then SEND. No positive
+  `tabindex` anywhere.
+- Every toolbar button has a focus-visible outline: 2px, `text` color, 2px offset.
+- After send and after NEW CHAT, focus goes to the textarea, and the textarea is one
+  line tall again.
+- When the model picker closes with Escape or DONE, focus goes back to the picker's
+  control, not to the textarea.
+- Removing the agent chip puts focus in the textarea.
+
+### Screen readers
+
+- The textarea is described by a hidden sentence: "Enter sends. Shift plus Enter adds
+  a line." The visual hint is hidden from screen readers.
+- The paste chips are in a list labelled "Pasted attachments".
+- Each chip's visual text is hidden from screen readers. Its remove button is described
+  by a hidden sentence, for example "Pasted text, 30 lines, 200 B" or "Pasted image,
+  64x48, 6.3 KB".
+- The X glyphs on the chips and on the agent chip are hidden from screen readers. Their
+  buttons keep "Remove pasted text", "Remove pasted image", and "Stop calling <name>".
+- A polite status line announces: "Pasted text added, <n> lines", "Pasted text
+  removed", "Pasted image added, <w>x<h>", "<n> pasted images added" (several in one
+  paste), and "Pasted image removed".
+
+### Large paste
+
+- A paste of more than 20 lines or more than 2,000 characters does not go into the
+  textarea. It becomes a chip in `.composer-attachments`: padding `10px 10px 0`, chips
+  in a wrapping row with an 8px gap.
+- Each chip has a file icon, "PASTED" in Press Start 2P 11px, then "<n> lines · <size>"
+  in `muted`, then a remove button with aria-label "Remove pasted text". A single line
+  reads "1 line". Example: "PASTED 45 lines · 1.4 KB".
+- Size is shown as B, KB with one decimal, or MB (for example "812 B" or "1.4 KB").
+  It is the UTF-8 byte size.
+- Lines are counted by newline. CRLF counts as one newline, and one trailing newline
+  is ignored.
+- Ctrl+Shift+V (Cmd+Shift+V on macOS) pastes into the textarea as usual, whatever the
+  size. It counts only if the V key went down within the last second. The V key is
+  matched by its physical key, so other keyboard layouts work. Blur clears that.
+- Several pastes make several chips, in paste order.
+- SEND is enabled when the textarea has text, or there is at least one text chip or
+  image chip (see Pasted images).
+- On send, the message is the typed text. Then, for each chip, a blank line and the
+  pasted text in a fenced code block. The fence is longer than any run of backticks
+  in the pasted text, and at least three backticks. Chips are cleared after send. The
+  history draws the fenced blocks as code boxes (see Markdown). If the typed text ends
+  inside an unclosed code fence, the message closes it before the first pasted block,
+  so a pasted block is never swallowed by it.
+
+````
+Why does this fail?
+
+```
+Error: port 5173 is in use
+```
+````
+
+- Chips are not saved if the app closes before send.
+- The composer resets when the project changes, so a draft and its chips never cross
+  projects.
+
+### Pasted images
+
+- When the clipboard holds an image and no plain text, the image becomes a chip in
+  `.composer-attachments`, in paste order with the text chips. An image can come from
+  a screenshot, "Copy image" in a browser, or an image file copied in the file manager.
+- If the clipboard holds any non-empty plain text, even only whitespace, the text wins
+  and the image is ignored. For example, a copy from a spreadsheet or a document carries
+  a picture of the cells, and that picture is not attached.
+- Only files the clipboard claims as images are tried. Then the file signature is
+  checked.
+- Ctrl+Shift+V (Cmd+Shift+V on macOS) never attaches images.
+- Dragging and dropping files is not supported.
+
+Chip:
+
+- An image chip is the same size and style as a text chip (see Large paste), with:
+  - a 24x24 thumbnail of the image, including its 2px `line` border, on a `bg` fill,
+    scaled to fit and centered, smooth scaling, and no rounded corners;
+  - "IMAGE" in Press Start 2P 11px;
+  - "<w>x<h> · <size>" in `muted`, for example "1280x720 · 312.4 KB". Size is B, KB
+    with one decimal, or MB;
+  - a remove button with aria-label "Remove pasted image".
+- Removing a chip puts focus back in the textarea.
+
+Limits:
+
+- Formats: PNG, JPG, GIF, or WebP. The file signature is checked in main, never the
+  claimed type.
+- 5 MB at most per image, 8000 px at most on each side, 5 images at most per message,
+  and 20 MB in total per message. The total cap exists because five 5 MB images would
+  go over the API's request size.
+- Main checks each image in paste order, using items 1 to 4 for each one. Then it
+  checks the count (5) and the total (6). The first failure is the error:
+  1. Not larger than 5 MB. Error: "Image must be 5 MB or smaller. This one is <size>."
+  2. A real PNG, JPEG, GIF, or WebP whose header can be read. Error: "Image must be a
+     PNG, JPG, GIF, or WebP."
+  3. At most 8000 px on each side. Error: "Image must be 8000 px or smaller on each
+     side. This one is <w>x<h>."
+  4. The browser can decode it. A damaged or truncated image that has a valid header
+     gets the same error as item 2: "Image must be a PNG, JPG, GIF, or WebP."
+  5. At most 5 images. Error: "A message can hold up to 5 images."
+  6. The images together are 20 MB or smaller. Error: "Images in one message must be
+     20 MB or smaller together. These are <size>."
+- The sizes in items 1 and 6 are rounded up to the next 0.1 MB, so the number shown
+  always exceeds the limit shown. Examples: "Image must be 5 MB or smaller. This one is
+  5.1 MB." and "Images in one message must be 20 MB or smaller together. These are
+  20.1 MB." The chips still show the normal size, for example "312.4 KB".
+- A paste with one failing image still adds the other images that pass, up to the
+  limits. The first failure is the one shown.
+- Files are not read once the count is full, so a paste of many files never reads more
+  than it can attach. A file the clipboard says is over 5 MB is refused without being
+  read.
+- The error shows in the error color, with `role="alert"`, right under the chips. In a
+  narrow box it wraps to two lines and is never cut off. While an error shows, the chips
+  area is about 1.5 rows tall, so the page never scrolls. It clears when the next paste
+  is accepted, when a small text paste is accepted, when a chip is removed, or on send.
+- Main checks every image again before anything is sent, so a message is never sent
+  with an image that fails.
+
+Send:
+
+- SEND is enabled when the textarea has text, or there is at least one text chip or
+  image chip. An image on its own is a valid message.
+- On send, the typed text and the pasted-text blocks go as one text part (as in Large
+  paste). The images go with it, in paste order, as image parts.
+- The images are sent to Claude, so they use my Claude plan like any other message.
+- Chips are cleared after send. The app writes nothing to disk. The image lives in
+  memory until it is sent, and is not saved if the app closes before send.
+- Claude Code keeps its own session transcript, which contains the images like any
+  other message. So an image with a secret in it stays in that transcript.
+
+History:
+
+- My message shows its images as thumbnails above its text. Each is at most 160px wide
+  and 120px tall, scaled to fit, with a 2px `muted` border, `image-rendering` smooth, and
+  the alt text "Pasted image". Thumbnails are not clickable. The border is `muted`, not
+  `line`, because the bubble is filled with `line` and a `line` border would vanish.
+- A pasted code block uses the same `muted` border.
+- A bubble with a code box may use the full row width. Its code is at most 220px tall
+  and scrolls inside.
+- The history's scrollbar is thin, with 4px of right padding.
+- The app frees an image's memory when its message leaves the conversation (NEW CHAT
+  or a project change).
+- Thumbnails are kept only while the app is open. A conversation loaded from a saved
+  session shows a line "<n> image attached" or "<n> images attached" in the text color
+  instead, because the app does not read the images back.
+- An image-only message shows no text line.
+- If the message was queued (sent during a run), the QUEUED word shows as it does for
+  any message.
+
+Screen readers:
+
+- A chip's thumbnail is decorative (empty alt). The chip's visual text is hidden from
+  screen readers, and its remove button is described by "Pasted image, <w>x<h>, <size>",
+  for example "Pasted image, 64x48, 6.3 KB". The status announcements are listed under
+  Screen readers in Composer.
+
+### Sizes that differ from the shape rules
+
+The composer is the one place that breaks these rules:
+
+- Its border is 3px, not 4px.
+- Its toolbar controls are 36px tall, not 44px.
+- The remove button on each paste chip and the agent chip's X are 32px, not 44px.
+- The hint is IBM Plex Mono 11px. The type rule sets 12px as the smallest mono text.
+
+This is a deliberate exception for the composer only. The textarea itself is at least 44px.
 
 ## Title bar
 
@@ -761,12 +1027,15 @@ stored text never changes: tasks.json and the saved session keep the source.
   including history loaded from a saved session.
 - INBOX task detail: TASK (what Claude asked the agent), and REPORT when the
   task ended as done.
+- CHAT: fenced code blocks in my own messages (the Composer turns a large paste into one).
 
 ### Where it is not
 
 These stay plain text, character for character:
 
-- My own messages.
+- My own messages, except fenced code blocks (three backticks, the code, three
+  backticks), which are drawn as a code box like the ones in a reply, with a `muted` border and COPY. Everything else in them stays plain text,
+  character for character.
 - Tool card labels and activity lines ("Finding **/*.{test,spec}.*" keeps its
   asterisks).
 - Request details, on CHAT, in INBOX, and in the popup.

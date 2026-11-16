@@ -1,4 +1,4 @@
-/* The called agent: a small chip on my message, a larger one in the input row. */
+/* The called agent: a small chip on my message, a larger one in the input box. */
 .agent-chip {
   align-self: flex-start;
   display: inline-flex;
@@ -11,15 +11,23 @@
   overflow-wrap: anywhere;
 }
 
+/* In the input box's toolbar: a 36px chip like the model picker's. It gives up width
+   before STOP and SEND do, and cuts the name with an ellipsis. */
 .agent-chip--input {
-  flex: none;
-  align-self: flex-end;
-  max-width: 40%;
-  min-height: 48px;
+  flex: 0 1 auto;
+  align-self: auto;
+  min-width: 0;
+  height: 36px;
   padding: 0 0 0 8px;
   background: var(--panel);
-  border: var(--border) solid var(--accent);
-  font-size: 14px;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.agent-chip--input .agent-chip__name {
+  font-weight: normal;
+  line-height: 1.5;
 }
 
 .agent-chip__name {
@@ -33,7 +41,7 @@
 .agent-chip__remove {
   flex: none;
   align-self: stretch;
-  width: 44px;
+  width: 32px;
   margin: 0;
   padding: 0;
   background: var(--panel);
@@ -50,4 +58,23 @@
 .agent-chip__remove:focus-visible {
   background: var(--bg);
   color: var(--accent);
+}
+
+/* The keyboard ring goes round the whole chip, like the model picker's, not round the
+   small button inside it. */
+.agent-chip__remove:focus-visible {
+  outline: none;
+}
+
+.agent-chip--input:has(.agent-chip__remove:focus-visible) {
+  outline: var(--border-thin) solid var(--text);
+  outline-offset: 2px;
+}
+
+/* Narrow input box (under 520px, which is 514px of content inside its 3px borders): the
+   avatar and the remove button only. The group's aria-label still names the agent. */
+@container composer (width < 514px) {
+  .agent-chip--input .agent-chip__name {
+    display: none;
+  }
 }

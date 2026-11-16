@@ -1,11 +1,14 @@
-import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import type { ExtraProps } from 'react-markdown'
 import type { ProjectInfo } from '../../../shared/ipc'
+import { splitFenced } from '../../../shared/composerMessage'
 import { toolLabel, type ToolLabel } from '../../../shared/toolLabel'
 import type {
   CallTarget,
   Conversation,
   ConversationItem,
   ConversationStatus,
+  OutgoingImage,
   ToolItem
 } from '../hooks/useConversation'
 import { useAgents } from '../hooks/useAgents'
@@ -27,11 +30,13 @@ import { partyWork, taskViews, type TaskView } from '../conversation/agentWork'
 import { callTargetOf } from '../conversation/callTarget'
 import AgentChip from '../components/AgentChip'
 import AgentTaskCard from '../components/AgentTaskCard'
+import Composer from '../components/Composer'
 import Dialog from '../components/Dialog'
 import ToolCard from '../components/ToolCard'
 import Mascot from '../components/Mascot'
 import DialogueBox from '../components/DialogueBox'
 import Markdown from '../components/Markdown'
+import { MarkdownCodeBlock } from '../markdown/MarkdownElements'
 import { toPlainText } from '../../../shared/plainText'
 import PartyPanel from '../components/PartyPanel'
 import './ConversationScreen.css'
@@ -65,6 +70,49 @@ function toBlocks(items: ConversationItem[]): Block[] {
     }
   }
   return blocks
+}
+
+type HastNode = NonNullable<ExtraProps['node']>
+
+// The tree react-markdown would hand the code box for a fenced block, so my pasted
+// code is drawn by the very same component as a reply's.
+function codeNode(text: string, language: string | null): HastNode {
+  return {
+    type: 'element',
+    tagName: 'pre',
+    properties: {},
+    children: [
+      {
+        type: 'element',
+        tagName: 'code',
+        properties: language ? { className: [`language-${language}`] } : {},
+        children: [{ type: 'text', value: text }]
+      }
+    ]
+  }
+}
+
+// My own message is plain text. Only a fenced code block, which a big paste turns
+// into, is drawn as the code box replies use: its lines do not wrap, the box scrolls
+// sideways, and it has COPY.
+function UserText({ text }: { text: string }): React.JSX.Element {
+  const segments = useMemo(() => splitFenced(text), [text])
+  if (!segments.some((segment) => segment.kind === 'code')) return <span>{text}</span>
+  return (
+    <>
+      {segments.map((segment, i) =>
+        segment.kind === 'text' ? (
+          <span key={i}>{segment.text}</span>
+        ) : (
+          <div key={i} className="md conversation__code">
+            <MarkdownCodeBlock node={codeNode(segment.text, segment.language)}>
+              <code>{segment.text}</code>
+            </MarkdownCodeBlock>
+          </div>
+        )
+      )}
+    </>
+  )
 }
 
 type HistoryProps = {
@@ -111,11 +159,26 @@ function HistoryList({
         }
         const { item } = block
         switch (item.kind) {
-          case 'user':
+          case 'user': {
+            // A saved conversation does not keep the pictures, only how many there were.
+            const missing = item.imageCount - item.images.length
             return (
               <div key={item.id} className="conversation__mine">
                 {item.call && <AgentChip agent={item.call} />}
-                <span>{item.text}</span>
+                {item.images.length > 0 && (
+                  <div className="conversation__images">
+                    {item.images.map((url) => (
+                      <img key={url} className="conversation__image" src={url} alt="Pasted image" />
+                    ))}
+                  </div>
+                )}
+                {missing > 0 && (
+                  <span className="conversation__attached">
+                    {missing} {missing === 1 ? 'image' : 'images'} attached
+                  </span>
+                )}
+                {/* A message of images alone has no text line. */}
+                {item.text.trim() !== '' && <UserText text={item.text} />}
                 {item.delivery === 'queued' && (
                   <span className="conversation__delivery">QUEUED</span>
                 )}
@@ -124,6 +187,7 @@ function HistoryList({
                 )}
               </div>
             )
+          }
           case 'text': {
             const tag = item.meta ? replyTag(item.meta, lists) : ''
             return (
@@ -201,7 +265,7 @@ const STICK_THRESHOLD = 24
 const MAX_AGENTS = 3
 
 // The CHAT screen from designs/8-chat-party.html: the header, then the history
-// and the stage in one frame with the input row under it, and the party panel on
+// and the stage in one frame with the input box under it, and the party panel on
 // the right.
 function ConversationScreen({
   project,
@@ -223,12 +287,14 @@ function ConversationScreen({
   const chatTheme = useChatTheme(project.path)
   const [themeOpen, setThemeOpen] = useState(false)
   const [typing, setTyping] = useState(false)
-  const [input, setInput] = useState('')
   const [confirmNew, setConfirmNew] = useState(false)
   const [newChatError, setNewChatError] = useState<string | null>(null)
   const historyRef = useRef<HTMLDivElement>(null)
+  // The input box's text, so focus can be moved there from outside it.
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const stickToBottom = useRef(true)
+  // Bumped when the input should take focus once the screen has settled.
+  const [inputFocus, setInputFocus] = useState(0)
 
   // The saved conversation comes back once per project, when nothing is in memory.
   useEffect(() => {
@@ -238,6 +304,14 @@ function ConversationScreen({
   useEffect(() => {
     if (focusRequest > 0) inputRef.current?.focus()
   }, [focusRequest])
+
+  // After NEW CHAT the confirm dialog closes and hands focus back to the header button
+  // that opened it. The input takes it from there, a frame later.
+  useEffect(() => {
+    if (inputFocus === 0) return
+    const frame = requestAnimationFrame(() => inputRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [inputFocus])
 
   const views = useMemo(() => taskViews(items, project.path), [items, project.path])
   const work = useMemo(() => partyWork(views), [views])
@@ -317,20 +391,12 @@ function ConversationScreen({
 
   // Sending works during a run too: main puts the message into the run, and Claude
   // reads it once the agent that is working has finished.
-  function submit(): void {
-    if (input.trim() === '') return
+  function submit(message: string, images: OutgoingImage[]): void {
+    if (message.trim() === '' && images.length === 0) return
     stickToBottom.current = true
-    send(input, call)
-    setInput('')
+    send(message, call, images)
     // One agent per message: the chip clears after I send.
     onCallChange(null)
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault()
-      submit()
-    }
   }
 
   async function startNewChat(): Promise<void> {
@@ -343,6 +409,7 @@ function ConversationScreen({
       modelChoice.reload()
       // And with no theme of its own: it shows the default theme.
       chatTheme.reload()
+      setInputFocus((tick) => tick + 1)
     }
   }
 
@@ -463,48 +530,41 @@ function ConversationScreen({
             </div>
           </div>
 
-          <form
-            className="conversation__input-row"
-            onSubmit={(event) => {
-              event.preventDefault()
-              submit()
-            }}
-          >
-            <ModelPicker
-              lists={modelChoice.lists}
-              listFailed={modelChoice.listFailed}
-              choice={modelChoice.choice}
-              asDefault={modelChoice.asDefault}
-              onAsDefaultChange={modelChoice.setAsDefault}
-              onPick={modelChoice.pick}
-              hasReplies={hasReplies}
-              onOpen={() => {
-                if (modelChoice.listFailed) modelChoice.reload()
-              }}
-            />
-            {call && <AgentChip agent={call.agent} onRemove={() => onCallChange(null)} />}
-            <label htmlFor="conversation-input" className="visually-hidden">
-              {call ? `Message for ${call.agent.name}` : `Message ${speaker}`}
-            </label>
-            <textarea
-              ref={inputRef}
-              id="conversation-input"
-              className="conversation__input"
-              rows={1}
-              placeholder={placeholder}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            {running && (
-              <button type="button" className="button" onClick={stop}>
-                STOP
-              </button>
-            )}
-            <button type="submit" className="button" disabled={input.trim() === ''}>
-              SEND
-            </button>
-          </form>
+          <Composer
+            key={project.path}
+            label={call ? `Message for ${call.agent.name}` : `Message ${speaker}`}
+            placeholder={placeholder}
+            running={running}
+            inputRef={inputRef}
+            picker={
+              <ModelPicker
+                lists={modelChoice.lists}
+                listFailed={modelChoice.listFailed}
+                choice={modelChoice.choice}
+                asDefault={modelChoice.asDefault}
+                onAsDefaultChange={modelChoice.setAsDefault}
+                onPick={modelChoice.pick}
+                hasReplies={hasReplies}
+                onOpen={() => {
+                  if (modelChoice.listFailed) modelChoice.reload()
+                }}
+              />
+            }
+            agent={
+              call && (
+                <AgentChip
+                  agent={call.agent}
+                  onRemove={() => {
+                    onCallChange(null)
+                    // The button that had focus is gone with the chip.
+                    inputRef.current?.focus()
+                  }}
+                />
+              )
+            }
+            onSend={submit}
+            onStop={stop}
+          />
         </div>
 
         <PartyPanel

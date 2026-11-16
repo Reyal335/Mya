@@ -1,0 +1,331 @@
+/* The chat input: one bordered box. The text on top, growing upward; a toolbar under
+   it with the model picker and agent chip on the left and STOP and SEND on the right.
+   Nothing here clips: the model picker's dialog opens above the box from inside it,
+   anchored to it, so the box and its toolbar never get an overflow. Only the text
+   scrolls. */
+.composer {
+  --composer-border: 3px;
+
+  /* The model picker's dialog is positioned against this box. */
+  position: relative;
+  /* Chips and hints in the toolbar react to the box's width, not the window's. */
+  container-type: inline-size;
+  container-name: composer;
+  /* Yields last, and through its text: the box may be shorter than its content, so
+     the text shrinks and scrolls instead of the page. */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  background: var(--bg);
+  border: var(--composer-border) solid var(--line);
+  border-radius: 0;
+  box-shadow: var(--shadow-hard);
+  /* A click on the empty part of the box goes to the text. Buttons keep their own. */
+  cursor: text;
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+/* Pasted text and images: chips above the text, in paste order. Many of them scroll
+   here rather than pushing the text out of the box. With an error line under them
+   there is room for about a row and a half. */
+.composer-attachments {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 82px;
+  margin: 0;
+  padding: 10px 10px 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--bg);
+}
+
+.composer-attachments:has(+ .composer-error) {
+  max-height: 58px;
+}
+
+/* position: relative anchors the chip's visually-hidden sentence (position: absolute)
+   to the chip. Without it the sentence is placed against .composer at its static
+   position, outside the scrolled chip list, and can stretch the page's scroll area. */
+.composer-chip {
+  position: relative;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 0 0 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  cursor: default;
+}
+
+/* A pasted image: 24x24 with its 2px border, scaled to fit and centered, smooth. */
+.composer-chip__thumb {
+  flex: none;
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  object-fit: contain;
+}
+
+.composer-chip__icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.composer-chip__label {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.composer-chip__detail {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.composer-chip__remove {
+  flex: none;
+  align-self: stretch;
+  width: 32px;
+  margin: 0;
+  padding: 0;
+  background: var(--panel);
+  color: var(--text);
+  border: 0;
+  border-left: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.composer-chip__remove:hover {
+  background: var(--bg);
+  color: var(--error);
+}
+
+/* Inside the button: the row of chips scrolls, and a ring outside would be cut off. */
+.composer-chip__remove:focus-visible {
+  background: var(--bg);
+  color: var(--error);
+  outline: var(--border-thin) solid var(--text);
+  outline-offset: -4px;
+}
+
+/* Why the last pasted image was refused. It is one line in a wide box, and wraps in a
+   narrow one; the chips above it give up height for it. */
+.composer-error {
+  flex: none;
+  margin: 0;
+  padding: 10px 12px 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--error);
+  overflow-wrap: anywhere;
+}
+
+.composer-attachments + .composer-error {
+  padding-top: 6px;
+}
+
+/* The text. It takes the height the message needs, from one line up to ten, then
+   scrolls. In a short window the box gives it up first. */
+.composer-input {
+  flex: 1 1 auto;
+  field-sizing: content;
+  width: 100%;
+  min-height: 44px;
+  max-height: 240px;
+  margin: 0;
+  padding: 14px 16px 6px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 22px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--bg);
+}
+
+.composer-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* The toolbar never wraps and never changes height. The chips give up width first
+   (their text is cut with an ellipsis), STOP and SEND never shrink. It has no
+   position, so the picker's dialog is placed against the box instead. */
+.composer-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px 8px;
+}
+
+/* The room left over, between the chips and the buttons. It is a container of its own,
+   so the line count and the key hint can ask how much of it there is: they show only
+   when they fit whole, and never take room from the chips. */
+.composer-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  container-type: inline-size;
+  container-name: composer-room;
+  white-space: nowrap;
+}
+
+.composer-meta,
+.composer-hint {
+  display: none;
+  color: var(--muted);
+}
+
+.composer-meta {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.composer-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* The count shows only when the whole of it fits. In Press Start 2P 11px every glyph is
+   11px wide, so "<n> LINES" is (digits + 6) x 11px: 77px for "5 LINES". The number of
+   digits is on the element, and each size has its own width to wait for. */
+@container composer-room (min-width: 80px) {
+  .composer-meta[data-digits='1'] {
+    display: block;
+  }
+}
+
+@container composer-room (min-width: 91px) {
+  .composer-meta[data-digits='2'] {
+    display: block;
+  }
+}
+
+@container composer-room (min-width: 102px) {
+  .composer-meta[data-digits='3'] {
+    display: block;
+  }
+}
+
+@container composer-room (min-width: 113px) {
+  .composer-meta[data-digits='4'] {
+    display: block;
+  }
+}
+
+/* "⏎ send · ⇧⏎ newline" is about 129px. A container query measures the content box, and
+   the box has 3px borders, so 514px here is the 520px box the design calls narrow. The
+   hint goes in a narrow box, where the picker and the agent chip also shrink to their
+   icons: those rules sit with the picker and the chip. */
+@container composer (width >= 514px) {
+  @container composer-room (min-width: 136px) {
+    .composer-hint {
+      display: block;
+    }
+  }
+}
+
+/* The busiest toolbar, an agent called and a run going, does not fit its names in a box
+   this size: the model control shrinks to its meter and caret, as in a narrow box. Its
+   aria-label and its title still carry the name. */
+@container composer (max-width: 760px) {
+  .composer-toolbar:has(.agent-chip--input):has(.composer-action--stop) .model-picker__label {
+    display: none;
+  }
+}
+
+/* STOP and SEND */
+.composer-action {
+  flex: none;
+  height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.composer-action:focus-visible {
+  outline: var(--border-thin) solid var(--text);
+  outline-offset: 2px;
+}
+
+.composer-action--send {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+
+.composer-action--send:hover:not(:disabled) {
+  border-color: var(--text);
+}
+
+.composer-action--send:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--shadow);
+}
+
+.composer-action--send:disabled {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--line);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.composer-action--stop {
+  background: transparent;
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.composer-action--stop:hover {
+  background: var(--error);
+  color: var(--bg);
+}
+
+.composer-action--stop:active {
+  transform: translate(1px, 1px);
+}
