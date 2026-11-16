@@ -33,6 +33,7 @@ import { historyItems, type RecordedMessage, type SavedTask } from './history'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
 import { getActiveVoice } from './mascots'
 import { choiceForRun } from './modelChoice'
+import { userContent, type SendImage } from './pastedImages'
 import { childEnv, claudeExecutable, loadSdk, type Sdk } from './sdk'
 import { getDefaultChoice } from './settings'
 import { voiceAppend } from './voice'
@@ -285,10 +286,10 @@ function checkCall(
   return { ok: true, name: agent.name }
 }
 
-function userMessage(text: string, id: string): SDKUserMessage {
+function userMessage(text: string, id: string, images: SendImage[] = []): SDKUserMessage {
   return {
     type: 'user',
-    message: { role: 'user', content: text },
+    message: { role: 'user', content: userContent(text, images) },
     parent_tool_use_id: null,
     uuid: id as UUID
   }
@@ -337,7 +338,8 @@ export async function sendMessage(
   rawCall: unknown,
   rawMessageId: unknown,
   cwd: string,
-  sender: WebContents
+  sender: WebContents,
+  images: SendImage[] = []
 ): Promise<AgentSendResult> {
   const call = readCall(rawCall)
   if (call === 'invalid') return unavailable('That is not an agent from the list.')
@@ -350,11 +352,11 @@ export async function sendMessage(
 
   for (;;) {
     const run = activeRun
-    if (!run) return startRun(prompt, call, rawMessageId, cwd, sender)
+    if (!run) return startRun(prompt, call, rawMessageId, cwd, sender, images)
 
     // A run is going, or is starting and its first message is not in yet.
     if (await run.ready) {
-      const joined = await joinRun(run, prompt, call, rawMessageId)
+      const joined = await joinRun(run, prompt, call, rawMessageId, images)
       if (joined) return joined
     }
     // The run closed or failed before the message could go in. Wait for it to be
@@ -368,7 +370,8 @@ async function joinRun(
   run: Run,
   prompt: string,
   call: { scope: string; filePath: string } | null,
-  messageId: string
+  messageId: string,
+  images: SendImage[]
 ): Promise<AgentSendResult | null> {
   let text = prompt
   if (call) {
@@ -382,7 +385,9 @@ async function joinRun(
   // message is in the run, or the run is closed and the caller starts a new one.
   if (activeRun !== run || run.input.closed) return null
   if (call && run.openTasks.size >= MAX_AGENTS) return unavailable(FULL_MESSAGE)
-  if (!pushToRun(run.input, run.messages, userMessage(text, messageId), messageId)) return null
+  if (!pushToRun(run.input, run.messages, userMessage(text, messageId, images), messageId)) {
+    return null
+  }
   return { ok: true, requestId: run.requestId, joined: true }
 }
 
@@ -391,7 +396,8 @@ async function startRun(
   call: { scope: string; filePath: string } | null,
   messageId: string,
   cwd: string,
-  sender: WebContents
+  sender: WebContents,
+  images: SendImage[]
 ): Promise<AgentSendResult> {
   // Claim the run before anything async: a message sent meanwhile joins this run
   // once its first message is in.
@@ -415,7 +421,7 @@ async function startRun(
     return { ok: false, error: { code: 'sdk_error', message: errorMessage(err) } }
   }
 
-  run.input.push(userMessage(text, messageId))
+  run.input.push(userMessage(text, messageId, images))
   run.settleReady(true)
   void execute(run)
   return { ok: true, requestId: run.requestId, joined: false }
