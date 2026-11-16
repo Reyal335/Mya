@@ -5,9 +5,20 @@ type NavItemProps = {
   active: boolean
   onClick: () => void
   count?: number
+  // A red dot: something new to see here.
+  dot?: boolean
+  // What the dot means, for screen readers.
+  dotLabel?: string
 }
 
-function NavItem({ label, active, onClick, count }: NavItemProps): React.JSX.Element {
+function NavItem({
+  label,
+  active,
+  onClick,
+  count,
+  dot = false,
+  dotLabel
+}: NavItemProps): React.JSX.Element {
   const showCount = count !== undefined && count > 0
 
   return (
@@ -23,6 +34,7 @@ function NavItem({ label, active, onClick, count }: NavItemProps): React.JSX.Ele
           {count}
         </span>
       )}
+      {dot && <span className="nav-item__dot" role="img" aria-label={dotLabel ?? 'New'} />}
     </button>
   )
 }

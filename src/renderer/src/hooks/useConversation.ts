@@ -13,6 +13,7 @@ import type {
   ToolState
 } from '../../../shared/ipc'
 import type { ReplyMeta } from '../../../shared/models'
+import type { TaskLoot, TaskXp } from '../../../shared/progression'
 
 export type { ToolState }
 
@@ -71,6 +72,9 @@ export type ConversationItem =
       // running until the task ends. Waiting is derived from its pending requests.
       status: TaskStatus
       report: string | null
+      // Set when it ended as done: the QUEST CLEAR card's loot and XP.
+      loot: TaskLoot | null
+      xp: TaskXp | null
     }
   | {
       kind: 'notice'
@@ -319,14 +323,18 @@ function applyEvent(state: State, event: AgentEvent): State {
         agent: event.agent,
         description: event.description,
         status: 'running',
-        report: null
+        report: null,
+        loot: null,
+        xp: null
       })
 
     case 'task_end':
       return updateTask(state, event.taskId, (item) => ({
         ...item,
         status: event.status,
-        report: event.status === 'stopped' ? item.report : event.report
+        report: event.status === 'stopped' ? item.report : event.report,
+        loot: event.loot,
+        xp: event.xp
       }))
 
     case 'message_state':
@@ -378,7 +386,9 @@ function fromHistory(item: HistoryItem): DistributiveOmit<ConversationItem, 'id'
         agent: item.agent,
         description: item.description,
         status: item.status,
-        report: item.report
+        report: item.report,
+        loot: item.loot,
+        xp: item.xp
       }
   }
 }

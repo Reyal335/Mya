@@ -13,6 +13,8 @@ type SidebarProps = {
   // and the number of tasks waiting for me.
   chatCount: number
   inboxCount: number
+  // An unlock not yet seen: ACHIEVEMENTS shows a red dot.
+  achievementsDot: boolean
   // The account meter under the project name. It opens ACCOUNT.
   meter: React.ReactNode
 }
@@ -21,7 +23,8 @@ const NAV_ITEMS: { screen: Screen; label: string }[] = [
   { screen: 'chat', label: 'CHAT' },
   { screen: 'inbox', label: 'INBOX' },
   { screen: 'agents', label: 'AGENTS' },
-  { screen: 'mascots', label: 'MASCOTS' }
+  { screen: 'mascots', label: 'MASCOTS' },
+  { screen: 'achievements', label: 'ACHIEVEMENTS' }
 ]
 
 function Sidebar({
@@ -32,6 +35,7 @@ function Sidebar({
   onOpenProject,
   chatCount,
   inboxCount,
+  achievementsDot,
   meter
 }: SidebarProps): React.JSX.Element {
   return (
@@ -45,6 +49,8 @@ function Sidebar({
           count={
             item.screen === 'inbox' ? inboxCount : item.screen === 'chat' ? chatCount : undefined
           }
+          dot={item.screen === 'achievements' && achievementsDot}
+          dotLabel="New achievement"
         />
       ))}
       <div className="sidebar__footer">

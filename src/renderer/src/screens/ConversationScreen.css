@@ -371,3 +371,11 @@
 .stage__tag--asking {
   background: var(--waiting);
 }
+
+/* The equipped title, under the state caption. */
+.stage__title {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  color: var(--waiting);
+}

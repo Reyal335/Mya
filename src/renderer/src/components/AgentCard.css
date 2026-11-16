@@ -100,7 +100,9 @@
 }
 
 .agent-card--callable {
-  padding-right: 88px;
+  padding-right: 104px;
+  /* Room for CALL and STATUS stacked at the right edge. */
+  min-height: 128px;
 }
 
 .agent-card__call {
@@ -112,4 +114,30 @@
 .agent-card__call[aria-disabled='true'] {
   opacity: 0.45;
   cursor: default;
+}
+
+/* Class, level, and XP: the badge, LV n, and a 6px bar. */
+.agent-card__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-card__level {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+
+.agent-card__progress .xp-bar {
+  flex: 1;
+  max-width: 160px;
+}
+
+/* STATUS sits under CALL at the card's right edge. */
+.agent-card__status {
+  position: absolute;
+  top: 64px;
+  right: 12px;
 }

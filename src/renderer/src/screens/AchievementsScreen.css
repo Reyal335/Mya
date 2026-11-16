@@ -1,0 +1,261 @@
+/* The ACHIEVEMENTS screen: medal cards in a grid and the unlocked rewards beside them.
+   The grid is 3 columns at full width and 2 under 900px of content width. */
+.achievements {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 28px;
+}
+
+.achievements__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-bottom: 14px;
+  border-bottom: var(--border) solid var(--line);
+}
+
+.achievements__title {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1.5;
+}
+
+.achievements__count {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* One segment per achievement. */
+.achievements__segments {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.achievements__segment {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: var(--border-thin) solid var(--line);
+}
+
+.achievements__segment--on {
+  background: var(--waiting);
+  border-color: var(--waiting);
+}
+
+.achievements__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.achievements__grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0 8px 8px 0;
+  list-style: none;
+}
+
+@container (max-width: 899px) {
+  .achievements__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* At the smallest windows the 340px column would leave the cards too narrow, so the
+   rewards move under the grid. */
+@container (max-width: 759px) {
+  .achievements__body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .achievements__rewards {
+    width: auto;
+  }
+}
+
+.achievement {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--panel);
+  border: var(--border) solid var(--line);
+}
+
+.achievement--unlocked {
+  border-color: var(--waiting);
+}
+
+/* The newest unlock not seen before: a second, outer ring. */
+.achievement--newest {
+  box-shadow:
+    0 0 0 4px var(--bg),
+    0 0 0 8px var(--waiting);
+}
+
+.achievement--locked {
+  color: var(--muted);
+}
+
+.achievement--hidden {
+  background: var(--bg);
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.achievement__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.achievement__name {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.achievement__date {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.achievement__date--new {
+  color: var(--waiting);
+}
+
+.achievement__description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.achievement__reward {
+  margin: 0;
+  font-size: 12px;
+  color: var(--waiting);
+  overflow-wrap: anywhere;
+}
+
+.achievement__reward--locked {
+  color: var(--muted);
+}
+
+.achievement__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.achievement__count {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+}
+
+.achievement__bar {
+  display: block;
+  height: 8px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+.achievement__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+}
+
+.achievements__rewards {
+  flex: none;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: var(--border) solid var(--line);
+}
+
+.achievements__label {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  font-weight: normal;
+  color: var(--accent);
+}
+
+.achievements__muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.achievements__reward-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.achievements__reward-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.achievements__reward-picture {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  image-rendering: pixelated;
+}
+
+.achievements__reward-title {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  color: var(--waiting);
+}
+
+.achievements__reward-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.achievements__reward-name {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* ON is filled; OFF is the plain button. */
+.achievements__reward-row .button[aria-pressed='true'] {
+  background: var(--waiting);
+  color: var(--bg);
+  border-color: var(--text);
+}

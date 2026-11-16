@@ -1,0 +1,27 @@
+.medal {
+  flex: none;
+  display: block;
+}
+
+.medal__ribbon {
+  fill: var(--accent);
+}
+
+.medal__body {
+  fill: var(--waiting);
+}
+
+.medal__mark {
+  fill: var(--bg);
+}
+
+/* Locked and hidden: grey. */
+.medal--locked .medal__ribbon,
+.medal--hidden .medal__ribbon {
+  fill: var(--line);
+}
+
+.medal--locked .medal__body,
+.medal--hidden .medal__body {
+  fill: var(--muted);
+}

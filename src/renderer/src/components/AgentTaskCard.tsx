@@ -1,12 +1,14 @@
 import type { TaskStatus } from '../../../shared/ipc'
 import type { TaskView } from '../conversation/agentWork'
 import AgentIcon from './AgentIcon'
+import QuestClearCard from './QuestClearCard'
 import { toPlainText } from '../../../shared/plainText'
 import './AgentTaskCard.css'
 
 type AgentTaskCardProps = {
   view: TaskView
-  onOpen: (taskId: string) => void
+  // Opens the task in INBOX; 'activity' scrolls it to ACTIVITY (VIEW CHANGES).
+  onOpen: (taskId: string, section?: 'activity') => void
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -22,6 +24,19 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 // start of its report and OPEN IN INBOX.
 function AgentTaskCard({ view, onOpen }: AgentTaskCardProps): React.JSX.Element {
   const { item, state, activity } = view
+  // A task that ended as done, with XP for its agent file, grows into QUEST CLEAR.
+  if (state === 'ended' && item.status === 'done' && item.loot && item.xp) {
+    return (
+      <QuestClearCard
+        agent={item.agent}
+        description={item.description}
+        loot={item.loot}
+        xp={item.xp}
+        onViewChanges={() => onOpen(item.taskId, 'activity')}
+        onOpenInInbox={() => onOpen(item.taskId)}
+      />
+    )
+  }
   const status: TaskStatus = state === 'waiting' ? 'waiting' : item.status
   const smaller = [item.agent.role, item.description].filter(Boolean).join(' · ')
 

@@ -12,6 +12,9 @@ import type {
   ToolItem
 } from '../hooks/useConversation'
 import { useAgents } from '../hooks/useAgents'
+import { useAgentProgress, useProgression } from '../hooks/useProgression'
+import { accessoryById } from '../progression/accessories'
+import { achievementForReward } from '../../../shared/achievements'
 import { useChatTheme } from '../hooks/useChatTheme'
 import { useModelChoice } from '../hooks/useModelChoice'
 import { replyTag, type ModelLists } from '../../../shared/models'
@@ -49,7 +52,7 @@ type ConversationScreenProps = {
   onCallChange: (call: CallTarget | null) => void
   // Changes when another screen wants the input focused.
   focusRequest: number
-  onOpenTask: (taskId: string) => void
+  onOpenTask: (taskId: string, section?: 'activity') => void
 }
 
 // Consecutive tool cards share one wrapping row, as in the mockup. Tool calls
@@ -120,7 +123,7 @@ type HistoryProps = {
   projectPath: string
   views: Map<string, TaskView>
   note: Conversation['historyNote']
-  onOpenTask: (taskId: string) => void
+  onOpenTask: (taskId: string, section?: 'activity') => void
   // The models, to name the model on each reply's tag.
   lists: ModelLists | null
 }
@@ -282,6 +285,14 @@ function ConversationScreen({
   // The name the conversation speaks under: the mascot's.
   const speaker = speakerName(mascot)
   const { agents, loaded: agentsLoaded } = useAgents(project.path)
+  const progress = useAgentProgress(agents)
+  // The equipped title and accessory: the title under the state caption, the
+  // accessory drawn over the mascot.
+  const { equipped } = useProgression()
+  const accessory = accessoryById(equipped.accessory)
+  const title = equipped.title
+    ? (achievementForReward('title', equipped.title)?.reward.name ?? null)
+    : null
   const { mode, toggle } = usePartyPanelMode()
   const modelChoice = useModelChoice(project.path)
   const chatTheme = useChatTheme(project.path)
@@ -496,6 +507,7 @@ function ConversationScreen({
                     reverse={loop.reverse}
                     scale={2}
                     label={`Mascot, ${shownState}`}
+                    accessory={accessory}
                   />
                   {badge && (
                     <span className={`stage__badge stage__badge--${shownState}`} aria-hidden="true">
@@ -506,6 +518,7 @@ function ConversationScreen({
                 <div className={`stage__tag stage__tag--${shownState}`}>
                   {shownState.toUpperCase()}
                 </div>
+                {title && <div className="stage__title">{title.toUpperCase()}</div>}
               </div>
               <DialogueBox
                 agentName={speaker}
@@ -577,6 +590,7 @@ function ConversationScreen({
           mode={mode}
           onToggle={toggle}
           onOpenTask={onOpenTask}
+          progress={progress}
         />
       </div>
 

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MascotSummary } from '../../../shared/ipc'
 import { DEFAULT_MASCOT_ID } from '../../../shared/mascotRules'
 import { useMascots } from '../hooks/useMascots'
+import { useProgression } from '../hooks/useProgression'
+import { accessoryById } from '../progression/accessories'
 import { useOpenInEditorSetting } from '../hooks/useOpenInEditorSetting'
 import { usePopupsSetting } from '../hooks/usePopupsSetting'
 import { DEFAULT_MASCOT, withDefaultEdits } from '../mascots/defaultMascot'
@@ -37,6 +39,8 @@ function MascotsScreen({ setLeaveGuard }: MascotsScreenProps): React.JSX.Element
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // The equipped accessory is drawn over every mascot card.
+  const accessory = accessoryById(useProgression().equipped.accessory)
   const nonce = useRef(0)
   const titleRef = useRef<HTMLHeadingElement>(null)
 
@@ -168,6 +172,7 @@ function MascotsScreen({ setLeaveGuard }: MascotsScreenProps): React.JSX.Element
               : null
           }
           builtIn
+          accessory={accessory}
           active={activeId === DEFAULT_MASCOT_ID}
           busy={busy || !loaded}
           onSetActive={() => void setActive(DEFAULT_MASCOT_ID)}
@@ -195,6 +200,7 @@ function MascotsScreen({ setLeaveGuard }: MascotsScreenProps): React.JSX.Element
             loops={mascot.loops}
             problem={mascot.problem}
             builtIn={false}
+            accessory={accessory}
             active={mascot.id === activeId}
             busy={busy}
             onSetActive={mascot.problem ? undefined : () => void setActive(mascot.id)}

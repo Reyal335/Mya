@@ -1,0 +1,159 @@
+/* The STATUS sheet: an agent's class, level, skills, and record. */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.status__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.status__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dialog__body .status__name {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.status__tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status__model {
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  border: var(--border-thin) solid var(--line);
+}
+
+.dialog__body .status__scope,
+.dialog__body .status__muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.status__level {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.status__level-label {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+
+.status__level-number {
+  font-family: var(--font-pixel);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--waiting);
+}
+
+.status__xp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status__xp-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.status__error {
+  color: var(--error);
+}
+
+.status__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status__label {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  font-weight: normal;
+  color: var(--accent);
+}
+
+.status__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status__chip {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+/* The tools that decide the class, starred and in the class color. */
+.status__chip--deciding {
+  border-color: currentColor;
+}
+
+.status__chip--scout {
+  color: var(--class-scout);
+}
+
+.status__chip--builder {
+  color: var(--class-builder);
+}
+
+.status__chip--mage {
+  color: var(--class-mage);
+}
+
+.status__chip--knight {
+  color: var(--class-knight);
+}
+
+.status__chip--hero {
+  color: var(--class-hero);
+}
+
+.status__record {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.status__record dt {
+  color: var(--muted);
+}
+
+.status__record dd {
+  margin: 0;
+}

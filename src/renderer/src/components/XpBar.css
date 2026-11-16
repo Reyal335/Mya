@@ -1,0 +1,36 @@
+/* An XP bar: a bordered track with flat fills, no gradients, no transitions. */
+.xp-bar {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 6px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  overflow: hidden;
+}
+
+.xp-bar--card {
+  height: 14px;
+}
+
+.xp-bar__fill {
+  flex: none;
+  height: 100%;
+  background: var(--accent);
+}
+
+.xp-bar__gained {
+  flex: none;
+  height: 100%;
+  background: var(--waiting);
+}
+
+/* On the called row the track sits on the accent fill, so the fill is dark. */
+.xp-bar--dark {
+  border-color: var(--bg);
+  background: transparent;
+}
+
+.xp-bar--dark .xp-bar__fill {
+  background: var(--bg);
+}

@@ -144,3 +144,8 @@
   display: flex;
   gap: 12px;
 }
+
+/* The QUEST CLEAR card above REPORT uses the detail's full width. */
+.task-detail .quest {
+  max-width: none;
+}
