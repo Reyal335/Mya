@@ -1,0 +1,38 @@
+[
+  {
+    "id": "party-hat",
+    "name": "Party hat",
+    "file": "party-hat.png",
+    "anchor": {
+      "x": 24,
+      "y": 0
+    }
+  },
+  {
+    "id": "nightcap",
+    "name": "Nightcap",
+    "file": "nightcap.png",
+    "anchor": {
+      "x": 24,
+      "y": 0
+    }
+  },
+  {
+    "id": "crown",
+    "name": "Crown",
+    "file": "crown.png",
+    "anchor": {
+      "x": 24,
+      "y": 0
+    }
+  },
+  {
+    "id": "backpack",
+    "name": "Backpack",
+    "file": "backpack.png",
+    "anchor": {
+      "x": 46,
+      "y": 46
+    }
+  }
+]
