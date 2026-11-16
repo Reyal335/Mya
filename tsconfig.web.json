@@ -7,8 +7,11 @@
     "src/preload/*.d.ts",
     "src/shared/**/*"
   ],
+  "exclude": ["src/shared/**/*.test.ts"],
   "compilerOptions": {
     "composite": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
