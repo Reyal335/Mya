@@ -44,7 +44,7 @@ import {
 } from './settings'
 import { setPopupsEnabled, showTestPopup } from './popupWindow'
 import { agentStats, agentsSummary } from './progression'
-import { dismissFight, fightFor, fightOn } from './bosses'
+import { bossIdsInFights, dismissFight, fightFor, fightOn } from './bosses'
 import {
   createBoss,
   dropBossPicks,
@@ -306,7 +306,7 @@ export function registerIpc(): void {
   // conversation. The test command is checked and trimmed in settings.ts.
   // The boss manager: ids, tokens, and numbers only. bossPacks.ts checks every field again and
   // builds every path itself.
-  ipcMain.handle(IpcChannel.BossesList, () => listBosses())
+  ipcMain.handle(IpcChannel.BossesList, async () => listBosses(await bossIdsInFights()))
   ipcMain.handle(IpcChannel.BossesPickIdle, (event) =>
     pickIdle(BrowserWindow.fromWebContents(event.sender))
   )

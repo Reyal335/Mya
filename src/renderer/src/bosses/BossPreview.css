@@ -1,0 +1,87 @@
+/* The editor's PREVIEW: the battle view in a 250px frame. */
+.boss-preview {
+  position: relative;
+  height: 250px;
+  overflow: hidden;
+  background: var(--bg);
+  border: var(--border) solid var(--boss-accent, var(--error));
+}
+
+/* --bg at 35% over the picture, so the plate and sprite read against any background. */
+.boss-preview__dim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+}
+
+/* The battle view's bottom gradient: the lower 46% fades to --bg at 85%. */
+.boss-preview__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--bg) 85%, transparent)
+  );
+}
+
+.boss-preview__plate {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.boss-preview__plate-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.boss-preview__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--boss-accent, var(--error));
+  text-shadow: 2px 2px 0 var(--shadow);
+}
+
+.boss-preview__hp {
+  margin-left: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* A 220x30 ellipse under the boss: its bottom edge on the sprite's bottom. */
+.boss-preview__glow {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  width: 220px;
+  height: 30px;
+  margin-left: -110px;
+  border-radius: 50%;
+  background: var(--boss-accent, var(--error));
+  opacity: 0.22;
+}
+
+/* The sprite, 128px, centered, 30px above the bottom. */
+.boss-preview__sprite {
+  position: absolute;
+  bottom: 30px;
+  left: calc(50% - 64px);
+  width: 128px;
+  height: 128px;
+}

@@ -33,6 +33,13 @@
   outline: none;
 }
 
+/* The panel under a tab holds what the screen held before the tabs: the same gap. */
+.mascots__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .mascots__error {
   margin: 0;
   padding: 10px 12px;

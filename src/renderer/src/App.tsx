@@ -12,6 +12,7 @@ import ConversationScreen from './screens/ConversationScreen'
 import InboxScreen from './screens/InboxScreen'
 import AgentsScreen from './screens/AgentsScreen'
 import MascotsScreen from './screens/MascotsScreen'
+import type { MascotsTab } from './screens/mascotsTabIds'
 import AchievementsScreen from './screens/AchievementsScreen'
 import { useProgression } from './hooks/useProgression'
 import { useBossFight } from './hooks/useBossFight'
@@ -43,6 +44,8 @@ function App(): React.JSX.Element {
   // The open conversation's boss fight, and the party panel's tab for this session.
   const boss = useBossFight(project?.path ?? null)
   const [partyTab, setPartyTab] = useState<PartyTab>('party')
+  // MASCOTS or BOSSES: remembered for the session, not across restarts.
+  const [mascotsTab, setMascotsTab] = useState<MascotsTab>('mascots')
   const { clear } = conversation
   // The agent called for my next message, and the task open in INBOX.
   const [call, setCall] = useState<CallTarget | null>(null)
@@ -123,7 +126,7 @@ function App(): React.JSX.Element {
   )
 
   const openTaskSummary = tasks.tasks.find((task) => task.id === selectedTaskId) ?? null
-  const crumb = titleBarCrumb(screen, speakerName(mascot), project, openTaskSummary)
+  const crumb = titleBarCrumb(screen, speakerName(mascot), project, openTaskSummary, mascotsTab)
 
   const mainWaiting = conversation.items.some(
     (item) => item.kind === 'tool' && item.permission !== null && item.taskId === null
@@ -197,7 +200,9 @@ function App(): React.JSX.Element {
       {screen === 'agents' && (
         <AgentsScreen project={project} setLeaveGuard={setLeaveGuard} onCall={callAgent} />
       )}
-      {screen === 'mascots' && <MascotsScreen setLeaveGuard={setLeaveGuard} />}
+      {screen === 'mascots' && (
+        <MascotsScreen tab={mascotsTab} onTab={setMascotsTab} setLeaveGuard={setLeaveGuard} />
+      )}
       {screen === 'achievements' && <AchievementsScreen progression={progression} />}
       {screen === 'account' && <AccountScreen store={account} />}
       <AchievementToast

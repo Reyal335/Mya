@@ -47,8 +47,11 @@ export type BossEntry =
       pack: BossPack
       builtIn: boolean
       inPool: boolean
-      // The stored background's file and size, for the editor's row.
+      // The stored strip's file name and the background's file and size, for the editor's rows.
+      idleFile: string | null
       backgroundInfo: BossBackgroundInfo | null
+      // A saved fight was against this boss.
+      inFight: boolean
     }
   | { kind: 'problem'; id: string; problem: string }
 
@@ -60,7 +63,17 @@ export function entriesFrom(items: BossListItem[]): BossEntry[] {
     if (item.builtIn) {
       const pack = DEFAULT_PACKS.find((each) => each.id === item.id)
       return pack
-        ? [{ kind: 'boss', pack, builtIn: true, inPool: item.inPool, backgroundInfo: null }]
+        ? [
+            {
+              kind: 'boss',
+              pack,
+              builtIn: true,
+              inPool: item.inPool,
+              idleFile: null,
+              backgroundInfo: null,
+              inFight: item.inFight
+            }
+          ]
         : []
     }
     if (!item.idle) return []
@@ -77,7 +90,9 @@ export function entriesFrom(items: BossListItem[]): BossEntry[] {
         pack,
         builtIn: false,
         inPool: item.inPool,
-        backgroundInfo: item.backgroundInfo
+        idleFile: item.idleFile,
+        backgroundInfo: item.backgroundInfo,
+        inFight: item.inFight
       }
     ]
   })

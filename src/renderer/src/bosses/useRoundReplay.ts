@@ -45,7 +45,7 @@ function rest(fight: Fight | null): ReplayView {
 }
 
 // A spot around the sprite's edge, in percent of its box.
-function edgeSpot(): { x: number; y: number } {
+export function edgeSpot(): { x: number; y: number } {
   const angle = Math.random() * Math.PI * 2
   return { x: 50 + Math.cos(angle) * 42, y: 45 + Math.sin(angle) * 38 }
 }

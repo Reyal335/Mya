@@ -152,8 +152,13 @@ export type BossListItem =
       inPool: boolean
       problem: null
       idle: BossLoop | null
+      // The stored strip's file name, for the editor's row (null for a built-in boss).
+      idleFile: string | null
       background: string | null
       backgroundInfo: BossBackgroundInfo | null
+      // A saved fight, in any project, was against this boss: deleting it changes how that fight
+      // is drawn.
+      inFight: boolean
     }
   | { id: string; builtIn: false; inPool: false; problem: string }
 

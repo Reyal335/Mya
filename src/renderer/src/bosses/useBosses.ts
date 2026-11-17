@@ -20,7 +20,9 @@ const BUILT_IN_ENTRIES: BossEntry[] = DEFAULT_PACKS.map((pack) => ({
   pack,
   builtIn: true,
   inPool: true,
-  backgroundInfo: null
+  idleFile: null,
+  backgroundInfo: null,
+  inFight: false
 }))
 
 // The bosses, as main has them. Main tells every window after a boss is added, changed,

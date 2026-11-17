@@ -1,4 +1,5 @@
 import type { ProjectInfo, TaskSummary } from '../../../shared/ipc'
+import type { MascotsTab } from '../screens/mascotsTabIds'
 import type { Screen } from '../screens/types'
 
 export type Crumb = {
@@ -20,12 +21,14 @@ const SCREEN_NAMES: Record<Screen, string> = {
 
 // What the title bar's breadcrumb shows. On CHAT it is the title and project the CHAT
 // header shows; on INBOX with a thread open it is that thread's title (the heading its
-// detail shows); anywhere else the screen name alone.
+// detail shows); on MASCOTS it is "Bosses" while the BOSSES tab is selected; anywhere else the
+// screen name alone.
 export function titleBarCrumb(
   screen: Screen,
   chatTitle: string,
   project: ProjectInfo | null,
-  openTask: TaskSummary | null
+  openTask: TaskSummary | null,
+  mascotsTab: MascotsTab = 'mascots'
 ): Crumb {
   const name = SCREEN_NAMES[screen]
   if (screen === 'chat' && project) {
@@ -33,6 +36,9 @@ export function titleBarCrumb(
   }
   if (screen === 'inbox' && openTask) {
     return { screen: name, item: { main: openTask.agent.name, rest: null } }
+  }
+  if (screen === 'mascots' && mascotsTab === 'bosses') {
+    return { screen: name, item: { main: 'Bosses', rest: null } }
   }
   return { screen: name, item: null }
 }

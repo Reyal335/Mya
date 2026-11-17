@@ -353,6 +353,15 @@ export async function dismissFight(projectPath: string | null): Promise<{ ok: bo
   return { ok: true }
 }
 
+// The id of every boss a saved fight was against: the manager warns before deleting one.
+export async function bossIdsInFights(): Promise<Set<string>> {
+  const current = await load()
+  const ids = new Set<string>()
+  for (const fight of Object.values(current.fights)) ids.add(fight.bossId)
+  for (const list of Object.values(current.past)) for (const fight of list) ids.add(fight.bossId)
+  return ids
+}
+
 export async function loadBosses(): Promise<void> {
   await load()
   // The custom packs are read once now; a fight uses what was read last.

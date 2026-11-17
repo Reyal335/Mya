@@ -1,0 +1,91 @@
+/* The BOSSES tab from "21. Boss manager". */
+.bosses {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bosses__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.bosses__title {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1.5;
+}
+
+.bosses__title:focus {
+  outline: none;
+}
+
+.bosses__count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bosses__error {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--border) solid var(--error);
+  color: var(--error);
+  overflow-wrap: anywhere;
+}
+
+/* Two columns, one when the tab is narrower than 360px. */
+.bosses__grid-wrap {
+  container-type: inline-size;
+}
+
+.bosses__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+@container (max-width: 359px) {
+  .bosses__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bosses__add {
+  min-height: 220px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--bg);
+  color: var(--error);
+  border: var(--border) dashed var(--error);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.bosses__add:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.bosses__add-plus {
+  font-size: 28px;
+}
+
+.bosses__note {
+  margin: 0;
+  padding: 10px 12px;
+  border: var(--border) solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}

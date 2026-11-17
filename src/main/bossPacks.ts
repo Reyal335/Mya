@@ -139,7 +139,10 @@ export function validBosses(): Promise<{ id: string; name: string }[]> {
   ])
 }
 
-export function listBosses(): Promise<BossesResult<{ bosses: BossListItem[] }>> {
+// `inFights` holds the id of every boss a saved fight (current or finished) was against.
+export function listBosses(
+  inFights: ReadonlySet<string>
+): Promise<BossesResult<{ bosses: BossListItem[] }>> {
   return run(async () => {
     const custom = await entries(true)
     const out = new Set(await getBossesOutOfPool())
@@ -151,8 +154,10 @@ export function listBosses(): Promise<BossesResult<{ bosses: BossListItem[] }>> 
       inPool: !out.has(boss.id),
       problem: null,
       idle: null,
+      idleFile: null,
       background: null,
-      backgroundInfo: null
+      backgroundInfo: null,
+      inFight: inFights.has(boss.id)
     }))
     for (const { id, result } of custom) {
       if (!result.ok) {
@@ -168,6 +173,8 @@ export function listBosses(): Promise<BossesResult<{ bosses: BossListItem[] }>> 
         inPool: !out.has(id),
         problem: null,
         idle: boss.idle,
+        idleFile: boss.idleFile,
+        inFight: inFights.has(id),
         background: boss.background?.src ?? null,
         backgroundInfo: boss.background
           ? {

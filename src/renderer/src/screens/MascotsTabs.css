@@ -1,0 +1,52 @@
+/* MASCOTS | BOSSES, from "21. Boss manager". */
+.mascots-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.mascots-tabs__list {
+  display: flex;
+  gap: 8px;
+}
+
+.mascots-tabs__tab {
+  min-height: 44px;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mascots-tabs__tab:where(:hover) {
+  border-color: var(--text);
+}
+
+/* Selected: a fill, dark text, a --text border, and a hard shadow. MASCOTS takes the accent,
+   BOSSES the boss red. */
+.mascots-tabs__tab--selected {
+  color: var(--bg);
+  border-color: var(--text);
+  box-shadow: var(--shadow-hard);
+}
+
+.mascots-tabs__tab--mascots.mascots-tabs__tab--selected {
+  background: var(--accent);
+}
+
+.mascots-tabs__tab--bosses.mascots-tabs__tab--selected {
+  background: var(--error);
+}
+
+.mascots-tabs__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
