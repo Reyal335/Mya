@@ -1383,8 +1383,8 @@ run deals one hit per test that now passes and heals the boss for each test that
 full run with nothing failing defeats it. The fight only reads output the agent already
 produced: it never runs a command, never changes what an agent may do, and costs no extra
 usage. The mockups are on the canvas: "20. BOSS tab in the party panel" and "20b/20c/20d.
-Battle view" (one per default boss). Only the HP rules and state names of "18. Boss
-battle" and "18b. Boss battle states" carry over.
+Battle view" (one per default boss). Only the HP rules of "18. Boss battle" carry over.
+The screen that adds and edits bosses is "21. Boss manager": see Boss manager.
 
 ### Detecting a test run
 
@@ -1464,19 +1464,91 @@ notices and end cards stay in its history.
 
 ### Packs
 
-- The defaults (red-suite, flaky-golem, null-wraith) are copied from `designs/bosses/`
-  into `src/renderer/src/assets/bosses/`. Nothing is loaded from designs/ at runtime. They
-  cannot be edited or deleted.
-- Format v1: `manifest.json` `{ version: 1, name, accent ("#RRGGBB"), background,
-  states: { idle (required), hit, heal, defeated: { file, frames, fps } } }`. A missing
-  state plays idle. defeated plays once and holds its last frame.
-- User packs: `userData/bosses/<uuid>/`, read once at start. Strips follow the sheet rules
-  (PNG, 64 high, width a multiple of 64, at most 16 frames, under 1 MB; frames from the
-  width). The background is a PNG or JPG, at most 5 MB, 320x180 to 4000x4000. A pack that
-  fails is skipped and logged once, never shown and never picked. There is no manager
-  screen yet.
-- At encounter a pack is picked uniformly at random, leaving out the project's last boss
-  when there are at least two. It never changes for that fight.
+A boss is a name, an accent color, one idle loop, and an optional background. Nothing else
+is drawn for it: the hit, the heal, and the defeat are effects the app draws the same way
+for every boss (see Boss effects), so a pack has no other strips.
+
+- The defaults (red-suite, flaky-golem, null-wraith) are copied from `designs/bosses/<id>/`
+  (`manifest.json`, `idle.png`, `background.png`) into `src/renderer/src/assets/bosses/`.
+  Nothing is loaded from designs/ at runtime. They cannot be edited or deleted, and they are
+  never problem cards (one that failed to load would be a bug).
+- Format 2: `manifest.json` `{ version: 2, name, accent ("#RRGGBB"), background (a file name
+  or null), idle: { file, frames, fps } }`. Name 1 to 24 characters after trimming, no line
+  breaks. Accent a `#RRGGBB` color (stored in capitals). Idle passes the sheet rules (see
+  Mascots): PNG, 64 high, width a multiple of 64, at most 16 frames, under 3 MB; the frame
+  count comes from the image, whatever the manifest says; fps a whole number from 1 to 30.
+  Background, when set, passes the background rules below.
+- Format 1 (the first packs: `version: 1`, `background` a file name, and a `states` object
+  with one entry per strip, `idle` required) still loads. `states.idle` is the idle loop; any
+  other entry is ignored and not checked. Its name may be up to 32 characters. A pack is never
+  rewritten only to upgrade it: one saved in the boss editor is written as format 2.
+- User packs: `userData/bosses/<uuid>/` holds `manifest.json`, `idle.png`, and
+  `background.png` or `background.jpg` exactly as uploaded (byte for byte). A folder whose
+  name is not a UUID is skipped and logged, because an id is checked to be a UUID or a
+  built-in id before a path is built from it. The manager reads the folders each time its tab
+  opens; a fight uses what was read last. A pack that fails a rule is a problem card in the
+  manager and is never picked or drawn.
+- Writing: a new pack is built in `.tmp-<uuid>/` and renamed into place, `manifest.json`
+  last, so a half-written pack never appears (a leftover is removed at the next read). An
+  update writes the new files through temporary files, then the manifest, then deletes the
+  files the manifest no longer uses; removing the background deletes its file.
+- Background rules, in this order; the first failure is the message:
+  1. 5 MB or smaller: "Background must be 5 MB or smaller."
+  2. A real PNG or JPEG by its first bytes, not its name: "Background must be a PNG or JPG."
+  3. The size, read from the file's header first (so a small file that claims a huge picture
+     is refused before anything is allocated) and then with nativeImage, whose size counts;
+     an image nativeImage cannot read gets the message from rule 2. At least 320x180:
+     "Background must be at least 320x180. <file> is <w>x<h>." At most 4000 on each side:
+     "Background must be 4000 px or smaller on each side. <file> is <w>x<h>."
+  Any aspect ratio. A background is never resized or converted on import.
+- Drawing a background (the battle view, the manager's thumbnails, and the editor's
+  preview; the BOSS tab shows none): the chat theme scaling rule (see Chat themes).
+  Pixel art, both sides 640 or less, is scaled by whole numbers with `image-rendering:
+  pixelated`; a bigger picture is scaled smoothly to cover. It is anchored to the bottom edge,
+  centered across, and cropped to the frame, with no theme fade. A boss with no background
+  has plain `--bg` behind it.
+- The pool: `settings.json` `bossesOutOfPool` is a list of boss ids; a missing list means every
+  boss is in. At encounter a boss is drawn uniformly at random from the valid bosses that are
+  in the pool, leaving out the project's last boss when at least two are in. If no valid boss
+  is in the pool, every valid boss is. Turning the last boss in the pool off is refused: "At
+  least one boss stays in the pool." A deleted boss's id is removed from the list. The boss
+  never changes for that fight.
+- A boss that no longer exists: a fight keeps its HP, rounds, and log, and is drawn with
+  The Red Suite's sprite, accent, and background. Its notices and end cards use the name it
+  had: a fight saves `bossName` (an empty string for a fight saved before it was kept, which
+  then reads as "The Red Suite"). The name is refreshed on every round while the boss exists,
+  so a rename shows from the next round, and the lines already in the history keep the name
+  they were written with.
+
+### Boss effects
+
+`BossSprite` draws a boss everywhere (the BOSS tab, the battle view, the rail button,
+notices, end cards, the manager's cards, and the editor's preview): the idle loop through the
+Mascot component, and three effects, the same for every boss, built-in or custom. They are
+CSS on a wrapper, not art.
+
+- Hit: the whole sprite is a pure white silhouette (`filter: brightness(0) invert(1)`, so
+  transparent pixels stay transparent) and sits 1 source pixel (the scale in CSS pixels) to
+  the right, for 120ms. The move is a layout offset (`left`), not a transform: a transform
+  can blur one device pixel at fractional display scaling (measured here at 125%, 150%, and
+  175%). A new hit during a flash restarts it.
+- Heal: a flat `--loot-add` (#6FCF7F) silhouette for 160ms. It is an SVG color matrix in a
+  data URL (`filter: url("data:image/svg+xml,...")`) that sends every pixel to that green and
+  keeps its alpha, so the shape and the hard edges stay; a chain of CSS filters can only come
+  near the color.
+- Defeated: over 800ms, in 4 hard steps (`steps(4)`, no easing), the sprite sinks 4 source
+  pixels, turns grayscale, and drops to 35% opacity. Then it holds that look and the loop
+  stops on frame 0. A boss that is defeated when it first appears (a view opened later, an
+  end card) shows that look at once, without the animation.
+- Reduced motion: no flash, tint, move, or sinking. A defeated boss shows its final look at
+  once. The editor's HIT frame is a picture, not an animation, so it stays white.
+- Checked with the built app at scales 1 to 4 and display scaling 100%, 125%, and 150%: a
+  hit is 2 colors (the page and white), a heal 2 (the page and #6FCF7F), and a defeated boss
+  3 (the page and two grays), the same count as the plain sprite or fewer, so no edge is
+  blended.
+- The effects are exposed as props: `effect` (`{ kind: 'hit' | 'heal', id }`; a new id plays
+  it again), `defeated`, `hold="hit"` (held white, for the editor), and `still` (frame 0). The
+  round replay, the editor's TEST HIT, and the end cards all use them.
 
 ### BOSS tab
 
@@ -1506,7 +1578,7 @@ notices and end cards stay in its history.
   shadow, pixel 8px), which reads BACK TO CHAT (`--bg` fill) while the battle view is open.
 - Got away: the same box, "GOT AWAY · <hp> left" in place of the HP line, the weak
   points, FIGHT ON in the EXPAND BATTLE style, and EXPAND BATTLE as a plain button.
-- Defeated: the defeated loop held, "DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds
+- Defeated: the defeated look held (see Boss effects), "DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds
   · <time>", and DISMISS, which moves the fight out of the tab (its notices stay in the
   history).
 - FIGHT ON makes the fight active again, then sends "Keep going until all the tests
@@ -1523,8 +1595,10 @@ tab) and Escape go back; so do leaving CHAT, NEW CHAT, and the end of the fight'
 conversation. A later fight never opens the view by itself.
 
 - One frame: position relative, overflow hidden, 4px border in the boss accent.
-- Background: the pack's background, object-fit cover, object-position center bottom,
-  pixelated. The lower 46% fades from transparent to `--bg` at 85%.
+- Background: the pack's background by the rule in Packs (pixel art at whole-number scales,
+  a big picture smoothly), anchored to the bottom edge and cropped to the frame, with no
+  theme fade; plain `--bg` without one. The lower 46% fades from transparent to `--bg` at
+  85%.
 - Floor glow: a 320x40 ellipse in the boss accent at 20% opacity, centered under the boss,
   its middle 20px above the sprite's bottom.
 - TEST LOG, left: top 12px, left 12px, bottom 88px, width min(320px, 40%), `--bg` at 90%,
@@ -1545,7 +1619,8 @@ conversation. A later fight never opens the view by itself.
   sits under BACK TO CHAT (top 60px, right 12px) and the boss starts at 108px.
 - BACK TO CHAT: top 12px, right 12px, 40px tall, `--bg` at 90%, 4px `--line` border, pixel
   8px.
-- Boss: the current state's loop centered in the space right of the test log, top 78px:
+- Boss: the idle loop, with its effects, centered in the space right of the test log, top
+  78px:
   scale 4 (256px); scale 3 (192px) when that space is under 300px wide or the frame under
   420px tall; and scale 2 (128px) when even 192px would not fit above the lineup. At
   960x600 the frame is about 324px tall, so the boss is 128px there.
@@ -1565,14 +1640,16 @@ already final):
 
 - Hits one at a time, 120ms apart, at most 2 seconds in total (evenly spaced past 16).
   Each: a "−1" (pixel 13px, `--waiting`, 2px text shadow) at a random spot around the
-  sprite's edge, rising 12px and fading over 600ms; the hit loop for 200ms; the HP bar down
-  by one.
+  sprite's edge, rising 12px and fading over 600ms; the white hit flash (see Boss effects);
+  the HP bar down by one.
 - After the last hit: "<n> HIT COMBO!" (pixel 16px, `--waiting`, 3px text shadow) above the
   sprite for 1.5 seconds.
-- Heals after the hits: "+1" in `--loot-add`, the heal loop, the bar up by one.
-- Victory: the defeated loop plays once and holds.
+- Heals after the hits: "+1" in `--loot-add`, the green heal tint, the bar up by one.
+- Victory: after the last hit the defeat plays (the sprite sinks, grays, and fades) and
+  holds; the banner comes with it.
 - Reduced motion: no pops and no combo text; the bar and the log are final at once; the
-  sprite shows frame 0 of its state.
+  sprite shows frame 0 with no flash, tint, or sinking, and a victory shows the defeated look
+  at once.
 
 ### History, nav, and popups
 
@@ -1586,8 +1663,8 @@ already final):
   still failing.", "Partial run: <passed> / <total> passed. It counts once a full run
   confirms it.", "<Boss> is defeated! All <total> tests pass.", "<Boss> got away. <hp>
   tests still failing.", and "<Boss> is back! <hp> of <maxHp> tests left."
-- An ended fight adds an end card after its last notice. Defeated: the held defeated
-  frame, "<BOSS> DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds · <start hp> → 0
+- An ended fight adds an end card after its last notice. Defeated: the defeated look
+  held, "<BOSS> DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds · <start hp> → 0
   tests left · <total> / <total> passing · +<xp> XP", and BATTLE LOG, which opens the
   battle view read-only on the final round. Got away: the idle frame, "<BOSS> GOT AWAY"
   (pixel 9px, muted), "<hp> / <maxHp> tests left", and FIGHT ON.
@@ -1598,3 +1675,133 @@ already final):
   "<Boss> got away. <hp> tests still failing."
 - The mascot plays hurt for 1.2 seconds after a round with heals and victory for 3 seconds
   after a victory (see Mascots).
+
+## Boss manager
+
+The mockup is "21. Boss manager (MASCOTS > BOSSES)" on the "MyClaud app mockup" canvas. The
+MASCOTS screen has two tabs, MASCOTS and BOSSES. BOSSES shows every boss, lets me choose which
+ones are in the random pool, and adds, edits, and deletes custom bosses. The files are
+described under Boss battles (Packs, Boss effects); this section is the screen.
+
+### Tabs
+
+- Under the screen's header row (MASCOTS and the POPUPS, TEST POPUP, and EDITOR buttons): a
+  tablist with MASCOTS and BOSSES. Each is a button with role tab, 44px tall, padding 0 16px,
+  pixel font 10px. Selected MASCOTS: accent fill, dark text, 4px `--text` border, 4px hard
+  shadow. Selected BOSSES: `--error` fill, dark text, 4px `--text` border, 4px hard shadow.
+  Unselected: `--bg` fill, `--text`, 4px `--line` border. Arrow keys (and Home and End) move
+  between the tabs and select the one they land on; only the selected tab is in the Tab order.
+- Next to the tabs on BOSSES, one muted 12px line: "A random boss from the pool appears when
+  a test run fails."
+- The mascot gallery and editor are under the MASCOTS tab, unchanged.
+- The tab is remembered for the session, not across restarts. The title bar reads "MASCOTS /
+  Bosses" on the BOSSES tab and "MASCOTS" on the other.
+
+### Gallery
+
+- "BOSSES" (pixel 14px) and "<n> of <total> in the pool" muted. The total counts valid
+  bosses; a problem card is not one.
+- A 2-column grid, 14px gap (1 column when the tab is narrower than 360px). The built-in
+  bosses first, then custom ones oldest first, then the ADD BOSS card.
+- A boss card: 10px padding, panel fill, 4px `--line` border, 8px gap. The card being edited:
+  4px `--text` border and a `4px 4px 0` shadow in the boss's accent. A card that is out of the
+  pool is drawn at 75% opacity.
+  - Thumbnail: 104px tall, 2px border in the accent, the background drawn by the rule in
+    Packs, a bottom gradient from transparent to `--bg` at 70% over the lower half, and the
+    BossSprite at scale 1 (64px), centered, 6px above the bottom, playing idle.
+  - A row: a 10px square in the accent, then the name (13px, 600).
+  - A row: "Built-in" or "Custom" (11px muted, plus " · editing" while it is open in the
+    editor), and on the right the POOL toggle: a button, 32px tall, padding 0 8px, pixel font
+    7px, `aria-pressed`, `aria-label` "<name> in the random pool", reading POOL: ON (accent
+    fill, dark text, 2px accent border) or POOL: OFF (`--bg`, muted, 2px `--line` border).
+  - Custom cards only: EDIT and DELETE, side by side, 32px tall. DELETE uses the danger style
+    (`--error` text and border on `--bg`).
+- A problem card (a pack that failed a rule): the reason in `--error`, the folder name, and
+  DELETE only. Built-in bosses are never problem cards.
+- ADD BOSS: a button card, min-height 220px, `--bg`, 4px dashed `--error` border, `--error`
+  text, a "+" at 28px over "ADD BOSS" in the pixel font at 10px.
+- Under the grid, a box with a 4px `--line` border and 12px muted text: "Turn POOL off to
+  keep a boss out of the draw. At least one boss stays in the pool. Built-in bosses can't be
+  edited or deleted."
+- Turning off the last boss in the pool shows "At least one boss stays in the pool." above the
+  grid; the toggle stays on.
+- Delete asks first in the dialog style of the other screens (DELETE BOSS?, danger tone):
+  "Delete <name>? Its folder goes to the trash." When a saved fight, in any project, used the
+  boss, add: "A fight using this boss will show The Red Suite instead." (Whether a fight used
+  it is read again when DELETE is pressed.) The folder goes to the OS trash with
+  `shell.trashItem`. For a problem card, <name> is the folder name.
+
+### Editor
+
+In the same dialog the mascot editor uses (wide, modal): 4px `--text` border, panel fill, 6px
+hard shadow, 20px padding, 16px gap. Title "ADD BOSS" or "EDIT BOSS" (pixel 11px, accent).
+
+- NAME: label (pixel 9px), a 44px text field. Required, 1 to 24 characters after trimming
+  ("Name is required." and "Name must be at most 24 characters.").
+- FORMAT box (4px accent border, `--bg`, 13px): "FORMAT" in the pixel font, then "One idle
+  loop: a horizontal strip of 64x64 frames, PNG. Height 64px, width a multiple of 64, up to 16
+  frames. Drawn 4x in battle." and the slicer's grid wording: "A strip of 64x64 frames is used
+  as it is. Any other sheet opens the slicer: set columns and rows, then pick the frames for
+  the loop. Frames must be square and are scaled to 64x64."
+- IDLE LOOP row: the mascot editor's state row (one component, `SheetRow`, for both): the
+  file name, its size and frame count, FPS (1 to 30, starts at 4; a replaced strip keeps its
+  speed), UPLOAD or REPLACE, the slicer for grid sheets, the playing loop, and the strip with
+  frame dividers. There is no REUSE SHEET, REMOVE, or REVERSE AT END. Required: with no strip,
+  SAVE BOSS is disabled and the row says "Idle loop is required." The picks go through
+  the same checks as a mascot sheet (see Mascots and Sheet slicer), with the same messages.
+- BACKGROUND row (the same row frame): "<file> · <w>x<h>", UPLOAD or REPLACE, and REMOVE when
+  set. Under it a 240x125 thumbnail (4px `--line` border, the background rule) and three muted
+  lines: "PNG or JPG, 320x180 to 4000x4000, up to 5 MB.", "Anchored to the bottom edge,
+  cropped to fit. Small pixel art keeps crisp pixels.", and "No background: the battle uses
+  plain navy." A refused file shows its message in the row in `--error` (the background rules
+  under Packs) and leaves the previous background in place. Nothing is written until SAVE.
+- ACCENT: a fieldset (legend "Accent color", visually hidden) of 8 radio swatches, 32px
+  squares: #F0706A, #F2B84B, #6FCF7F, #5BC0BE, #B98CF0, #F4A9C0, #A9B6C6, #F2F4F8. Unselected:
+  2px `--bg` border. Selected: 4px `--text` border and a `3px 3px 0` hard shadow. Each has its
+  hex value as its accessible name. Native radios, so arrow keys move between them. Then
+  muted: "Used for the battle frame, the name, and the floor glow." A new boss starts on
+  #F0706A. A pack with an accent that is not one of the eight shows none selected and keeps
+  its accent until one is picked.
+- PREVIEW (label in the pixel font at 9px): a 250px-tall frame with a 4px border in the accent.
+  Inside: the background (or plain `--bg`), `--bg` at 35% over it, the battle view's bottom
+  gradient (the lower 46%, to `--bg` at 85%), a name plate at the top (the name in capitals,
+  pixel 10px, accent, 2px text shadow; "12 / 30" on the right; a 12px HP bar at 40% in
+  `--error`), a 220x30 floor glow ellipse in the accent at 22% (its bottom edge on the sprite's
+  bottom), and the BossSprite at scale 2 (128px) centered, 30px above the bottom. It updates
+  live as anything changes.
+- ADDED FOR YOU box (12px padding, `--bg`, 4px dashed `--line` border): the idle frame and the
+  hit frame at 64px side by side with a "›" between them, labelled IDLE and HIT (pixel 7px;
+  HIT in `--waiting` with a 2px `--waiting` border), then "ADDED FOR YOU" (pixel 8px, accent),
+  the text "Every boss flashes white for a moment when it takes a hit, like the built-in
+  ones. Heals flash green, and a defeated boss sinks and fades. You only draw the idle loop.",
+  and TEST HIT. TEST HIT plays one hit on the preview sprite: the white flash and a "−1" pop.
+  The HIT frame is the same BossSprite held in its hit look (`hold="hit"`), not a separate
+  image. TEST HIT is disabled until there is a strip.
+- Buttons: SAVE BOSS (primary; disabled until the form is valid and something changed),
+  CANCEL, and in edit mode DELETE BOSS on the right (danger style; it asks first, as above).
+  SAVE BOSS is also disabled while the slicer is open.
+- CANCEL, Escape, or leaving the screen with unsaved changes asks once (DISCARD CHANGES?:
+  "This boss has unsaved changes. They will be lost, with any pictures not yet saved." with
+  KEEP EDITING and DISCARD). Unsaved picks and slicer sources are dropped in main when the
+  editor closes. Built-in bosses never open in the editor.
+
+### Storage and the preload API
+
+`window.mya.bosses` gains `list()`, `pickIdle()`, `sliceIdle(sourceToken, columns, rows,
+cells)`, `dropSources()`, `pickBackground()`, `create(draft)`, `update(id, draft)`,
+`remove(id)`, `setInPool(id, on)`, and `onChanged(callback)`.
+
+- `list()` answers every boss in order: the three built-in ones (only their pool setting; the
+  window bundles their pictures), then each folder in `userData/bosses`, oldest first, as a
+  pack (id, name, accent, `builtIn`, `inPool`, the idle strip and background as data URLs, the
+  stored file names and background size, and `inFight`) or a problem (id, `problem`). It always
+  reads the folders.
+- A draft holds `name`, `accent`, `fps`, the idle change (`keep` or a token) and the background
+  change (`keep`, `remove`, or a token). The window never sends a path or image bytes; a pick
+  waits in main behind a token until SAVE.
+- Main checks every field again. An id is a UUID or a built-in id, checked before any path is
+  built; `update` and `remove` refuse a built-in id ("The built-in bosses cannot be edited."
+  and "The built-in bosses cannot be deleted.") and any other id ("That is not a boss id.").
+  An extra field in a draft is ignored.
+- After any change main sends `bosses:changed`. The BOSS tab, the battle view, and saved
+  fights redraw with the new name, accent, loop, and background at once.
