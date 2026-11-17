@@ -75,7 +75,15 @@ Conversations waiting for approval count as unread in the inbox.
 
 ## Mascots
 
-- A mascot has five states: idle, thinking, talking, working, asking.
+- A mascot has seven states: idle, thinking, talking, working, asking, and, for boss
+  battles, victory and hurt. Only idle is required.
+- victory falls back to the talking loop and hurt to the idle loop; every other state
+  falls back to idle. The upload dialog shows their rows after asking, with "Plays the
+  talking loop" and "Plays the idle loop" as their empty text, and a gallery card counts
+  "n of 7 loops".
+- The mascot plays hurt for 1.2 seconds after a boss round with heals and victory for 3
+  seconds after a victory. Both rank just below asking, and the 400ms minimum time
+  holds.
 - Each state has its own spritesheet and its own FPS.
 - A loop can reverse at the end (REVERSE AT END, off by default). It plays the frames
   forward, then back down to the second frame, then starts again: 1, 2, ... n, n-1,
@@ -89,7 +97,7 @@ Conversations waiting for approval count as unread in the inbox.
   layout opens the sheet slicer, which cuts it into such a strip (see Sheet
   slicer). A stored sheet that breaks these rules is reported with a specific
   message, for example "Height must be 64px. Yours is 128px."
-- Idle is required. A state with no sheet plays the idle loop.
+- Idle is required. A state with no sheet plays its fallback loop (above).
 - Display at 1x, 2x, or 3x only.
 
 ## Mascot voice
@@ -218,7 +226,8 @@ cells; the slicer itself disables USE instead).
 
 See `8-chat-party.html`, `8b-party-states.html`, `8c-party-rail.html`, and
 `1-inbox.html`. The sidebar reads CHAT, INBOX, AGENTS, MASCOTS, ACHIEVEMENTS (see
-Progression), and the app opens on CHAT. CHAT shows a count of 1 while a request from the main
+Progression), and the app opens on CHAT. The party panel's header is the PARTY | BOSS
+tab bar (see Boss battles). CHAT shows a count of 1 while a request from the main
 conversation itself is pending; INBOX shows the number of waiting tasks. Both
 are hidden at zero. Under the project name sits the account meter, which opens
 ACCOUNT (see Account and usage).
@@ -1365,3 +1374,227 @@ A nav item ACHIEVEMENTS under MASCOTS, same NavItem look. It shows a red dot (8p
   closes. It follows every popup rule (never takes focus, the popups setting, the queue). An
   unlock still queued when the app comes to the front is dropped like any queued popup; the
   red dot still shows it.
+
+## Boss battles
+
+When an agent (or Claude itself) runs the project's tests and some fail, a boss appears
+for that conversation. Its HP is the number of tests still not passing. Each later test
+run deals one hit per test that now passes and heals the boss for each test that broke. A
+full run with nothing failing defeats it. The fight only reads output the agent already
+produced: it never runs a command, never changes what an agent may do, and costs no extra
+usage. The mockups are on the canvas: "20. BOSS tab in the party panel" and "20b/20c/20d.
+Battle view" (one per default boss). Only the HP rules and state names of "18. Boss
+battle" and "18b. Boss battle states" carry over.
+
+### Detecting a test run
+
+- A Bash or PowerShell call, from the main conversation or inside an agent, whose command
+  contains one of these as whole words: npm test, npm run test, pnpm test, pnpm run test,
+  yarn test, npx jest, jest, npx vitest, vitest, node --test, pytest, python -m pytest, go
+  test, cargo test, dotnet test, php artisan test, phpunit, vendor/bin/pest. A path before
+  the runner counts (`node_modules/.bin/jest`); a dot after it does not (`jest.config.js`).
+  Or the project's own test command (settings.json `testCommands[projectPath]`, matched as
+  a substring), set in the BOSS tab's TEST COMMAND field.
+- Read when its tool_result arrives with the call ended as done or failed. Denied,
+  stopped, interrupted, and background calls are ignored.
+- The exit code is the `Exit code N` first line Claude Code writes for a failed command;
+  none means 0.
+- Output over about 30 KB arrives as a 2 KB preview of its start and the path of a file in
+  Claude Code's own `projects/<project>/<session>/tool-results/` folder. That file is read
+  (only inside that folder, at most 5 MB). Without it the preview is all there is.
+- The attacker is the task's agent when the call came from inside a task, otherwise the
+  main speaker.
+
+### Parsing
+
+`parseTestRun(command, output, exitCode)` in `src/shared/testRuns.ts`, tested against real
+output captured from scratch projects (`src/shared/fixtures/test-runs/`): Jest 30, Vitest
+5, node:test (Node 24), pytest 9, dotnet test (xUnit), PHPUnit 13, and Pest 4. Go and
+Cargo were not installed; their parsers follow the documented formats and are unverified.
+php artisan test prints Pest's format.
+
+- ANSI color codes and CR are stripped. ✓ ✔ √ pass; × ✕ ✗ ✘ ✖ ⨯ fail.
+- The count of tests is passed + failed. Skipped (and todo, deselected) tests never count,
+  so a filtered run never looks like the whole suite.
+- Files: the test file (forward slashes), the test class for dotnet, PHPUnit, and Pest,
+  the package for go.
+- parsed: `full` when every failure is named, `summary` with counts only, `exit-code`
+  when nothing parses (failed unknown; the exit code says pass or fail).
+- Cut output: what is there is used, and a missing summary is never zero failures.
+
+### HP and rounds
+
+One fight per conversation (project path plus session id), in
+`userData/boss-fights.json` (`{ version: 1, fights, past, lastBoss }`, written through a
+temporary file and a rename; a missing or corrupt file starts empty and a bad one is kept
+as `boss-fights.json.bad`). `past` keeps the fights the conversation finished, so their
+notices and end cards stay in its history.
+
+- Encounter: the first test run in a conversation with no active fight that has failures
+  (or a non-zero exit with nothing parsed). maxHp is the count of tests (or the failures
+  when that is unknown; 1 for an exit code alone), hp the failures, round 1.
+- A full run: its count covers maxHp, or it is the same command that started the fight.
+  Otherwise it is partial.
+- Each later test run is a round:
+  - Named output: per file in the run (every file the fight knows, for a full run), hits
+    are the tests that were failing and are not now, heals the tests failing now that were
+    not before. A full run that does not list a file counts it as passing.
+  - Summary only, full run: hits = max(0, previous hp − failed), heals = max(0, failed −
+    previous hp), unnamed.
+  - Summary only, partial run: HP does not change.
+  - Exit code only: nothing changes.
+  - hp is the sum of every file's failures (a full run's own count). A full run with more
+    tests grows maxHp.
+  - Energy: 1 per hit for the attacker, full at 10.
+- Victory: a full run with nothing failing and at least 1 test.
+- Escape: the run ends (done, error, or STOP) while the fight is active with HP left. The
+  next test run in the conversation, or FIGHT ON, brings the same boss, HP, and lineup
+  back.
+- NEW CHAT, a lost session, or a fresh-context restart removes the conversation's fight.
+- XP: the final hit's agent gets maxHp × 5 XP, at most 500. Every agent in the lineup that
+  landed a hit gets bossesDefeated + 1. The first victory unlocks BOSS SLAYER (the crown).
+
+### Lineup
+
+- At encounter: the attacker, then up to 3 other runnable party agents at random.
+- A later attacker not in the lineup replaces the member with the least energy.
+- 'main' is the main speaker, drawn with the mascot. A built-in agent is
+  'builtin:<name>' and earns no XP.
+- Cosmetic health starts full; the active member loses 5% on each heal, never below 40%.
+
+### Packs
+
+- The defaults (red-suite, flaky-golem, null-wraith) are copied from `designs/bosses/`
+  into `src/renderer/src/assets/bosses/`. Nothing is loaded from designs/ at runtime. They
+  cannot be edited or deleted.
+- Format v1: `manifest.json` `{ version: 1, name, accent ("#RRGGBB"), background,
+  states: { idle (required), hit, heal, defeated: { file, frames, fps } } }`. A missing
+  state plays idle. defeated plays once and holds its last frame.
+- User packs: `userData/bosses/<uuid>/`, read once at start. Strips follow the sheet rules
+  (PNG, 64 high, width a multiple of 64, at most 16 frames, under 1 MB; frames from the
+  width). The background is a PNG or JPG, at most 5 MB, 320x180 to 4000x4000. A pack that
+  fails is skipped and logged once, never shown and never picked. There is no manager
+  screen yet.
+- At encounter a pack is picked uniformly at random, leaving out the project's last boss
+  when there are at least two. It never changes for that fight.
+
+### BOSS tab
+
+- The party panel's header is a tab bar: PARTY | BOSS (role tablist; each a tab button,
+  40px tall, pixel font 8px, flex 1; arrow keys move between them), then the collapse
+  button (40px square). Selected PARTY: accent fill, dark text, 4px `--text` border.
+  Selected BOSS: `--error` fill, dark text, 4px `--text` border. Unselected: `--bg` fill,
+  4px `--line` border. While a fight is active and PARTY is selected, BOSS shows a 6px
+  `--error` dot after its label. The agent count moves into the PARTY tab's panel, above
+  the rows.
+- The selected tab is remembered for the session, not across restarts. It never switches
+  by itself.
+- No fight: "No boss yet. One appears when a test run fails." muted, then TEST COMMAND (a
+  40px text field, saved on blur) with the hint "Leave empty to use the usual runners."
+  muted.
+- Active fight, top to bottom, 10px gap: the boss box (4px border in the boss accent,
+  `--bg` fill, 10px padding, the idle loop at scale 2, centered; after a round with hits,
+  "<n> HITS" in pixel 9px `--waiting` with a 2px text shadow in its top-right corner for 2
+  seconds); the name (pixel 9px, boss accent) and "<runner> · round <n>" (11px muted); the
+  HP bar (12px, 2px `--line` border, `--bg` track, what is left in `--error`, the part just
+  lost in `--waiting` draining over 600ms); "<hp> / <maxHp> tests left" (12px, hp bold);
+  WEAK POINTS (pixel 7px muted) and one row per file with failures, most first, at most 6
+  and "+<n> more files" (each a button, `--bg` fill, 2px border, `--error` on the first row
+  and `--line` on the rest, the file and its count in `--error`; a click puts "Focus on
+  <file>." into the composer after any draft, not sent, and focuses it); pinned to the
+  bottom, EXPAND BATTLE (44px, `--error` fill, dark text, 4px `--text` border, 4px hard
+  shadow, pixel 8px), which reads BACK TO CHAT (`--bg` fill) while the battle view is open.
+- Got away: the same box, "GOT AWAY · <hp> left" in place of the HP line, the weak
+  points, FIGHT ON in the EXPAND BATTLE style, and EXPAND BATTLE as a plain button.
+- Defeated: the defeated loop held, "DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds
+  · <time>", and DISMISS, which moves the fight out of the tab (its notices stay in the
+  history).
+- FIGHT ON makes the fight active again, then sends "Keep going until all the tests
+  pass." through the normal send. It is disabled while a run is going.
+- Rail: a 68px button (the 64px idle frame and a 2px border) at the top of the rail with a
+  4px HP bar under the frame. It opens the battle view. Its name is "<Boss>, <hp> of <maxHp>
+  tests left".
+
+### Battle view
+
+EXPAND BATTLE replaces the CHAT stage frame (history, stage, and theme) with the battle
+view. The header, the composer, and the party panel stay. BACK TO CHAT (in the view or the
+tab) and Escape go back; so do leaving CHAT, NEW CHAT, and the end of the fight's
+conversation. A later fight never opens the view by itself.
+
+- One frame: position relative, overflow hidden, 4px border in the boss accent.
+- Background: the pack's background, object-fit cover, object-position center bottom,
+  pixelated. The lower 46% fades from transparent to `--bg` at 85%.
+- Floor glow: a 320x40 ellipse in the boss accent at 20% opacity, centered under the boss,
+  its middle 20px above the sprite's bottom.
+- TEST LOG, left: top 12px, left 12px, bottom 88px, width min(320px, 40%), `--bg` at 90%,
+  4px `--text` border, 4px hard shadow, padding 10px 12px, 12px text, scrolls inside. Top
+  row: the mascot in a 32px box with a 2px `--line` border (drawn at half scale,
+  nearest-neighbour: hard edges, no blur), "TEST LOG" (pixel 8px, accent), "<runner> ·
+  round <n>" muted on the right. Then the latest round: "▶ <attacker> strikes!" (13px);
+  "✓ <test name> −1" rows (✓ in `--loot-add`, −1 in `--waiting`), at most 8 and "+<n>
+  more", or "<n> tests now pass" when unnamed; a divider (2px `--line` top and bottom, 4px
+  padding) with "<n> hit combo!" in `--waiting` bold and " <file> cleared." per file
+  cleared; "✕ <test name> +1" rows (✕ and +1 in `--error`) and "<Boss> healed <n>!
+  <file> broke."; "✕ <file short> · <test>" muted, at most 3 and "+<n> more still
+  failing". A round with no change: "No change. <hp> tests still failing."
+- HP plate, top: from 24px right of the test log to 168px from the right edge: the name
+  (pixel 10px, boss accent, 2px text shadow; it gives way first only after the runner
+  text), "<runner> · round <n>" (11px muted), "<hp> / <maxHp>" (13px, hp bold) on the
+  right, and the HP bar at 14px with a 3px border. On a frame 640px wide or less, the plate
+  sits under BACK TO CHAT (top 60px, right 12px) and the boss starts at 108px.
+- BACK TO CHAT: top 12px, right 12px, 40px tall, `--bg` at 90%, 4px `--line` border, pixel
+  8px.
+- Boss: the current state's loop centered in the space right of the test log, top 78px:
+  scale 4 (256px); scale 3 (192px) when that space is under 300px wide or the frame under
+  420px tall; and scale 2 (128px) when even 192px would not fit above the lineup. At
+  960x600 the frame is about 324px tall, so the boss is 128px there.
+- Lineup, bottom: left 12px, right 12px, bottom 12px, a card per member in a row, 8px gap,
+  flex 1: 4px border (`--line`; the active member `--waiting` on `--lineup-active`
+  #2A3558), padding 6px 8px, the agent's icon at 32px (the mascot for 'main') in a 40px
+  box, the name (12px, 600), a 6px health bar in `--loot-add`, and a 4px energy bar in the
+  accent (`--waiting` when full).
+- Victory: a banner over the boss, "<BOSS> IS DEFEATED!" (pixel 14px, `--waiting`) and
+  "<total> / <total> passing · +<xp> XP". Got away: "<BOSS> GOT AWAY." and "<hp> tests
+  still failing." with FIGHT ON.
+
+### The round replay
+
+After each round, in the battle view and the BOSS tab (renderer only; the fight in main is
+already final):
+
+- Hits one at a time, 120ms apart, at most 2 seconds in total (evenly spaced past 16).
+  Each: a "−1" (pixel 13px, `--waiting`, 2px text shadow) at a random spot around the
+  sprite's edge, rising 12px and fading over 600ms; the hit loop for 200ms; the HP bar down
+  by one.
+- After the last hit: "<n> HIT COMBO!" (pixel 16px, `--waiting`, 3px text shadow) above the
+  sprite for 1.5 seconds.
+- Heals after the hits: "+1" in `--loot-add`, the heal loop, the bar up by one.
+- Victory: the defeated loop plays once and holds.
+- Reduced motion: no pops and no combo text; the bar and the log are final at once; the
+  sprite shows frame 0 of its state.
+
+### History, nav, and popups
+
+- Each encounter, round, victory, and escape adds a one-line notice to the history, right
+  after the tool card of the test run (or the card of its task, for a run inside an
+  agent); one whose card is not in the history goes at the end. A notice is the boss's idle
+  frame in a 32px box, the log line, and a 2px border in the boss accent. Notices are never
+  typed out and never go into the dialogue box.
+- The log lines: "A wild <Boss> appears! <hp> of <maxHp> tests left.", "<n> hit combo!
+  <hp> of <maxHp> tests left.", "<Boss> healed <n>! <file> broke.", "No change. <hp> tests
+  still failing.", "Partial run: <passed> / <total> passed. It counts once a full run
+  confirms it.", "<Boss> is defeated! All <total> tests pass.", "<Boss> got away. <hp>
+  tests still failing.", and "<Boss> is back! <hp> of <maxHp> tests left."
+- An ended fight adds an end card after its last notice. Defeated: the held defeated
+  frame, "<BOSS> DEFEATED" (pixel 9px, `--waiting`), "<rounds> rounds · <start hp> → 0
+  tests left · <total> / <total> passing · +<xp> XP", and BATTLE LOG, which opens the
+  battle view read-only on the final round. Got away: the idle frame, "<BOSS> GOT AWAY"
+  (pixel 9px, muted), "<hp> / <maxHp> tests left", and FIGHT ON.
+- Notices and end cards come back after a restart, in place, from the saved fight.
+- CHAT's nav item shows a 6px `--error` dot while a fight is active and CHAT is not open.
+- Popups, in the background only (see Popup notification): a victory uses the finished
+  variant, "<Boss> is defeated! All <total> tests pass."; an escape the error variant,
+  "<Boss> got away. <hp> tests still failing."
+- The mascot plays hurt for 1.2 seconds after a round with heals and victory for 3 seconds
+  after a victory (see Mascots).
