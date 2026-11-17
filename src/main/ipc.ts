@@ -35,13 +35,16 @@ import {
   getPartyPanel,
   getPopups,
   getProject,
+  getTestCommand,
   setOpenInEditor,
   setPartyPanel,
+  setTestCommand,
   setPopups,
   setProject
 } from './settings'
 import { setPopupsEnabled, showTestPopup } from './popupWindow'
 import { agentStats, agentsSummary } from './progression'
+import { dismissFight, fightFor, fightOn, listUserPacks } from './bosses'
 import { achievementsData, equip, markAllSeen } from './progressionStore'
 import { clearFinishedTasks, getTask, listTasks, markTaskSeen, removeTask } from './tasks'
 import { createAgent, listAgents, readAgent, removeAgent, updateAgent } from './agents'
@@ -287,6 +290,28 @@ export function registerIpc(): void {
     ok: await equip(change)
   }))
   ipcMain.handle(IpcChannel.ProgressionMarkSeen, () => markAllSeen())
+
+  // Boss battles. The window never sends a path: main uses the open project and its
+  // conversation. The test command is checked and trimmed in settings.ts.
+  ipcMain.handle(IpcChannel.BossesPacks, () => listUserPacks())
+  ipcMain.handle(IpcChannel.BossesFight, () => fightFor(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesFightOn, () => fightOn(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesDismiss, () => dismissFight(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesGetTestCommand, async () => {
+    const project = getProject()
+    return project ? getTestCommand(project.path) : ''
+  })
+  ipcMain.handle(IpcChannel.BossesSetTestCommand, async (_event, command: unknown) => {
+    const project = getProject()
+    if (!project) return { ok: false, command: '' }
+    try {
+      const saved = await setTestCommand(project.path, command)
+      return saved === null ? { ok: false, command: '' } : { ok: true, command: saved }
+    } catch (err) {
+      console.error('Could not save settings:', err instanceof Error ? err.message : err)
+      return { ok: false, command: '' }
+    }
+  })
 
   // OPEN IN EDITOR on or off, kept in settings.json. Takes effect on the next OPEN/CHANGE.
   ipcMain.handle(IpcChannel.UiGetOpenInEditor, () => getOpenInEditor())

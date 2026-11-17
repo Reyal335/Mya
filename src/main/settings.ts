@@ -144,6 +144,35 @@ export function setPopups(on: boolean): Promise<void> {
   return updateSettings({ popups: on })
 }
 
+// The project's own test command for boss fights, or '' to use the usual runners. Kept
+// in settings.json as testCommands[projectPath].
+const MAX_TEST_COMMAND = 200
+
+export async function getTestCommand(projectPath: string): Promise<string> {
+  const { testCommands } = await readSettings()
+  if (!testCommands || typeof testCommands !== 'object') return ''
+  const value = (testCommands as Record<string, unknown>)[projectPath]
+  return typeof value === 'string' ? value : ''
+}
+
+// Returns the command as saved (trimmed, one line), or null when it is not text.
+export async function setTestCommand(projectPath: string, raw: unknown): Promise<string | null> {
+  if (typeof raw !== 'string') return null
+  const command = raw
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, MAX_TEST_COMMAND)
+  const { testCommands } = await readSettings()
+  const all =
+    testCommands && typeof testCommands === 'object'
+      ? { ...(testCommands as Record<string, unknown>) }
+      : {}
+  if (command === '') delete all[projectPath]
+  else all[projectPath] = command
+  await updateSettings({ testCommands: all })
+  return command
+}
+
 // OPEN IN EDITOR is off until I turn it on.
 export async function getOpenInEditor(): Promise<boolean> {
   const { openInEditor } = await readSettings()

@@ -86,6 +86,8 @@ export type PopupEvent =
   | { type: 'test'; notice: PopupNotice }
   // An achievement unlocked. Queued like a finished popup.
   | { type: 'achievement'; notice: PopupNotice }
+  // A boss fight ended: a victory (finished) or an escape (error). Queued the same way.
+  | { type: 'fight_ended'; notice: PopupNotice }
   // Acts main already checked with actAllowed. approve and deny change nothing
   // here: the request_closed that follows does.
   | { type: 'act'; id: string; action: PopupAction }
@@ -185,6 +187,7 @@ function apply(state: PopupState, event: PopupEvent, now: number): void {
       return
     }
     case 'achievement':
+    case 'fight_ended':
       if (canShow(state)) enqueue(state, event.notice)
       return
     case 'test': {

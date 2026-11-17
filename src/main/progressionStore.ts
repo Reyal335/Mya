@@ -304,6 +304,47 @@ export function recordTaskEnd(end: TaskEnd): Promise<TaskXp | null> {
   )
 }
 
+function entryFor(current: Store, filePath: string, at: number): AgentEntry {
+  const key = normalizePath(filePath)
+  current.agents[key] ??= {
+    xp: 0,
+    questsByProject: {},
+    toolUse: {},
+    itemsTotal: 0,
+    bossesDefeated: 0,
+    joinedAt: at
+  }
+  return current.agents[key]
+}
+
+// A boss is defeated. The final hit's agent file gets `xp`; every agent file in the lineup
+// that landed a hit gets bossesDefeated + 1. The first victory unlocks BOSS SLAYER.
+// Returns the XP given (0 when the final hit was not an agent file).
+export function recordBossVictory(victory: {
+  finalHit: string | null
+  xp: number
+  hitters: string[]
+}): Promise<number> {
+  return safely(
+    'Recording a boss victory',
+    async () => {
+      const current = await load()
+      const at = Date.now()
+      let given = 0
+      if (victory.finalHit !== null && victory.xp > 0) {
+        entryFor(current, victory.finalHit, at).xp += victory.xp
+        given = victory.xp
+      }
+      for (const filePath of new Set(victory.hitters)) {
+        entryFor(current, filePath, at).bossesDefeated += 1
+      }
+      await apply({ type: 'boss_defeated', at }, true)
+      return given
+    },
+    0
+  )
+}
+
 // The agents in the party that can be called now, as normalized paths.
 function runnableKeys(agents: GateAgent[]): string[] {
   return agents

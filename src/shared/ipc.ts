@@ -2,6 +2,7 @@
 // Our own small types only: never raw Agent SDK messages.
 
 import type { AccountData } from './account'
+import type { BossPack, Fight, FightEvent } from './bosses'
 import type { AchievementsData, Equipped, Reward, RewardKind, UnlockNotice } from './achievements'
 import type { PastedImage } from './images'
 import type { MascotStateName, MascotVoice } from './mascotRules'
@@ -94,7 +95,16 @@ export const IpcChannel = {
   // Main to every window: XP, an unlock, or what is equipped changed.
   ProgressionChanged: 'progression:changed',
   // Main to the main window: an achievement unlocked while the app was in front.
-  ProgressionUnlocked: 'progression:unlocked'
+  ProgressionUnlocked: 'progression:unlocked',
+  // Boss battles for test runs.
+  BossesPacks: 'bosses:packs',
+  BossesFight: 'bosses:fight',
+  BossesFightOn: 'bosses:fight-on',
+  BossesDismiss: 'bosses:dismiss',
+  BossesGetTestCommand: 'bosses:get-test-command',
+  BossesSetTestCommand: 'bosses:set-test-command',
+  // Main to every window: a fight started, played a round, ended, or went away.
+  BossesFightEvent: 'bosses:fight-event'
 } as const
 
 export type ProjectInfo = {
@@ -732,7 +742,25 @@ export type MyaApi = {
     // An unlock while the app is in front: the toast shows it.
     onUnlocked: (callback: (notice: UnlockNotice) => void) => () => void
   }
+  bosses: {
+    // The user's boss packs (userData/bosses), pictures as data URLs. The three default
+    // packs are bundled with the window.
+    packs: () => Promise<BossPack[]>
+    // The open conversation's fight, and the ones it finished before.
+    fight: () => Promise<BossFightData>
+    onFight: (callback: (event: FightEvent) => void) => () => void
+    // FIGHT ON: the boss that got away is active again. The window then sends the message.
+    fightOn: () => Promise<{ ok: boolean }>
+    // DISMISS on a defeated fight.
+    dismiss: () => Promise<{ ok: boolean }>
+    // The open project's own test command, '' for the usual runners.
+    getTestCommand: () => Promise<string>
+    setTestCommand: (command: string) => Promise<{ ok: boolean; command: string }>
+  }
 }
+
+// key is null before the open project has a conversation.
+export type BossFightData = { key: string | null; current: Fight | null; past: Fight[] }
 
 export type EquipChange = { kind: RewardKind; id: string | null }
 

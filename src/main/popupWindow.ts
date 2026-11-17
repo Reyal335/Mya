@@ -29,6 +29,7 @@ import { labelText, toolLabel } from '../shared/toolLabel'
 import { answerPermission, watchRuns } from './agent'
 import { getActiveMascot } from './mascots'
 import { equip, equippedNow, onUnlock } from './progressionStore'
+import { onFightEnd } from './bosses'
 import { getPopups } from './settings'
 import * as popups from './popups'
 
@@ -424,6 +425,19 @@ export function setupPopups(main: BrowserWindow): void {
   }
   watch()
   onUnlock(showUnlock)
+  // A boss defeated or got away: a finished or error popup, with the app in the background.
+  onFightEnd((end) =>
+    dispatch({
+      type: 'fight_ended',
+      notice: {
+        id: randomUUID(),
+        kind: end.kind === 'victory' ? 'finished' : 'error',
+        who: { kind: 'speaker' },
+        text: end.text,
+        open: { screen: 'chat' }
+      }
+    })
+  )
 
   const update = (): void => dispatch({ type: 'background', background: isBackground() })
   main.on('focus', update)
@@ -446,6 +460,7 @@ export function closePopups(): void {
   closing = true
   watchRuns(null)
   onUnlock(null)
+  onFightEnd(null)
   if (timer) clearTimeout(timer)
   timer = null
   screen.off('display-metrics-changed', onDisplaysChanged)

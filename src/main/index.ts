@@ -9,6 +9,7 @@ import { registerIpc } from './ipc'
 import { prefetchModels } from './models'
 import { getProject, loadProject } from './settings'
 import { loadProgression, useProjectFrom } from './progressionStore'
+import { loadBosses, watchConversations } from './bosses'
 import { loadTasks } from './tasks'
 import { loadUsage } from './usage'
 import { watchWindow } from './windowControls'
@@ -117,6 +118,9 @@ app.whenReady().then(async () => {
   // XP and achievements. A corrupt progression.json is kept aside and the app starts.
   useProjectFrom(() => getProject()?.path ?? null)
   await loadProgression()
+  // Boss fights, and the user's boss packs (a broken pack is skipped and logged).
+  await loadBosses()
+  watchConversations()
   // The saved usage numbers come back first; the account is read on its own after that.
   await loadUsage()
   registerIpc()

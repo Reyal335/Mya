@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { AccountData } from '../shared/account'
 import type { UnlockNotice } from '../shared/achievements'
+import type { FightEvent } from '../shared/bosses'
 import {
   IpcChannel,
   type AgentEvent,
@@ -153,6 +154,21 @@ const api: MyaApi = {
         ipcRenderer.removeListener(IpcChannel.ProgressionUnlocked, listener)
       }
     }
+  },
+  bosses: {
+    packs: () => ipcRenderer.invoke(IpcChannel.BossesPacks),
+    fight: () => ipcRenderer.invoke(IpcChannel.BossesFight),
+    onFight: (callback) => {
+      const listener = (_event: IpcRendererEvent, fight: FightEvent): void => callback(fight)
+      ipcRenderer.on(IpcChannel.BossesFightEvent, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.BossesFightEvent, listener)
+      }
+    },
+    fightOn: () => ipcRenderer.invoke(IpcChannel.BossesFightOn),
+    dismiss: () => ipcRenderer.invoke(IpcChannel.BossesDismiss),
+    getTestCommand: () => ipcRenderer.invoke(IpcChannel.BossesGetTestCommand),
+    setTestCommand: (command) => ipcRenderer.invoke(IpcChannel.BossesSetTestCommand, command)
   }
 }
 
