@@ -458,3 +458,89 @@ button.party__icon[aria-disabled='true'] {
   align-items: center;
   gap: 8px;
 }
+
+/* The header as a tab bar: PARTY | BOSS, then the collapse button (40px square). */
+.party__tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+}
+
+.party__tab {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.party__tab:hover,
+.party__tab:focus-visible {
+  border-color: var(--accent);
+}
+
+.party__tab--party.party__tab--selected {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.party__tab--boss.party__tab--selected {
+  background: var(--error);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.party__tab-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--error);
+}
+
+.party__head .party__toggle {
+  width: 40px;
+  height: 40px;
+}
+
+/* Each tab's content fills the rest of the panel. */
+.party__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The rail's boss button: the idle frame at scale 1 and a 4px HP bar under it. */
+.party__rail-boss {
+  flex: none;
+  /* 64px for the frame plus the 2px border on each side. */
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--error);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.party__rail-boss:hover,
+.party__rail-boss:focus-visible {
+  border-color: var(--text);
+}

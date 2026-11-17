@@ -1,0 +1,408 @@
+/* The battle view from "20b/20c/20d. Battle view": one frame, everything inside it. */
+.battle {
+  container-type: inline-size;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  border: var(--border) solid var(--boss-accent, var(--error));
+  font-size: 12px;
+}
+
+.battle__background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  image-rendering: pixelated;
+}
+
+/* The lower 46% fades from transparent to --bg at 85%. */
+.battle__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--bg) 85%, transparent)
+  );
+}
+
+.battle__muted {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* TEST LOG, left. */
+.battle__log {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  bottom: 88px;
+  width: min(320px, 40%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  border: var(--border) solid var(--text);
+  box-shadow: var(--shadow-hard);
+}
+
+.battle__log-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.battle__log-mascot {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: var(--border-thin) solid var(--line);
+}
+
+.battle__log-title {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--accent);
+}
+
+.battle__log-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.battle__log-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.battle__log-body p {
+  margin: 0;
+}
+
+.battle__strike {
+  font-size: 13px;
+}
+
+.battle__row {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.battle__row--muted {
+  color: var(--muted);
+}
+
+.battle__test {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle__pass {
+  flex: none;
+  color: var(--loot-add);
+}
+
+.battle__minus {
+  flex: none;
+  margin-left: auto;
+  color: var(--waiting);
+}
+
+.battle__fail {
+  flex: none;
+  color: var(--error);
+}
+
+.battle__row .battle__fail:last-child {
+  margin-left: auto;
+}
+
+/* "<n> hit combo!" between 2px lines. */
+.battle__combo {
+  padding: 4px 0;
+  color: var(--waiting);
+  border-top: var(--border-thin) solid var(--line);
+  border-bottom: var(--border-thin) solid var(--line);
+}
+
+/* The HP plate, top: from 24px right of the log to 168px from the right edge. */
+.battle__plate {
+  position: absolute;
+  top: 12px;
+  left: calc(12px + min(320px, 40%) + 24px);
+  right: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.battle__plate-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.battle__boss-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  color: var(--boss-accent, var(--error));
+  text-shadow: 2px 2px 0 var(--shadow);
+}
+
+.battle__plate-row .battle__muted {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.battle__plate-hp {
+  margin-left: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.battle__back {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  height: 40px;
+  margin: 0;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  color: var(--text);
+  border: var(--border) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.battle__back:hover,
+.battle__back:focus-visible {
+  border-color: var(--text);
+}
+
+/* The boss: centered in the space right of the log, from 78px down. */
+.battle__stage {
+  position: absolute;
+  top: 78px;
+  left: calc(12px + min(320px, 40%));
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.battle__stage button {
+  pointer-events: auto;
+}
+
+.battle__sprite {
+  position: relative;
+  width: var(--boss-size);
+  height: var(--boss-size);
+}
+
+/* A 320x40 ellipse under the boss, its middle 20px above the sprite's bottom. */
+.battle__glow {
+  position: absolute;
+  top: calc(var(--boss-size) - 40px);
+  left: 50%;
+  width: 320px;
+  height: 40px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--boss-accent, var(--error));
+  opacity: 0.2;
+}
+
+.battle__combo-text {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  color: var(--waiting);
+  text-shadow: 3px 3px 0 var(--shadow);
+}
+
+/* Victory or escape, over the boss. */
+.battle__banner {
+  position: absolute;
+  top: calc(var(--boss-size) * 0.3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  border: var(--border) solid var(--waiting);
+  box-shadow: var(--shadow-hard);
+  text-align: center;
+}
+
+.battle__banner--away {
+  border-color: var(--line);
+}
+
+.battle__banner-title {
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--waiting);
+}
+
+.battle__banner--away .battle__banner-title {
+  color: var(--text);
+}
+
+.battle__banner-text {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.battle__fight-on {
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--error);
+  color: var(--bg);
+  border: var(--border) solid var(--text);
+  border-radius: 0;
+  box-shadow: var(--shadow-hard);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.battle__fight-on:disabled {
+  background: var(--panel);
+  color: var(--muted);
+  border-color: var(--line);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* The lineup, bottom: one card per member. */
+.battle__lineup {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.battle__member {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: var(--border) solid var(--line);
+}
+
+.battle__member--active {
+  background: var(--lineup-active);
+  border-color: var(--waiting);
+}
+
+.battle__member-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.battle__member-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.battle__member-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.battle__bar {
+  display: block;
+  height: 6px;
+  background: var(--panel);
+}
+
+.battle__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--loot-add);
+}
+
+.battle__bar--energy {
+  height: 4px;
+}
+
+.battle__bar--energy > span {
+  background: var(--accent);
+}
+
+.battle__bar--full > span {
+  background: var(--waiting);
+}
+
+/* A narrow frame (the smallest windows): the plate goes under BACK TO CHAT, across the
+   space right of the log, and the boss starts 30px lower to make room. BattleView uses
+   the same top when it picks the boss's scale. */
+@container (max-width: 640px) {
+  .battle__plate {
+    top: 60px;
+    right: 12px;
+  }
+
+  .battle__stage {
+    top: 108px;
+  }
+}

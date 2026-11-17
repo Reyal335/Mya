@@ -70,7 +70,11 @@ function MascotCard({
         )}
       </div>
       <div className="mascot-card__name">{name}</div>
-      {idle && <div className="mascot-card__count">{count} of 5 loops</div>}
+      {idle && (
+        <div className="mascot-card__count">
+          {count} of {MASCOT_STATES.length} loops
+        </div>
+      )}
       {idle && (
         <div className="mascot-card__cycle" aria-live="polite">
           {cycle.state && (

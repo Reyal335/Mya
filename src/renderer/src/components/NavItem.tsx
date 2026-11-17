@@ -9,6 +9,8 @@ type NavItemProps = {
   dot?: boolean
   // What the dot means, for screen readers.
   dotLabel?: string
+  // 8px, or 6px (CHAT's fight dot).
+  dotSize?: 'normal' | 'small'
 }
 
 function NavItem({
@@ -17,7 +19,8 @@ function NavItem({
   onClick,
   count,
   dot = false,
-  dotLabel
+  dotLabel,
+  dotSize = 'normal'
 }: NavItemProps): React.JSX.Element {
   const showCount = count !== undefined && count > 0
 
@@ -34,7 +37,13 @@ function NavItem({
           {count}
         </span>
       )}
-      {dot && <span className="nav-item__dot" role="img" aria-label={dotLabel ?? 'New'} />}
+      {dot && (
+        <span
+          className={`nav-item__dot${dotSize === 'small' ? ' nav-item__dot--small' : ''}`}
+          role="img"
+          aria-label={dotLabel ?? 'New'}
+        />
+      )}
     </button>
   )
 }

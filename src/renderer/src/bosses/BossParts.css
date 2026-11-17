@@ -1,0 +1,106 @@
+/* Shared boss pieces: the face box, the HP bar, and the pops. */
+.boss-face {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.boss-face--32 {
+  width: 32px;
+  height: 32px;
+}
+
+.boss-face--64 {
+  width: 64px;
+  height: 64px;
+}
+
+/* The lost part sits behind what is left and drains over 600ms; what is left jumps. */
+.hp-bar {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  overflow: hidden;
+}
+
+.hp-bar--4 {
+  height: 4px;
+  border-width: 0;
+}
+
+.hp-bar--12 {
+  height: 12px;
+}
+
+.hp-bar--14 {
+  height: 14px;
+  border-width: 3px;
+}
+
+.hp-bar__lost,
+.hp-bar__left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.hp-bar__lost {
+  background: var(--waiting);
+  transition: width 600ms linear;
+}
+
+.hp-bar__left {
+  background: var(--error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-bar__lost {
+    transition: none;
+  }
+}
+
+.boss-pops {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Rises 12px and fades over 600ms. */
+.boss-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--waiting);
+  text-shadow: 2px 2px 0 var(--shadow);
+  animation: boss-pop 600ms steps(6) forwards;
+}
+
+.boss-pop--heal {
+  color: var(--loot-add);
+}
+
+@keyframes boss-pop {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 12px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-pops {
+    display: none;
+  }
+}

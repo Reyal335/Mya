@@ -1,5 +1,5 @@
 import type { MascotLoop, MascotLoops } from '../../../shared/ipc'
-import type { MascotStateName } from '../../../shared/mascotRules'
+import { STATE_FALLBACK, type MascotStateName } from '../../../shared/mascotRules'
 
 export type { MascotLoop, MascotStateName }
 
@@ -12,7 +12,8 @@ export type Mascot = {
   loops: MascotLoops
 }
 
-// The one place a missing state falls back to the idle loop.
+// The one place a missing state falls back: victory to talking, everything else to idle.
 export function loopFor(mascot: Mascot, state: MascotStateName): MascotLoop {
-  return mascot.loops[state] ?? mascot.loops.idle
+  const fallback = STATE_FALLBACK[state]
+  return mascot.loops[state] ?? (fallback ? mascot.loops[fallback] : undefined) ?? mascot.loops.idle
 }

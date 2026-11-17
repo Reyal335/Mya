@@ -42,3 +42,8 @@
   height: 8px;
   background: var(--error);
 }
+
+.nav-item__dot--small {
+  width: 6px;
+  height: 6px;
+}

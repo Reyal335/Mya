@@ -1,0 +1,84 @@
+/* Battle notices and end cards in the CHAT history. Solid fills, so they read over the
+   chat theme like the other plain lines. */
+.battle-notice {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 78%;
+  margin: 0;
+  padding: 6px 10px 6px 6px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--boss-accent, var(--error));
+  font-size: 13px;
+}
+
+.battle-notice .boss-face {
+  border: var(--border-thin) solid var(--line);
+}
+
+.battle-notice__line {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.boss-end {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 78%;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: var(--border) solid var(--boss-accent, var(--error));
+  box-shadow: var(--shadow-dialog);
+}
+
+.boss-end__sprite {
+  flex: none;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+.boss-end__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.boss-end__title {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.boss-end__title--won {
+  color: var(--waiting);
+}
+
+.boss-end__line {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.boss-end__button {
+  min-height: 32px;
+  margin: 0;
+  padding: 0 10px;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border-thin) solid var(--text);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.boss-end__button:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  cursor: not-allowed;
+}

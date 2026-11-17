@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import type { AgentSummary, PartyPanelMode, TaskAgent } from '../../../shared/ipc'
 import { callBlock } from '../../../shared/agentGate'
 import {
@@ -29,7 +29,17 @@ type PartyPanelProps = {
   onOpenTask: (taskId: string) => void
   // Class and level per agent file, keyed by filePath.
   progress: Record<string, AgentProgress>
+  // PARTY or BOSS, kept for the session by the app. It never switches by itself.
+  tab: PartyTab
+  onTab: (tab: PartyTab) => void
+  // A fight is active: BOSS shows a red dot while PARTY is selected.
+  bossDot: boolean
+  // The BOSS tab's content, and the rail's boss button (null without a fight).
+  bossTab: ReactNode
+  railBoss: ReactNode
 }
+
+export type PartyTab = 'party' | 'boss'
 
 type RowState = 'idle' | 'calling' | 'working' | 'waiting' | 'off'
 
@@ -146,8 +156,14 @@ function PartyPanel({
   mode,
   onToggle,
   onOpenTask,
-  progress
+  progress,
+  tab,
+  onTab,
+  bossDot,
+  bossTab,
+  railBoss
 }: PartyPanelProps): React.JSX.Element {
+  const tabsId = useId()
   const [pointed, setPointed] = useState<string | null>(null)
   const [cardTop, setCardTop] = useState(0)
   const railRef = useRef<HTMLElement>(null)
@@ -204,6 +220,7 @@ function PartyPanel({
     return (
       <aside className="party party--rail" aria-label="Party" ref={railRef}>
         {toggle}
+        {railBoss}
         <span className="party__rail-title">PARTY</span>
         <div className="party__rail-list" onScroll={() => setPointed(null)}>
           {list.map((member) => {
@@ -292,108 +309,166 @@ function PartyPanel({
   return (
     <aside className="party" aria-label="Party">
       <div className="party__head">
-        <h2 className="party__title">PARTY</h2>
-        <span className="party__count">
-          {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
-        </span>
+        <div
+          className="party__tabs"
+          role="tablist"
+          aria-label="Party panel"
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+            event.preventDefault()
+            const next = tab === 'party' ? 'boss' : 'party'
+            onTab(next)
+            document.getElementById(`${tabsId}-${next}`)?.focus()
+          }}
+        >
+          {(['party', 'boss'] as const).map((name) => (
+            <button
+              key={name}
+              id={`${tabsId}-${name}`}
+              type="button"
+              role="tab"
+              aria-selected={tab === name}
+              aria-controls={`${tabsId}-${name}-panel`}
+              tabIndex={tab === name ? 0 : -1}
+              className={`party__tab party__tab--${name}${tab === name ? ' party__tab--selected' : ''}`}
+              onClick={() => onTab(name)}
+            >
+              {name === 'party' ? 'PARTY' : 'BOSS'}
+              {name === 'boss' && bossDot && tab === 'party' && (
+                <span className="party__tab-dot" role="img" aria-label="A fight is going" />
+              )}
+            </button>
+          ))}
+        </div>
         {toggle}
       </div>
-      <p className="party__note">
-        {call
-          ? `Calling ${call.agent.name} for your next message.`
-          : 'Click a member to call them for your next message.'}
-      </p>
+      {tab === 'boss' ? (
+        <div
+          className="party__panel"
+          role="tabpanel"
+          id={`${tabsId}-boss-panel`}
+          aria-labelledby={`${tabsId}-boss`}
+        >
+          {bossTab}
+        </div>
+      ) : (
+        <div
+          className="party__panel"
+          role="tabpanel"
+          id={`${tabsId}-party-panel`}
+          aria-labelledby={`${tabsId}-party`}
+        >
+          <span className="party__count">
+            {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
+          </span>
+          <p className="party__note">
+            {call
+              ? `Calling ${call.agent.name} for your next message.`
+              : 'Click a member to call them for your next message.'}
+          </p>
 
-      <div className="party__list">
-        {loaded && list.length === 0 && (
-          <p className="party__empty">No agents yet. Make one on the AGENTS screen.</p>
-        )}
-        {list.map((member) => {
-          const rank = rankOf(member, progress)
-          const content = (
-            <>
-              <span className={member.state === 'working' ? 'party__hop' : undefined}>
-                <AgentIcon src={member.look.icon} size={32} label="" />
-              </span>
-              <span className="party__names">
-                <span className="party__name-line">
-                  <span className="party__name">{member.look.name}</span>
-                  {rank && <span className="party__lv">LV {rank.level.level}</span>}
-                </span>
-                {(rank || member.smaller) && (
-                  <span className="party__sub">
-                    {rank && (
-                      <ClassBadge classId={rank.agentClass.id} reason={rank.agentClass.reason} />
-                    )}
-                    {member.smaller && <span className="party__smaller">{member.smaller}</span>}
+          <div className="party__list">
+            {loaded && list.length === 0 && (
+              <p className="party__empty">No agents yet. Make one on the AGENTS screen.</p>
+            )}
+            {list.map((member) => {
+              const rank = rankOf(member, progress)
+              const content = (
+                <>
+                  <span className={member.state === 'working' ? 'party__hop' : undefined}>
+                    <AgentIcon src={member.look.icon} size={32} label="" />
                   </span>
-                )}
-                {rank && (
-                  <XpBar
-                    intoLevel={rank.level.intoLevel}
-                    toNext={rank.level.toNext}
-                    dark={member.state === 'calling'}
-                  />
-                )}
-              </span>
-              {(member.state === 'working' || member.state === 'waiting') && (
-                <span className="party__marker" aria-hidden="true" />
-              )}
-            </>
-          )
-          const className = `party__row party__row--${member.state}`
-          if (!member.action) {
-            return (
-              <div key={member.key} className={className} tabIndex={0} {...pointHandlers(member)}>
-                {content}
-              </div>
-            )
-          }
-          return (
-            <button
-              key={member.key}
-              type="button"
-              className={className}
-              aria-label={
-                member.action.kind === 'open'
-                  ? `${accessibleName(member, rank)}. ${member.smaller ?? ''}. Open its task in INBOX`
-                  : accessibleName(member, rank)
+                  <span className="party__names">
+                    <span className="party__name-line">
+                      <span className="party__name">{member.look.name}</span>
+                      {rank && <span className="party__lv">LV {rank.level.level}</span>}
+                    </span>
+                    {(rank || member.smaller) && (
+                      <span className="party__sub">
+                        {rank && (
+                          <ClassBadge
+                            classId={rank.agentClass.id}
+                            reason={rank.agentClass.reason}
+                          />
+                        )}
+                        {member.smaller && <span className="party__smaller">{member.smaller}</span>}
+                      </span>
+                    )}
+                    {rank && (
+                      <XpBar
+                        intoLevel={rank.level.intoLevel}
+                        toNext={rank.level.toNext}
+                        dark={member.state === 'calling'}
+                      />
+                    )}
+                  </span>
+                  {(member.state === 'working' || member.state === 'waiting') && (
+                    <span className="party__marker" aria-hidden="true" />
+                  )}
+                </>
+              )
+              const className = `party__row party__row--${member.state}`
+              if (!member.action) {
+                return (
+                  <div
+                    key={member.key}
+                    className={className}
+                    tabIndex={0}
+                    {...pointHandlers(member)}
+                  >
+                    {content}
+                  </div>
+                )
               }
-              aria-pressed={member.action.kind === 'call' ? member.state === 'calling' : undefined}
-              onClick={() => activate(member)}
-              {...pointHandlers(member)}
-            >
-              {content}
-            </button>
-          )
-        })}
-      </div>
+              return (
+                <button
+                  key={member.key}
+                  type="button"
+                  className={className}
+                  aria-label={
+                    member.action.kind === 'open'
+                      ? `${accessibleName(member, rank)}. ${member.smaller ?? ''}. Open its task in INBOX`
+                      : accessibleName(member, rank)
+                  }
+                  aria-pressed={
+                    member.action.kind === 'call' ? member.state === 'calling' : undefined
+                  }
+                  onClick={() => activate(member)}
+                  {...pointHandlers(member)}
+                >
+                  {content}
+                </button>
+              )
+            })}
+          </div>
 
-      <div className="party__detail">
-        {detail ? (
-          <>
-            <div className="party__detail-head">
-              <span className="party__detail-name">{detail.look.name}</span>
-              {detail.agent?.model && <span className="party__tag">{detail.agent.model}</span>}
-            </div>
-            {detail.agent ? (
+          <div className="party__detail">
+            {detail ? (
               <>
-                <p className="party__detail-description">{detail.agent.description}</p>
-                <p className="party__detail-tools">{toolsText(detail.agent.tools)}</p>
-                {detailClass && (
-                  <p className="party__detail-tools">
-                    {CLASS_NAMES[detailClass.id]} · {detailClass.reason}
-                  </p>
+                <div className="party__detail-head">
+                  <span className="party__detail-name">{detail.look.name}</span>
+                  {detail.agent?.model && <span className="party__tag">{detail.agent.model}</span>}
+                </div>
+                {detail.agent ? (
+                  <>
+                    <p className="party__detail-description">{detail.agent.description}</p>
+                    <p className="party__detail-tools">{toolsText(detail.agent.tools)}</p>
+                    {detailClass && (
+                      <p className="party__detail-tools">
+                        {CLASS_NAMES[detailClass.id]} · {detailClass.reason}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="party__detail-description">A built-in agent Claude brought in.</p>
                 )}
               </>
             ) : (
-              <p className="party__detail-description">A built-in agent Claude brought in.</p>
+              <p className="party__detail-empty">Hover a member to see what they do.</p>
             )}
-          </>
-        ) : (
-          <p className="party__detail-empty">Hover a member to see what they do.</p>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

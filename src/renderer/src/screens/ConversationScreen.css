@@ -379,3 +379,20 @@
   line-height: 1;
   color: var(--waiting);
 }
+
+/* Boss battles: victory in --waiting, hurt in --error. */
+.stage__tag--victory {
+  background: var(--waiting);
+}
+
+.stage__tag--hurt {
+  background: var(--error);
+}
+
+.stage__badge--victory {
+  background: var(--waiting);
+}
+
+.stage__badge--hurt {
+  background: var(--error);
+}

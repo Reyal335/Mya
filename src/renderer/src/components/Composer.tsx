@@ -41,6 +41,9 @@ type ComposerProps = {
   // Either part may be empty, not both.
   onSend: (message: string, images: OutgoingImage[]) => void
   onStop: () => void
+  // Text another part of CHAT puts in the box (a boss's weak point), not sent. A new tick
+  // is a new request. It goes after the draft, so nothing typed is lost.
+  insert?: { text: string; tick: number } | null
 }
 
 // A big paste or a pasted image, held beside the text. What is worked out from it (line
@@ -139,9 +142,29 @@ function Composer({
   picker,
   agent,
   onSend,
-  onStop
+  onStop,
+  insert = null
 }: ComposerProps): React.JSX.Element {
   const [text, setText] = useState('')
+  // The last insert request taken in, so each one lands once.
+  const [insertSeen, setInsertSeen] = useState(insert?.tick ?? 0)
+  if (insert && insert.tick !== insertSeen) {
+    setInsertSeen(insert.tick)
+    setText((current) =>
+      current.trim() === ''
+        ? insert.text
+        : `${current}${/\s$/.test(current) ? '' : ' '}${insert.text}`
+    )
+  }
+  const insertTick = insert?.tick ?? 0
+  // Focus moves to the box, with the caret after the inserted text.
+  useEffect(() => {
+    if (insertTick === 0) return
+    const box = inputRef.current
+    if (!box) return
+    box.focus()
+    box.setSelectionRange(box.value.length, box.value.length)
+  }, [insertTick, inputRef])
   const [attachments, setAttachments] = useState<Attachment[]>([])
   // Why the last pasted image was refused.
   const [error, setError] = useState<string | null>(null)

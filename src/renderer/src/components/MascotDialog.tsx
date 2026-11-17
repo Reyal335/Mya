@@ -564,7 +564,11 @@ function MascotDialog({
           </div>
         ) : (
           <div className="sheet-row__placeholder">
-            {state === 'idle' ? 'Idle is required' : 'Plays the idle loop'}
+            {state === 'idle'
+              ? 'Idle is required'
+              : state === 'victory'
+                ? 'Plays the talking loop'
+                : 'Plays the idle loop'}
           </div>
         )}
 
