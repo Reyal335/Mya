@@ -14,10 +14,8 @@ import {
   FRAME_SIZE,
   MASCOT_STATES,
   mascotNameError,
-  MAX_FPS,
   MAX_MASCOT_NAME_LENGTH,
   MAX_VOICE_LENGTH,
-  MIN_FPS,
   parseFps,
   voiceError,
   type EmojiLevel,
@@ -27,9 +25,9 @@ import {
 import { DEFAULT_MASCOT } from '../mascots/defaultMascot'
 import Dialog from './Dialog'
 import { startingGrid } from '../../../shared/sliceRules'
-import Mascot from './Mascot'
-import SheetSlicer, { type SliceGrid, type SliceSource } from './SheetSlicer'
-import SheetStrip from './SheetStrip'
+import SheetRow from './SheetRow'
+import SheetSlicer from './SheetSlicer'
+import { useSheetPicker, type PickedStrip, type SheetApi } from './useSheetPicker'
 import './MascotDialog.css'
 
 export type MascotDialogTarget =
@@ -136,6 +134,15 @@ function framesText(frames: number): string {
   return `${frames} ${frames === 1 ? 'frame' : 'frames'}`
 }
 
+// How the mascot editor picks and cuts sheets.
+const MASCOT_SHEETS: SheetApi = {
+  pick: () => window.mya.mascots.pickSheet(),
+  slice: (sourceToken, columns, rows, cells) =>
+    window.mya.mascots.sliceSheet(sourceToken, columns, rows, cells),
+  discard: (token) => window.mya.mascots.discardSheet(token),
+  dropSources: () => window.mya.mascots.dropSources()
+}
+
 // The upload dialog from designs/4-mascot-manager.html: a name and one row per
 // state. Picked sheets wait in the main process until SAVE; any not saved are
 // dropped when the dialog closes.
@@ -167,42 +174,20 @@ function MascotDialog({
   const [voiceEmoji, setVoiceEmoji] = useState<EmojiLevel>(initial.voiceEmoji)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  // The latest sheet picked in another layout. It stays loaded in the main
-  // process until the dialog closes, so REUSE SHEET can slice it for other rows.
-  // `grid` is the grid last confirmed for it.
-  const [source, setSource] = useState<(SliceSource & { grid: SliceGrid | null }) | null>(null)
-  // The one row that is slicing, with its own fps text for the preview. The key
-  // gives each opening a fresh slicer.
-  const [slicing, setSlicing] = useState<{
-    state: MascotStateName
-    fps: string
-    // Whether the slicer opens with REVERSE AT END on.
-    reverse: boolean
-    key: number
-  } | null>(null)
-  const slicerOpenings = useRef(0)
-  // The blob: URL the source sheet is shown from.
-  const sourceUrl = useRef<string | null>(null)
-
-  // Tokens of picked sheets not yet saved. Read through a ref so the latest
-  // value is known after an await and on unmount.
-  const pending = useRef(new Set<string>())
   const slotsRef = useRef(slots)
   useEffect(() => {
     slotsRef.current = slots
   }, [slots])
 
-  // Closing the dialog drops picks that were not saved and every loaded source sheet.
-  useEffect(
-    () => () => {
-      for (const token of pending.current) void window.mya.mascots.discardSheet(token)
-      pending.current.clear()
-      void window.mya.mascots.dropSources()
-      if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current)
-      sourceUrl.current = null
-    },
-    []
-  )
+  // Picked sheets wait in the main process until SAVE. Closing the dialog drops the ones not
+  // saved and every loaded source sheet. The latest sheet picked in another layout stays loaded,
+  // so REUSE SHEET can slice it for other rows.
+  const picker = useSheetPicker<MascotStateName>(MASCOT_SHEETS, {
+    startingFps,
+    startingReverse,
+    onStrip: fillSlot,
+    onError: (state, message) => updateSlot(state, { error: message })
+  })
 
   const nameError = mascotNameError(name)
   const filled = MASCOT_STATES.filter((state) => slots[state].sheet)
@@ -214,7 +199,7 @@ function MascotDialog({
   // only counts as a change while there is voice text: with none, it does not end up in
   // the draft either way.
   const dirty =
-    slicing !== null ||
+    picker.slicing !== null ||
     name.trim() !== initial.name.trim() ||
     trimmedVoice !== initial.voiceText.trim() ||
     (trimmedVoice !== '' && voiceEmoji !== initial.voiceEmoji) ||
@@ -226,7 +211,7 @@ function MascotDialog({
             slots[state].reverse !== initial.slots[state].reverse))
     )
   const valid = nameError === null && slots.idle.sheet !== null && fpsValid && voiceProblem === null
-  const canSave = valid && dirty && !saving && slicing === null
+  const canSave = valid && dirty && !saving && picker.slicing === null
 
   useEffect(() => {
     onDirtyChange(dirty)
@@ -239,9 +224,7 @@ function MascotDialog({
   }
 
   function dropToken(change: MascotSheetChange): void {
-    if (change.type !== 'token') return
-    pending.current.delete(change.token)
-    void window.mya.mascots.discardSheet(change.token)
+    if (change.type === 'token') picker.release(change.token)
   }
 
   // The speed a new sheet starts at: a replaced upload keeps its speed; an
@@ -257,15 +240,14 @@ function MascotDialog({
     return Boolean(before.sheet && !before.sheet.builtIn && before.reverse)
   }
 
-  // Puts a strip that waits in the main process behind `token` into a row.
+  // Puts a strip that waits in the main process behind its token into a row.
   function fillSlot(
     state: MascotStateName,
-    strip: { token: string; preview: string; frames: number; fileName: string },
+    strip: PickedStrip,
     fps: string,
     reverse: boolean
   ): void {
     dropToken(slotsRef.current[state].change)
-    pending.current.add(strip.token)
     updateSlot(state, {
       sheet: {
         src: strip.preview,
@@ -279,88 +261,6 @@ function MascotDialog({
       reverse,
       error: null
     })
-  }
-
-  // Opens the slicer on the loaded source for one row. Only one row slices at
-  // a time, so this closes any other slicer.
-  function openSlicer(state: MascotStateName): void {
-    slicerOpenings.current += 1
-    setSlicing({
-      state,
-      fps: startingFps(state),
-      reverse: startingReverse(state),
-      key: slicerOpenings.current
-    })
-    updateSlot(state, { error: null })
-  }
-
-  async function pick(state: MascotStateName): Promise<void> {
-    try {
-      const result = await window.mya.mascots.pickSheet()
-      // A refused sheet leaves the row as it was, slicer and all.
-      if (!result.ok) {
-        updateSlot(state, { error: result.error.message })
-        return
-      }
-      if (result.canceled) return
-      if (result.kind === 'strip') {
-        // A legal strip is used as it is.
-        fillSlot(state, result, startingFps(state), startingReverse(state))
-        setSlicing((current) => (current?.state === state ? null : current))
-        return
-      }
-      // Only the latest sheet is kept, so the previous one's URL is let go.
-      if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current)
-      const url = URL.createObjectURL(
-        new Blob([new Uint8Array(result.bytes)], { type: 'image/png' })
-      )
-      sourceUrl.current = url
-      setSource({
-        token: result.sourceToken,
-        fileName: result.fileName,
-        width: result.width,
-        height: result.height,
-        url,
-        grid: null
-      })
-      openSlicer(state)
-    } catch (err) {
-      console.error('Could not pick a sheet:', err)
-      updateSlot(state, { error: 'The sheet could not be opened.' })
-    }
-  }
-
-  // USE N FRAMES: main cuts the strip; the row then holds it like an uploaded one.
-  async function confirmSlice(
-    state: MascotStateName,
-    fps: string,
-    grid: SliceGrid,
-    cells: number[],
-    reverse: boolean
-  ): Promise<string | null> {
-    if (!source) return 'This sheet is no longer loaded. Upload it again.'
-    try {
-      const result = await window.mya.mascots.sliceSheet(
-        source.token,
-        grid.columns,
-        grid.rows,
-        cells
-      )
-      if (!result.ok) return result.error.message
-      fillSlot(
-        state,
-        { ...result, fileName: `${source.fileName} · sliced ${grid.columns} x ${grid.rows}` },
-        fps,
-        reverse
-      )
-      const token = source.token
-      setSource((current) => (current?.token === token ? { ...current, grid } : current))
-      setSlicing(null)
-      return null
-    } catch (err) {
-      console.error('Could not slice the sheet:', err)
-      return 'The sheet could not be cut into frames.'
-    }
   }
 
   function remove(state: MascotStateName): void {
@@ -408,7 +308,7 @@ function MascotDialog({
         : await window.mya.mascots.create(draft)
       if (result.ok) {
         // Saved sheets are no longer pending; main has already let go of them.
-        pending.current.clear()
+        picker.forgetPending()
         onDirtyChange(false)
         onSaved()
         return
@@ -424,17 +324,16 @@ function MascotDialog({
   function renderRow(state: MascotStateName): React.JSX.Element {
     const slot = slots[state]
     const { sheet } = slot
-    const label = state.toUpperCase()
-    const slicer = slicing?.state === state && source ? { ...slicing, source } : null
+    const slicer =
+      picker.slicing?.row === state && picker.source
+        ? { ...picker.slicing, source: picker.source }
+        : null
     // While slicing, the fps field sets the slicer preview's speed.
     const fpsText = slicer ? slicer.fps : slot.fps
     const fps = parseFps(fpsText)
     const oneFrame = !slicer && sheet?.frames === 1
-    const fpsProblem = (slicer || sheet) && !oneFrame ? fpsError(fpsText) : null
-    const rowClass = ['sheet-row']
-    if (slicer) rowClass.push('sheet-row--slicing')
-    else if (slot.error) rowClass.push('sheet-row--error')
-    else if (!sheet) rowClass.push('sheet-row--empty')
+    const hasSheet = Boolean(slicer || sheet)
+    const fpsProblem = hasSheet && !oneFrame ? fpsError(fpsText) : null
 
     let meta = 'No sheet yet'
     if (slicer) {
@@ -444,149 +343,105 @@ function MascotDialog({
     }
 
     return (
-      <section key={state} className={rowClass.join(' ')} aria-label={`${state} loop`}>
-        <div className="sheet-row__head">
-          <span className={`sheet-row__state sheet-row__state--${state}`}>{label}</span>
-          {state === 'idle' && <span className="sheet-row__required">required</span>}
-          <span className="sheet-row__meta">{meta}</span>
-          {/* Always FPS, UPLOAD or REPLACE, REUSE SHEET, REMOVE, in this order. A control
-              that does not apply is disabled, so the buttons never move. */}
-          <div className="sheet-row__controls">
-            <label className="sheet-row__fps">
-              FPS
+      <SheetRow
+        key={state}
+        ariaLabel={`${state} loop`}
+        tag={state.toUpperCase()}
+        tagClass={`sheet-row__state--${state}`}
+        required={state === 'idle'}
+        meta={meta}
+        look={slicer ? 'slicing' : slot.error ? 'error' : !sheet ? 'empty' : 'filled'}
+        error={slot.error}
+        fps={{
+          text: fpsText,
+          active: hasSheet,
+          disabled: !hasSheet || oneFrame,
+          invalid: Boolean(fpsProblem),
+          label: `${state} FPS`,
+          title: oneFrame
+            ? 'A one-frame sheet does not animate.'
+            : !hasSheet
+              ? 'No sheet yet.'
+              : undefined,
+          onChange: (value) => {
+            if (slicer) picker.setSlicingFps(value)
+            else updateSlot(state, { fps: value })
+          }
+        }}
+        upload={{
+          replace: Boolean(sheet),
+          label: `${sheet ? 'Replace' : 'Upload'} ${state} sheet`,
+          onClick: () => void picker.pick(state)
+        }}
+        reuse={{
+          label: picker.source
+            ? `Reuse sheet ${picker.source.fileName} for ${state}`
+            : `Reuse sheet for ${state}`,
+          title: picker.source
+            ? `Slice ${picker.source.fileName} again for this state`
+            : 'No sheet loaded yet.',
+          disabled: !picker.source || Boolean(slicer),
+          onClick: () => picker.openSlicer(state)
+        }}
+        // The default's idle row can drop an uploaded sheet: the built-in one comes back.
+        remove={{
+          label: `Remove ${state} sheet`,
+          title:
+            state === 'idle'
+              ? isDefault
+                ? 'Goes back to the built-in idle sheet.'
+                : 'Idle is required'
+              : undefined,
+          disabled: Boolean(slicer) || !sheet || sheet.builtIn || (state === 'idle' && !isDefault),
+          onClick: () => remove(state)
+        }}
+        slicer={
+          slicer ? (
+            <SheetSlicer
+              key={slicer.opening}
+              source={slicer.source}
+              initialGrid={
+                slicer.source.grid ?? startingGrid(slicer.source.width, slicer.source.height)
+              }
+              initialReverse={slicer.reverse}
+              fps={fps}
+              onUse={(grid, cells, reverse) =>
+                picker.confirmSlice(state, slicer.fps, grid, cells, reverse)
+              }
+              onCancel={picker.closeSlicer}
+            />
+          ) : null
+        }
+        sheet={sheet ? { src: sheet.src, frames: sheet.frames } : null}
+        loop={{
+          fps,
+          reverse: slot.reverse,
+          label: `${state} loop playing`,
+          stripLabel: sheet ? `${state} sheet, ${framesText(sheet.frames)}` : ''
+        }}
+        placeholder={
+          state === 'idle'
+            ? 'Idle is required'
+            : state === 'victory'
+              ? 'Plays the talking loop'
+              : 'Plays the idle loop'
+        }
+        extra={
+          !slicer && sheet && !sheet.builtIn && canReverse(sheet.frames) ? (
+            <label className="sheet-row__reverse">
               <input
-                className="sheet-row__fps-input"
-                type="number"
-                inputMode="numeric"
-                min={MIN_FPS}
-                max={MAX_FPS}
-                step={1}
-                value={slicer || sheet ? fpsText : ''}
-                disabled={!(slicer || sheet) || oneFrame}
-                aria-label={`${state} FPS`}
-                aria-invalid={Boolean(fpsProblem)}
-                title={
-                  oneFrame
-                    ? 'A one-frame sheet does not animate.'
-                    : !(slicer || sheet)
-                      ? 'No sheet yet.'
-                      : undefined
-                }
-                onChange={(event) => {
-                  const value = event.target.value
-                  if (slicer) setSlicing((current) => current && { ...current, fps: value })
-                  else updateSlot(state, { fps: value })
-                }}
+                type="checkbox"
+                checked={slot.reverse}
+                aria-label={`${state} reverse at end`}
+                onChange={(event) => updateSlot(state, { reverse: event.target.checked })}
               />
+              REVERSE AT END
+              <span className="sheet-row__reverse-note">Plays forward, then back.</span>
             </label>
-            <button
-              type="button"
-              className="button button--small sheet-row__button"
-              aria-label={`${sheet ? 'Replace' : 'Upload'} ${state} sheet`}
-              onClick={() => void pick(state)}
-            >
-              {sheet ? 'REPLACE' : 'UPLOAD'}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary button--small sheet-row__button sheet-row__button--wide"
-              disabled={!source || Boolean(slicer)}
-              aria-label={
-                source ? `Reuse sheet ${source.fileName} for ${state}` : `Reuse sheet for ${state}`
-              }
-              title={
-                source ? `Slice ${source.fileName} again for this state` : 'No sheet loaded yet.'
-              }
-              onClick={() => openSlicer(state)}
-            >
-              REUSE SHEET
-            </button>
-            {/* The default's idle row can drop an uploaded sheet: the built-in one comes back. */}
-            <button
-              type="button"
-              className="button button--secondary button--small sheet-row__button"
-              disabled={
-                Boolean(slicer) || !sheet || sheet.builtIn || (state === 'idle' && !isDefault)
-              }
-              aria-label={`Remove ${state} sheet`}
-              title={
-                state === 'idle'
-                  ? isDefault
-                    ? 'Goes back to the built-in idle sheet.'
-                    : 'Idle is required'
-                  : undefined
-              }
-              onClick={() => remove(state)}
-            >
-              REMOVE
-            </button>
-          </div>
-        </div>
-
-        {slot.error && (
-          <div role="alert" className="sheet-row__error">
-            <span className="sheet-row__error-mark" aria-hidden="true">
-              X
-            </span>
-            <span>{slot.error}</span>
-          </div>
-        )}
-
-        {slicer ? (
-          <SheetSlicer
-            key={slicer.key}
-            source={slicer.source}
-            initialGrid={
-              slicer.source.grid ?? startingGrid(slicer.source.width, slicer.source.height)
-            }
-            initialReverse={slicer.reverse}
-            fps={fps}
-            onUse={(grid, cells, reverse) => confirmSlice(state, slicer.fps, grid, cells, reverse)}
-            onCancel={() => setSlicing(null)}
-          />
-        ) : sheet ? (
-          <div className="sheet-row__body">
-            <div className="sheet-row__loop">
-              <Mascot
-                src={sheet.src}
-                frames={sheet.frames}
-                fps={fps ?? 0}
-                reverse={slot.reverse}
-                scale={1}
-                label={`${state} loop playing`}
-              />
-            </div>
-            <SheetStrip
-              src={sheet.src}
-              frames={sheet.frames}
-              label={`${state} sheet, ${framesText(sheet.frames)}`}
-            />
-          </div>
-        ) : (
-          <div className="sheet-row__placeholder">
-            {state === 'idle'
-              ? 'Idle is required'
-              : state === 'victory'
-                ? 'Plays the talking loop'
-                : 'Plays the idle loop'}
-          </div>
-        )}
-
-        {!slicer && sheet && !sheet.builtIn && canReverse(sheet.frames) && (
-          <label className="sheet-row__reverse">
-            <input
-              type="checkbox"
-              checked={slot.reverse}
-              aria-label={`${state} reverse at end`}
-              onChange={(event) => updateSlot(state, { reverse: event.target.checked })}
-            />
-            REVERSE AT END
-            <span className="sheet-row__reverse-note">Plays forward, then back.</span>
-          </label>
-        )}
-
-        {fpsProblem && <p className="sheet-row__fps-error">{fpsProblem}</p>}
-      </section>
+          ) : null
+        }
+        fpsProblem={fpsProblem}
+      />
     )
   }
 
