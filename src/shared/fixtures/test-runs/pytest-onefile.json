@@ -1,0 +1,5 @@
+{
+  "command": "pytest tests/test_strings.py",
+  "exitCode": 1,
+  "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0\r\nrootdir: C:\\fx\\project\r\nplugins: anyio-4.12.1\r\ncollected 3 items\r\n\r\ntests\\test_strings.py .Fs                                                [100%]\r\n\r\n================================== FAILURES ===================================\r\n__________________________________ test_trim __________________________________\r\n\r\n    def test_trim():\r\n>       assert \" a \".strip() == \"a \"\r\nE       AssertionError: assert 'a' == 'a '\r\nE         \r\nE         - a \r\nE         + a\r\n\r\ntests\\test_strings.py:7: AssertionError\r\n=========================== short test summary info ===========================\r\nFAILED tests/test_strings.py::test_trim - AssertionError: assert 'a' == 'a '\r\n=================== 1 failed, 1 passed, 1 skipped in 0.63s ====================\r\n"
+}

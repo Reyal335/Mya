@@ -1,0 +1,5 @@
+{
+  "command": "npx vitest run src/math.test.js",
+  "exitCode": 1,
+  "output": "\n RUN  v5.1.0 C:/fx/project\n\n ❯ src/math.test.js (5 tests | 2 failed) 63ms\n   ❯ math (5)\n     × multiplies 24ms\n     × rounds down 9ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/math.test.js > math > multiplies\nAssertionError: expected 6 to be 7 // Object.is equality\n\n- Expected\n+ Received\n\n- 7\n+ 6\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  src/math.test.js > math > rounds down\nAssertionError: expected 2 to be 3 // Object.is equality\n\n- Expected\n+ Received\n\n- 3\n+ 2\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 3 passed (5)\n   Start at  13:32:17\n   Duration  762ms (import 37%, tests 36%, transform 15%, worker 11%)\n\n"
+}

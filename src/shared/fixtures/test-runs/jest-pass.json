@@ -1,0 +1,5 @@
+{
+  "command": "npx jest -t \"adds|upper\"",
+  "exitCode": 0,
+  "output": "\nTest Suites: 2 passed, 2 total\nTests:       7 skipped, 2 passed, 9 total\nSnapshots:   0 total\nTime:        1.11 s\nRan all test suites with tests matching \"adds|upper\".\n"
+}
