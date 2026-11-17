@@ -10,16 +10,6 @@
   font-size: 12px;
 }
 
-.battle__background {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center bottom;
-  image-rendering: pixelated;
-}
-
 /* The lower 46% fades from transparent to --bg at 85%. */
 .battle__fade {
   position: absolute;

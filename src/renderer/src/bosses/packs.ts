@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react'
 import {
-  BOSS_STATES,
   DEFAULT_BOSSES,
   readBossManifest,
-  type BossLoop,
-  type BossPack,
-  type BossStateName
+  type BossBackgroundInfo,
+  type BossListItem,
+  type BossPack
 } from '../../../shared/bosses'
 
 // The three default boss packs, bundled with the window (copied from designs/bosses/).
@@ -27,20 +25,14 @@ function defaultPack(id: string): BossPack | null {
   const read = readBossManifest(manifests[`../assets/bosses/${id}/manifest.json`])
   if (!read.ok) return null
   const { manifest } = read
-  const background = picture(id, manifest.background)
-  const states: Partial<Record<BossStateName, BossLoop>> = {}
-  for (const state of BOSS_STATES) {
-    const loop = manifest.states[state]
-    const src = loop ? picture(id, loop.file) : null
-    if (loop && src) states[state] = { src, frames: loop.frames, fps: loop.fps }
-  }
-  if (!states.idle || !background) return null
+  const idle = picture(id, manifest.idle.file)
+  if (!idle) return null
   return {
     id,
     name: manifest.name,
     accent: manifest.accent,
-    background,
-    states: states as BossPack['states']
+    background: manifest.background ? picture(id, manifest.background) : null,
+    idle: { src: idle, frames: manifest.idle.frames, fps: manifest.idle.fps }
   }
 }
 
@@ -48,29 +40,45 @@ export const DEFAULT_PACKS: BossPack[] = DEFAULT_BOSSES.flatMap(
   (boss) => defaultPack(boss.id) ?? []
 )
 
-// A missing state plays idle.
-export function bossLoop(pack: BossPack, state: BossStateName): BossLoop {
-  return pack.states[state] ?? pack.states.idle
-}
-
-// The defaults, then the user's packs from main (checked there; broken ones never come).
-export function useBossPacks(): BossPack[] {
-  const [user, setUser] = useState<BossPack[]>([])
-  useEffect(() => {
-    let disposed = false
-    window.mya.bosses
-      .packs()
-      .then((packs) => {
-        if (!disposed) setUser(packs)
-      })
-      .catch((err: unknown) => console.error('Could not read the boss packs:', err))
-    return () => {
-      disposed = true
+// One boss as the manager draws it: a pack, or a folder that failed a rule.
+export type BossEntry =
+  | {
+      kind: 'boss'
+      pack: BossPack
+      builtIn: boolean
+      inPool: boolean
+      // The stored background's file and size, for the editor's row.
+      backgroundInfo: BossBackgroundInfo | null
     }
-  }, [])
-  return [...DEFAULT_PACKS, ...user]
-}
+  | { kind: 'problem'; id: string; problem: string }
 
-export function packById(packs: BossPack[], id: string): BossPack | null {
-  return packs.find((pack) => pack.id === id) ?? null
+// The built-in bosses, in order, then the custom ones as main sent them. A built-in boss takes
+// its pictures from the bundle and only its pool setting from main.
+export function entriesFrom(items: BossListItem[]): BossEntry[] {
+  return items.flatMap((item): BossEntry[] => {
+    if (item.problem !== null) return [{ kind: 'problem', id: item.id, problem: item.problem }]
+    if (item.builtIn) {
+      const pack = DEFAULT_PACKS.find((each) => each.id === item.id)
+      return pack
+        ? [{ kind: 'boss', pack, builtIn: true, inPool: item.inPool, backgroundInfo: null }]
+        : []
+    }
+    if (!item.idle) return []
+    const pack: BossPack = {
+      id: item.id,
+      name: item.name,
+      accent: item.accent,
+      background: item.background,
+      idle: item.idle
+    }
+    return [
+      {
+        kind: 'boss',
+        pack,
+        builtIn: false,
+        inPool: item.inPool,
+        backgroundInfo: item.backgroundInfo
+      }
+    ]
+  })
 }

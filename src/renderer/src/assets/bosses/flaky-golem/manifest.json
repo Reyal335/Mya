@@ -1,28 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "The Flaky Golem",
   "accent": "#B98CF0",
   "background": "background.png",
-  "states": {
-    "idle": {
-      "file": "idle.png",
-      "frames": 2,
-      "fps": 3
-    },
-    "hit": {
-      "file": "hit.png",
-      "frames": 2,
-      "fps": 8
-    },
-    "heal": {
-      "file": "heal.png",
-      "frames": 2,
-      "fps": 6
-    },
-    "defeated": {
-      "file": "defeated.png",
-      "frames": 4,
-      "fps": 6
-    }
+  "idle": {
+    "file": "idle.png",
+    "frames": 2,
+    "fps": 3
   }
 }

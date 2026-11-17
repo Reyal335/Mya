@@ -17,8 +17,6 @@ type MascotProps = {
   // Whole-number display scale: the mascot is drawn at 64 * scale pixels square. 0.5
   // draws it at 32px (the boss test log): nearest-neighbour, so hard edges, never blurred.
   scale?: number
-  // Play the frames once and hold the last one (a boss's defeated loop).
-  once?: boolean
   label: string
   // An equipped accessory: a 16x16 picture drawn over the frame with its top-left
   // corner at (x, y) in 64px frame pixels, at the mascot's scale.
@@ -40,39 +38,20 @@ function Mascot({
   reverse = false,
   scale = 2,
   label,
-  accessory = null,
-  once = false
+  accessory = null
 }: MascotProps): React.JSX.Element {
   const count = Math.min(MAX_FRAMES, Math.max(1, Math.floor(frames)))
   const size = scale === 0.5 ? FRAME / 2 : FRAME * Math.max(1, Math.round(scale))
   const animated = count > 1 && fps > 0
   const bounces = reverse && canReverse(count)
-  // Played by the Web Animations API, not the CSS loop: once, or forward then back.
-  const scripted = once || bounces
+  // Played by the Web Animations API, not the CSS loop: forward then back.
+  const scripted = bounces
   const reducedMotion = usePrefersReducedMotion()
   const ref = useRef<HTMLDivElement>(null)
 
-  // Once: each frame in turn, then the last one held. Reduced motion shows frame 0.
   useEffect(() => {
     const element = ref.current
-    if (!element || !animated || !once || reducedMotion) return
-    const stops = Array.from({ length: count }, (_, frame) => ({
-      backgroundPositionX: `${-frame * size}px`,
-      offset: frame / count,
-      easing: 'step-end'
-    }))
-    stops.push({ backgroundPositionX: `${-(count - 1) * size}px`, offset: 1, easing: 'step-end' })
-    const animation = element.animate(stops, {
-      duration: (count / fps) * 1000,
-      iterations: 1,
-      fill: 'forwards'
-    })
-    return () => animation.cancel()
-  }, [animated, once, count, fps, reducedMotion, size, src])
-
-  useEffect(() => {
-    const element = ref.current
-    if (!element || !animated || !bounces || once || reducedMotion) return
+    if (!element || !animated || !bounces || reducedMotion) return
     const order = loopOrder(count, true)
     const length = order.length
     const stops = order.map((frame, k) => ({
@@ -90,7 +69,7 @@ function Mascot({
     return () => animation.cancel()
     // The element is made again when `src` changes (see the key below), so it is
     // listed: a new element needs a new animation.
-  }, [animated, bounces, once, count, fps, reducedMotion, size, src])
+  }, [animated, bounces, count, fps, reducedMotion, size, src])
 
   const style = {
     width: size,
@@ -106,7 +85,7 @@ function Mascot({
   // direction change.
   const sheet = (
     <div
-      key={`${src}|${count}|${fps}|${bounces}|${once}`}
+      key={`${src}|${count}|${fps}|${bounces}`}
       ref={ref}
       className={animated && !scripted ? 'mascot mascot--animated' : 'mascot'}
       role="img"

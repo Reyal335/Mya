@@ -182,3 +182,15 @@ export async function getOpenInEditor(): Promise<boolean> {
 export function setOpenInEditor(on: boolean): Promise<void> {
   return updateSettings({ openInEditor: on })
 }
+
+// The bosses I turned POOL off for, by id. A missing list means every boss is in. An entry that
+// is not text is dropped, and an id is kept once.
+export async function getBossesOutOfPool(): Promise<string[]> {
+  const { bossesOutOfPool } = await readSettings()
+  if (!Array.isArray(bossesOutOfPool)) return []
+  return [...new Set(bossesOutOfPool.filter((id): id is string => typeof id === 'string'))]
+}
+
+export function setBossesOutOfPool(ids: string[]): Promise<void> {
+  return updateSettings({ bossesOutOfPool: [...new Set(ids)] })
+}

@@ -211,6 +211,7 @@ export function startFight(
     projectPath: encounter.projectPath,
     sessionId: encounter.sessionId,
     bossId: encounter.bossId,
+    bossName: encounter.bossName,
     status: 'active',
     maxHp,
     hp,
@@ -243,7 +244,8 @@ export function applyRun(
   bossName: string
 ): { fight: Fight; round: FightRound } {
   const { run } = input
-  let fight: Fight = { ...saved, files: { ...saved.files } }
+  // The name it has now, or the one it saved once the boss is gone.
+  let fight: Fight = { ...saved, bossName, files: { ...saved.files } }
   const lines: string[] = []
   const notices: FightNotice[] = []
   // Any test run brings a boss that got away back.

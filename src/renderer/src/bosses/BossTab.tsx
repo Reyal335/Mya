@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react'
 import { fightText, type BossPack, type Fight } from '../../../shared/bosses'
 import { RUNNER_NAMES } from '../../../shared/testRuns'
-import { BossSprite, HpBar, PopLayer } from './BossParts'
+import BossSprite from './BossSprite'
+import { HpBar, PopLayer } from './BossParts'
 import type { ReplayView } from './useRoundReplay'
 import { durationText, fileLabel, weakPoints } from './fightView'
 import './BossTab.css'
@@ -142,8 +143,9 @@ function BossTab({
     <div className="boss-tab__box">
       <BossSprite
         pack={pack}
-        state={fight.status === 'defeated' ? 'defeated' : view.sprite}
         scale={2}
+        effect={view.effect}
+        defeated={view.defeated}
         label={`${pack.name}${fight.status === 'defeated' ? ', defeated' : ''}`}
       />
       <PopLayer pops={view.pops} />

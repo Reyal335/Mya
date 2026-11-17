@@ -5,7 +5,9 @@ import { RUNNER_NAMES } from '../../../shared/testRuns'
 import AgentIcon from '../components/AgentIcon'
 import Mascot from '../components/Mascot'
 import { loopFor, type Mascot as MascotData } from '../mascots/types'
-import { BossSprite, HpBar, PopLayer } from './BossParts'
+import ThemeBackdrop from '../components/ThemeBackdrop'
+import BossSprite from './BossSprite'
+import { HpBar, PopLayer } from './BossParts'
 import type { ReplayView } from './useRoundReplay'
 import './BattleView.css'
 
@@ -257,13 +259,10 @@ function BattleView({
       aria-label={`Battle with ${pack.name}`}
       role="region"
     >
-      <img
-        className="battle__background"
-        src={pack.background}
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-      />
+      {/* The pack's background by the chat theme's scaling rule (small pixel art stays crisp, a
+          big picture is scaled smoothly), bottom-anchored and cropped to the frame, with no theme
+          fade; without one it is plain navy. */}
+      <ThemeBackdrop image={pack.background} fade={0} what="boss background" />
       <span className="battle__fade" aria-hidden="true" />
 
       <TestLog fight={fight} pack={pack} mascot={mascot} speaker={speaker} />
@@ -292,8 +291,9 @@ function BattleView({
         <div className="battle__sprite">
           <BossSprite
             pack={pack}
-            state={defeated ? 'defeated' : view.sprite}
             scale={scale}
+            effect={view.effect}
+            defeated={view.defeated}
             label={`${pack.name}${defeated ? ', defeated' : ''}`}
           />
           <PopLayer pops={view.pops} />
@@ -303,7 +303,7 @@ function BattleView({
             </span>
           )}
         </div>
-        {defeated && view.sprite === 'defeated' && (
+        {defeated && view.defeated && (
           <div className="battle__banner" role="status">
             <span className="battle__banner-title">{pack.name.toUpperCase()} IS DEFEATED!</span>
             <span className="battle__banner-text">

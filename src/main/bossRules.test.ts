@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { Fight } from '../shared/bosses.ts'
+import { poolIds, type Fight } from '../shared/bosses.ts'
 import type { TestRun } from '../shared/testRuns.ts'
 import {
   applyRun,
@@ -317,6 +317,50 @@ test('pickBoss: never the last one when there is a choice', () => {
   }
   assert.equal(pickBoss(['only'], 'only', Math.random), 'only')
   assert.equal(pickBoss([], null, Math.random), null)
+})
+
+test('a new fight saves the boss name, and a round keeps it current', () => {
+  const fight = encounter()
+  assert.equal(fight.bossName, BOSS)
+  // The boss was renamed: the next round says so. Once it is deleted the caller passes the saved
+  // name back, so the fight keeps using it.
+  const renamed = applyRun(fight, input(named(EIGHT.slice(0, 7), 40)), 'Lint Goblin')
+  assert.equal(renamed.fight.bossName, 'Lint Goblin')
+  assert.ok(renamed.fight.log.at(-1)?.includes('hit combo'))
+  const deleted = applyRun(renamed.fight, input(named(EIGHT, 40)), renamed.fight.bossName)
+  assert.equal(deleted.fight.bossName, 'Lint Goblin')
+  assert.ok(deleted.fight.log.at(-1)?.includes('Lint Goblin healed 1!'))
+  // The boss going away changes none of the fight numbers.
+  assert.equal(deleted.fight.round, 3)
+  assert.equal(deleted.fight.hp, 8)
+  assert.equal(deleted.fight.maxHp, 40)
+  assert.equal(deleted.fight.bossId, 'red-suite')
+})
+
+test('the pool: a fight only ever draws a boss that is in it', () => {
+  const valid = ['red-suite', 'flaky-golem', 'null-wraith', 'c1']
+  const out = ['red-suite', 'c1']
+  for (let i = 0; i < 40; i++) {
+    const picked = pickBoss(poolIds(valid, out), null, () => i / 40)
+    assert.ok(picked === 'flaky-golem' || picked === 'null-wraith', String(picked))
+  }
+})
+
+test('the pool: the last boss is left out when two or more are in, and kept when one is', () => {
+  const valid = ['red-suite', 'flaky-golem', 'null-wraith']
+  for (let i = 0; i < 30; i++) {
+    const picked = pickBoss(poolIds(valid, ['null-wraith']), 'flaky-golem', () => i / 30)
+    assert.equal(picked, 'red-suite')
+  }
+  // One boss in the pool, and it was the last: it comes again.
+  assert.equal(
+    pickBoss(poolIds(valid, ['red-suite', 'null-wraith']), 'flaky-golem', fixed),
+    'flaky-golem'
+  )
+  // Nothing in the pool: every valid boss is.
+  const all = poolIds(valid, valid)
+  assert.deepEqual(all, valid)
+  assert.ok(valid.includes(pickBoss(all, null, fixed) ?? ''))
 })
 
 test('NEW CHAT removes the conversation fight', () => {

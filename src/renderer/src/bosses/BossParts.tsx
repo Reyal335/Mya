@@ -1,39 +1,13 @@
-import type { BossPack, BossStateName } from '../../../shared/bosses'
-import Mascot from '../components/Mascot'
-import { bossLoop } from './packs'
+import type { BossPack } from '../../../shared/bosses'
+import BossSprite from './BossSprite'
 import type { Pop } from './useRoundReplay'
 import './BossParts.css'
-
-// The boss's loop for a state, at a whole-number scale. defeated plays once and holds.
-export function BossSprite({
-  pack,
-  state,
-  scale,
-  label
-}: {
-  pack: BossPack
-  state: BossStateName
-  scale: number
-  label: string
-}): React.JSX.Element {
-  const loop = bossLoop(pack, state)
-  return (
-    <Mascot
-      src={loop.src}
-      frames={loop.frames}
-      fps={loop.fps}
-      scale={scale}
-      once={state === 'defeated' && Boolean(pack.states.defeated)}
-      label={label}
-    />
-  )
-}
 
 // The boss's idle frame as a still picture in a small box (notices, the rail).
 export function BossFace({ pack, size }: { pack: BossPack; size: 32 | 64 }): React.JSX.Element {
   return (
     <span className={`boss-face boss-face--${size}`} aria-hidden="true">
-      <BossSprite pack={pack} state="idle" scale={size === 32 ? 0.5 : 1} label="" />
+      <BossSprite pack={pack} scale={size === 32 ? 0.5 : 1} label="" />
     </span>
   )
 }

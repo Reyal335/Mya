@@ -2,7 +2,7 @@
 // Our own small types only: never raw Agent SDK messages.
 
 import type { AccountData } from './account'
-import type { BossPack, Fight, FightEvent } from './bosses'
+import type { BossListItem, Fight, FightEvent } from './bosses'
 import type { AchievementsData, Equipped, Reward, RewardKind, UnlockNotice } from './achievements'
 import type { PastedImage } from './images'
 import type { MascotStateName, MascotVoice } from './mascotRules'
@@ -97,14 +97,24 @@ export const IpcChannel = {
   // Main to the main window: an achievement unlocked while the app was in front.
   ProgressionUnlocked: 'progression:unlocked',
   // Boss battles for test runs.
-  BossesPacks: 'bosses:packs',
+  BossesList: 'bosses:list',
+  BossesPickIdle: 'bosses:pick-idle',
+  BossesSliceIdle: 'bosses:slice-idle',
+  BossesDropSources: 'bosses:drop-sources',
+  BossesPickBackground: 'bosses:pick-background',
+  BossesCreate: 'bosses:create',
+  BossesUpdate: 'bosses:update',
+  BossesRemove: 'bosses:remove',
+  BossesSetInPool: 'bosses:set-in-pool',
   BossesFight: 'bosses:fight',
   BossesFightOn: 'bosses:fight-on',
   BossesDismiss: 'bosses:dismiss',
   BossesGetTestCommand: 'bosses:get-test-command',
   BossesSetTestCommand: 'bosses:set-test-command',
   // Main to every window: a fight started, played a round, ended, or went away.
-  BossesFightEvent: 'bosses:fight-event'
+  BossesFightEvent: 'bosses:fight-event',
+  // Main to every window: a boss was added, changed, deleted, or its POOL toggled.
+  BossesChanged: 'bosses:changed'
 } as const
 
 export type ProjectInfo = {
@@ -585,6 +595,45 @@ export type PickSheetResult =
 export type SliceSheetResult =
   { ok: true; token: string; frames: number; preview: string } | { ok: false; error: MascotsError }
 
+// --- Bosses: the manager ---
+
+// What the editor does with the idle strip and the background of a boss it saves.
+export type BossIdleChange = { type: 'keep' } | { type: 'token'; token: string }
+export type BossBackgroundChange =
+  { type: 'keep' } | { type: 'remove' } | { type: 'token'; token: string }
+
+// What the editor sends to create or update a boss. Main checks every field again; no path and
+// no image bytes ever come from the window.
+export type BossDraft = {
+  name: string
+  accent: string
+  fps: number
+  idle: BossIdleChange
+  background: BossBackgroundChange
+}
+
+export type BossesErrorCode = 'invalid' | 'not_found' | 'built_in' | 'last_in_pool' | 'io_error'
+
+export type BossesError = { code: BossesErrorCode; message: string }
+
+export type BossesResult<T extends object = object> =
+  ({ ok: true } & T) | { ok: false; error: BossesError }
+
+// A picked background waits in main behind `token` until SAVE, like a picked sheet.
+export type PickBackgroundResult =
+  | { ok: true; canceled: true }
+  | {
+      ok: true
+      canceled: false
+      token: string
+      fileName: string
+      width: number
+      height: number
+      // The picture as a data URL, for the row and the preview.
+      preview: string
+    }
+  | { ok: false; error: BossesError }
+
 // The API the preload exposes as window.mya.
 export type MyaApi = {
   project: {
@@ -743,9 +792,29 @@ export type MyaApi = {
     onUnlocked: (callback: (notice: UnlockNotice) => void) => () => void
   }
   bosses: {
-    // The user's boss packs (userData/bosses), pictures as data URLs. The three default
-    // packs are bundled with the window.
-    packs: () => Promise<BossPack[]>
+    // Every boss: the three built-in ones (their pictures are bundled with the window), then the
+    // folders in userData/bosses, oldest first, each a pack or a problem. Always read from disk.
+    list: () => Promise<BossesResult<{ bosses: BossListItem[] }>>
+    // The idle strip is picked like a mascot sheet: a legal strip is used as it is, anything else
+    // opens the slicer. Nothing is written until SAVE.
+    pickIdle: () => Promise<PickSheetResult>
+    sliceIdle: (
+      sourceToken: string,
+      columns: number,
+      rows: number,
+      cells: number[]
+    ) => Promise<SliceSheetResult>
+    // Drops every loaded source sheet and every pick that was not saved. Called when the editor
+    // closes.
+    dropSources: () => Promise<void>
+    pickBackground: () => Promise<PickBackgroundResult>
+    create: (draft: BossDraft) => Promise<BossesResult<{ id: string }>>
+    update: (id: string, draft: BossDraft) => Promise<BossesResult<{ id: string }>>
+    // The folder goes to the OS trash. The built-in bosses are refused.
+    remove: (id: string) => Promise<BossesResult>
+    // POOL ON or OFF. The last boss in the pool cannot leave it.
+    setInPool: (id: string, on: boolean) => Promise<BossesResult<{ inPool: boolean }>>
+    onChanged: (callback: () => void) => () => void
     // The open conversation's fight, and the ones it finished before.
     fight: () => Promise<BossFightData>
     onFight: (callback: (event: FightEvent) => void) => () => void

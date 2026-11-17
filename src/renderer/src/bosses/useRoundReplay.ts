@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import type { BossStateName, Fight, FightRound } from '../../../shared/bosses'
+import type { Fight, FightRound } from '../../../shared/bosses'
+import type { BossEffect } from './BossSprite'
 
 // The round replay: the fight in main is already final, and this only shows it again a
 // hit at a time. Hits 120ms apart (evenly within 2 seconds past 16), each a "−1" pop, the
-// hit loop for 200ms, and the bar down by one; then "<n> HIT COMBO!" for 1.5 seconds,
-// then heals; a victory ends on the defeated loop. Reduced motion shows the end at once.
+// white hit flash on the sprite, and the bar down by one; then "<n> HIT COMBO!" for 1.5 seconds,
+// then heals; a victory ends with the defeat (the sprite sinks and fades). Reduced motion shows the end at once.
 
 export const HIT_GAP_MS = 120
 export const MAX_HITS_MS = 2_000
@@ -17,7 +18,10 @@ export type Pop = { id: number; text: '−1' | '+1'; x: number; y: number }
 
 export type ReplayView = {
   hp: number
-  sprite: BossStateName
+  // The hit or heal to play on the sprite now; a new id plays it again, also during one.
+  effect: BossEffect | null
+  // The boss is defeated: the sprite sinks and fades, or already shows that.
+  defeated: boolean
   pops: Pop[]
   // "<n> HIT COMBO!" above the sprite.
   combo: number | null
@@ -29,12 +33,15 @@ export function gapFor(hits: number): number {
   return hits > 16 ? MAX_HITS_MS / hits : HIT_GAP_MS
 }
 
-function restSprite(fight: Fight | null): BossStateName {
-  return fight?.status === 'defeated' ? 'defeated' : 'idle'
-}
-
 function rest(fight: Fight | null): ReplayView {
-  return { hp: fight?.hp ?? 0, sprite: restSprite(fight), pops: [], combo: null, hitsBadge: null }
+  return {
+    hp: fight?.hp ?? 0,
+    effect: null,
+    defeated: fight?.status === 'defeated',
+    pops: [],
+    combo: null,
+    hitsBadge: null
+  }
 }
 
 // A spot around the sprite's edge, in percent of its box.
@@ -44,6 +51,7 @@ function edgeSpot(): { x: number; y: number } {
 }
 
 let nextPop = 1
+let nextEffect = 1
 
 export function useRoundReplay(
   fight: Fight | null,
@@ -63,7 +71,8 @@ export function useRoundReplay(
       round && !reducedMotion && (round.hits.length > 0 || round.heals.length > 0)
         ? {
             hp: round.hpBefore,
-            sprite: 'idle',
+            effect: null,
+            defeated: false,
             pops: [],
             combo: null,
             hitsBadge: round.hits.length > 0 ? round.hits.length : null
@@ -90,8 +99,8 @@ export function useRoundReplay(
     for (let i = 0; i < hits; i++) {
       const ms = i * gap
       pop(ms, '−1')
-      at(ms, (view) => ({ ...view, hp: Math.max(0, view.hp - 1), sprite: 'hit' }))
-      at(ms + HIT_LOOP_MS, (view) => ({ ...view, sprite: 'idle' }))
+      const effect: BossEffect = { kind: 'hit', id: nextEffect++ }
+      at(ms, (view) => ({ ...view, hp: Math.max(0, view.hp - 1), effect }))
     }
     let end = hits > 0 ? (hits - 1) * gap + HIT_LOOP_MS : 0
     if (hits > 0) {
@@ -101,11 +110,11 @@ export function useRoundReplay(
     for (let i = 0; i < heals; i++) {
       const ms = end + i * HIT_GAP_MS
       pop(ms, '+1')
-      at(ms, (view) => ({ ...view, hp: view.hp + 1, sprite: 'heal' }))
-      at(ms + HIT_LOOP_MS, (view) => ({ ...view, sprite: 'idle' }))
+      const effect: BossEffect = { kind: 'heal', id: nextEffect++ }
+      at(ms, (view) => ({ ...view, hp: view.hp + 1, effect }))
     }
     if (heals > 0) end += (heals - 1) * HIT_GAP_MS + HIT_LOOP_MS
-    if (round.kind === 'victory') at(end, (view) => ({ ...view, sprite: 'defeated' }))
+    if (round.kind === 'victory') at(end, (view) => ({ ...view, defeated: true }))
     at(HITS_BADGE_MS, (view) => ({ ...view, hitsBadge: null }))
     // Done: back to the fight as main has it.
     timers.push(

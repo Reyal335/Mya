@@ -1,5 +1,6 @@
 import type { BossPack, Fight, FightNotice } from '../../../shared/bosses'
-import { BossFace, BossSprite } from './BossParts'
+import BossSprite from './BossSprite'
+import { BossFace } from './BossParts'
 import './BattleNotices.css'
 
 // A one-line battle notice in the CHAT history: the boss's idle frame in a 32px box and
@@ -42,7 +43,7 @@ export function BossEndCard({
     return (
       <article className="boss-end" style={style} aria-label={`${pack.name} defeated`}>
         <span className="boss-end__sprite">
-          <BossSprite pack={pack} state="defeated" scale={1} label="" />
+          <BossSprite pack={pack} scale={1} defeated label="" />
         </span>
         <div className="boss-end__text">
           <span className="boss-end__title boss-end__title--won">
@@ -62,7 +63,7 @@ export function BossEndCard({
   return (
     <article className="boss-end" style={style} aria-label={`${pack.name} got away`}>
       <span className="boss-end__sprite">
-        <BossSprite pack={pack} state="idle" scale={1} label="" />
+        <BossSprite pack={pack} scale={1} label="" />
       </span>
       <div className="boss-end__text">
         <span className="boss-end__title">{pack.name.toUpperCase()} GOT AWAY</span>

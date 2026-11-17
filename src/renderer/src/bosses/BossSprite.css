@@ -1,0 +1,64 @@
+/* The boss and its three effects. The wrapper takes the filter and the offsets, so Mascot's own
+   animation and hard pixels are untouched. --boss-px is one source pixel in CSS pixels. */
+.boss-sprite {
+  position: relative;
+  flex: none;
+  display: block;
+  line-height: 0;
+}
+
+/* Hit: a pure white silhouette (transparent pixels stay transparent) and one source pixel to
+   the right, for 120ms. The offset is left, a layout position the browser snaps to whole device
+   pixels, not a transform. */
+.boss-sprite--hit,
+.boss-sprite--held-hit {
+  left: var(--boss-px);
+  filter: brightness(0) invert(1);
+}
+
+/* Heal: a flat --loot-add (#6FCF7F) silhouette for 160ms. A CSS filter chain can only come near a
+   color, so this is an SVG color matrix that sends every pixel to 0.435, 0.812, 0.498 (the
+   token) and keeps its alpha: the shape and the hard edges stay, as for the white flash. */
+.boss-sprite--heal {
+  filter: url('data:image/svg+xml;utf8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27t%27 color-interpolation-filters=%27sRGB%27%3E%3CfeColorMatrix type=%27matrix%27 values=%270 0 0 0 0.435 0 0 0 0 0.812 0 0 0 0 0.498 0 0 0 1 0%27/%3E%3C/filter%3E%3C/svg%3E#t');
+}
+
+/* Defeated: 800ms in 4 hard steps (no easing): sinks 4 source pixels, turns gray, drops to 35%
+   opacity, then holds. */
+.boss-sprite--defeated {
+  animation: boss-defeat 800ms steps(4) forwards;
+}
+
+.boss-sprite--defeated,
+.boss-sprite--defeated-held {
+  top: calc(var(--boss-px) * 4);
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+@keyframes boss-defeat {
+  from {
+    top: 0;
+    filter: grayscale(0);
+    opacity: 1;
+  }
+
+  to {
+    top: calc(var(--boss-px) * 4);
+    filter: grayscale(1);
+    opacity: 0.35;
+  }
+}
+
+/* Reduced motion: no flash, move, or sinking. A defeated boss shows its final look at once. */
+@media (prefers-reduced-motion: reduce) {
+  .boss-sprite--hit,
+  .boss-sprite--heal {
+    left: 0;
+    filter: none;
+  }
+
+  .boss-sprite--defeated {
+    animation: none;
+  }
+}

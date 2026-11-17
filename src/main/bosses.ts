@@ -1,13 +1,11 @@
 import { app, BrowserWindow } from 'electron'
-import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import {
-  BOSS_STATES,
   DEFAULT_BOSSES,
+  FALLBACK_BOSS_ID,
   bossXp,
   fightKey,
-  readBossManifest,
-  type BossPack,
+  poolIds,
   type Fight,
   type FightEvent,
   type FightRound
@@ -25,10 +23,10 @@ import {
   type Attacker
 } from './bossRules'
 import { getChatSession, onSessionEnded } from './chats'
-import { headerSize, sniffImage, toDataUrl } from './imageFile'
 import { isObject, readJsonFile, serialQueue, setAside, writeJsonFile } from './jsonFile'
-import { pngSize, toPngDataUrl } from './png'
+import { validBosses } from './bossPacks'
 import { recordBossVictory } from './progressionStore'
+import { getBossesOutOfPool } from './settings'
 
 // Boss fights: one per conversation (project path plus session id), in
 // userData/boss-fights.json as { version: 1, fights, past, lastBoss }. `past` keeps the
@@ -69,7 +67,11 @@ function readFight(raw: unknown): Fight | null {
     Array.isArray(raw.lineup) &&
     Array.isArray(raw.log) &&
     Array.isArray(raw.notices)
-  return ok ? (raw as unknown as Fight) : null
+  if (!ok) return null
+  return {
+    ...(raw as unknown as Fight),
+    bossName: typeof raw.bossName === 'string' ? raw.bossName : ''
+  }
 }
 
 function readStore(raw: unknown): Store | null {
@@ -155,131 +157,16 @@ function announceEnd(kind: 'victory' | 'escape', text: string): void {
   }
 }
 
-// --- Packs ------------------------------------------------------------------------------
+// --- Which boss ---------------------------------------------------------------------------
 
-const MB = 1024 * 1024
-const MAX_STRIP_BYTES = 1 * MB
-const MAX_BACKGROUND_BYTES = 5 * MB
-const FRAME = 64
-const MAX_FRAMES = 16
+const FALLBACK_NAME =
+  DEFAULT_BOSSES.find((boss) => boss.id === FALLBACK_BOSS_ID)?.name ?? 'The Boss'
 
-type UserPack = BossPack
-let userPacks: UserPack[] | null = null
-// Broken packs are logged once each, never shown and never picked.
-const reported = new Set<string>()
-
-function packsDir(): string {
-  return join(app.getPath('userData'), 'bosses')
-}
-
-class PackProblem extends Error {}
-
-async function readStrip(
-  folder: string,
-  file: string,
-  fps: number
-): Promise<BossPack['states']['idle']> {
-  const path = join(folder, file)
-  const info = await stat(path)
-  if (info.size >= MAX_STRIP_BYTES) throw new PackProblem(`${file} is 1 MB or larger.`)
-  const bytes = await readFile(path)
-  const size = pngSize(bytes)
-  if (!size) throw new PackProblem(`${file} is not a PNG.`)
-  if (size.height !== FRAME) throw new PackProblem(`${file}: height must be 64px.`)
-  if (size.width % FRAME !== 0 || size.width === 0) {
-    throw new PackProblem(`${file}: width must be a multiple of 64.`)
-  }
-  const frames = size.width / FRAME
-  if (frames > MAX_FRAMES) throw new PackProblem(`${file}: at most 16 frames.`)
-  return { src: toPngDataUrl(bytes), frames, fps }
-}
-
-async function readBackground(folder: string, file: string): Promise<string> {
-  const path = join(folder, file)
-  const info = await stat(path)
-  if (info.size > MAX_BACKGROUND_BYTES) throw new PackProblem(`${file} is over 5 MB.`)
-  const bytes = await readFile(path)
-  const kind = sniffImage(bytes)
-  if (!kind) throw new PackProblem(`${file} is not a PNG or JPG.`)
-  const size = headerSize(bytes, kind)
-  if (!size) throw new PackProblem(`${file} cannot be read.`)
-  if (size.width < 320 || size.height < 180 || size.width > 4000 || size.height > 4000) {
-    throw new PackProblem(`${file} must be from 320x180 to 4000x4000.`)
-  }
-  return toDataUrl(bytes, kind)
-}
-
-async function readPack(id: string): Promise<UserPack> {
-  const folder = join(packsDir(), id)
-  let manifestRaw: unknown
-  try {
-    manifestRaw = JSON.parse(await readFile(join(folder, 'manifest.json'), 'utf8'))
-  } catch {
-    throw new PackProblem('manifest.json is missing or not JSON.')
-  }
-  const read = readBossManifest(manifestRaw)
-  if (!read.ok) throw new PackProblem(read.message)
-  const { manifest } = read
-  const states: Partial<BossPack['states']> = {}
-  for (const state of BOSS_STATES) {
-    const loop = manifest.states[state]
-    if (loop) states[state] = await readStrip(folder, loop.file, loop.fps)
-  }
-  return {
-    id,
-    name: manifest.name,
-    accent: manifest.accent,
-    background: await readBackground(folder, manifest.background),
-    states: states as BossPack['states']
-  }
-}
-
-// User packs in userData/bosses/<uuid>/, read once. A pack that fails is skipped and logged.
-async function loadUserPacks(): Promise<UserPack[]> {
-  if (userPacks) return userPacks
-  const found: UserPack[] = []
-  let entries: string[]
-  try {
-    entries = (await readdir(packsDir(), { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-  } catch {
-    entries = []
-  }
-  for (const id of entries) {
-    if (!/^[0-9a-f-]{8,64}$/i.test(id) || DEFAULT_BOSSES.some((boss) => boss.id === id)) {
-      if (!reported.has(id)) console.error(`[bosses] Skipped the boss pack "${id}": not a pack id.`)
-      reported.add(id)
-      continue
-    }
-    try {
-      found.push(await readPack(id))
-    } catch (err) {
-      if (!reported.has(id)) {
-        const why = err instanceof PackProblem ? err.message : String(err)
-        console.error(`[bosses] Skipped the boss pack "${id}": ${why}`)
-      }
-      reported.add(id)
-    }
-  }
-  userPacks = found
-  return found
-}
-
-async function packIds(): Promise<string[]> {
-  return [...DEFAULT_BOSSES.map((boss) => boss.id), ...(await loadUserPacks()).map((p) => p.id)]
-}
-
-async function bossName(id: string): Promise<string> {
-  const builtIn = DEFAULT_BOSSES.find((boss) => boss.id === id)
-  if (builtIn) return builtIn.name
-  return (await loadUserPacks()).find((pack) => pack.id === id)?.name ?? 'The Boss'
-}
-
-// The user packs for the window, with their pictures as data URLs. The defaults are
-// bundled with the window.
-export async function listUserPacks(): Promise<BossPack[]> {
-  return loadUserPacks()
+// What a fight calls its boss: the boss's name now, or, once the boss has been deleted, the
+// name the fight saved (the window draws it as The Red Suite).
+async function bossNameFor(fight: Fight): Promise<string> {
+  const known = (await validBosses()).find((boss) => boss.id === fight.bossId)
+  return known?.name ?? (fight.bossName.trim() || FALLBACK_NAME)
 }
 
 // --- Test runs from the agent run --------------------------------------------------------
@@ -340,10 +227,16 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
     const existing = current.fights[key]
     let result: { fight: Fight; round: FightRound } | null
     if (existing && existing.status !== 'defeated') {
-      result = applyRun(existing, input, await bossName(existing.bossId))
+      result = applyRun(existing, input, await bossNameFor(existing))
     } else {
+      // The valid bosses that are in the pool, leaving out the project's last one when there is a
+      // choice. When none is in the pool, every valid boss is.
+      const valid = await validBosses()
       const bossId = pickBoss(
-        await packIds(),
+        poolIds(
+          valid.map((boss) => boss.id),
+          await getBossesOutOfPool()
+        ),
         current.lastBoss[report.projectPath] ?? null,
         Math.random
       )
@@ -354,7 +247,7 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
           projectPath: report.projectPath,
           sessionId: report.sessionId,
           bossId,
-          bossName: await bossName(bossId),
+          bossName: valid.find((boss) => boss.id === bossId)?.name ?? FALLBACK_NAME,
           party: partyOf(report.party)
         },
         input,
@@ -386,7 +279,7 @@ export async function runEnded(projectPath: string, sessionId: string | null): P
     const key = fightKey(projectPath, sessionId)
     const fight = current.fights[key]
     if (!fight) return
-    const escaped = escapeFight(fight, await bossName(fight.bossId), Date.now())
+    const escaped = escapeFight(fight, await bossNameFor(fight), Date.now())
     if (!escaped) return
     current.fights[key] = escaped
     await save()
@@ -462,5 +355,6 @@ export async function dismissFight(projectPath: string | null): Promise<{ ok: bo
 
 export async function loadBosses(): Promise<void> {
   await load()
-  await loadUserPacks()
+  // The custom packs are read once now; a fight uses what was read last.
+  await validBosses()
 }

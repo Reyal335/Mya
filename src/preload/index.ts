@@ -156,7 +156,23 @@ const api: MyaApi = {
     }
   },
   bosses: {
-    packs: () => ipcRenderer.invoke(IpcChannel.BossesPacks),
+    list: () => ipcRenderer.invoke(IpcChannel.BossesList),
+    pickIdle: () => ipcRenderer.invoke(IpcChannel.BossesPickIdle),
+    sliceIdle: (sourceToken, columns, rows, cells) =>
+      ipcRenderer.invoke(IpcChannel.BossesSliceIdle, sourceToken, columns, rows, cells),
+    dropSources: () => ipcRenderer.invoke(IpcChannel.BossesDropSources),
+    pickBackground: () => ipcRenderer.invoke(IpcChannel.BossesPickBackground),
+    create: (draft) => ipcRenderer.invoke(IpcChannel.BossesCreate, draft),
+    update: (id, draft) => ipcRenderer.invoke(IpcChannel.BossesUpdate, id, draft),
+    remove: (id) => ipcRenderer.invoke(IpcChannel.BossesRemove, id),
+    setInPool: (id, on) => ipcRenderer.invoke(IpcChannel.BossesSetInPool, id, on),
+    onChanged: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(IpcChannel.BossesChanged, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.BossesChanged, listener)
+      }
+    },
     fight: () => ipcRenderer.invoke(IpcChannel.BossesFight),
     onFight: (callback) => {
       const listener = (_event: IpcRendererEvent, fight: FightEvent): void => callback(fight)

@@ -44,7 +44,8 @@ import { toPlainText } from '../../../shared/plainText'
 import PartyPanel, { type PartyTab } from '../components/PartyPanel'
 import { FIGHT_ON_MESSAGE, type Fight } from '../../../shared/bosses'
 import type { BossFightStore } from '../hooks/useBossFight'
-import { packById, useBossPacks } from '../bosses/packs'
+import { useBosses } from '../bosses/useBosses'
+import { fightPack as packForFight } from '../../../shared/bosses'
 import { useRoundReplay } from '../bosses/useRoundReplay'
 import BossTab from '../bosses/BossTab'
 import { fileLabel } from '../bosses/fightView'
@@ -362,9 +363,11 @@ function ConversationScreen({
   const [inputFocus, setInputFocus] = useState(0)
   // Boss battles: the packs, the replay of the latest round, the battle view (open on the
   // live fight, or read-only on a finished one), and text a weak point puts in the box.
-  const packs = useBossPacks()
+  // A fight is drawn only once main has listed the bosses: a custom boss is never shown as The
+  // Red Suite while the list is on its way. A boss that was deleted is drawn as The Red Suite.
+  const { packs, loaded: bossesLoaded } = useBosses()
   const { current: fight, past: pastFights, fightOn: resumeFight, dismiss: dismissFight } = boss
-  const fightPack = fight ? packById(packs, fight.bossId) : null
+  const fightPack = fight && bossesLoaded ? packForFight(packs, fight) : null
   const replayView = useRoundReplay(fight, boss.replay, reducedMotion)
   // live: the fight it was opened on (its start time), so a later fight never opens the
   // view by itself and an ended conversation shows CHAT again.
@@ -373,7 +376,7 @@ function ConversationScreen({
   const battleFight = battle
     ? (battle.readOnly ?? (fight && fight.startedAt === battle.live ? fight : null))
     : null
-  const battlePack = battleFight ? packById(packs, battleFight.bossId) : null
+  const battlePack = battleFight && bossesLoaded ? packForFight(packs, battleFight) : null
   const battleOpen = battleFight !== null && battlePack !== null
 
   // The saved conversation comes back once per project, when nothing is in memory.
@@ -510,7 +513,7 @@ function ConversationScreen({
     const entries: BattleEntry[] = []
     const fights = [...pastFights, ...(fight ? [fight] : [])]
     fights.forEach((each, f) => {
-      const pack = packById(packs, each.bossId)
+      const pack = bossesLoaded ? packForFight(packs, each) : null
       if (!pack) return
       const ending =
         each.status === 'defeated'
@@ -547,7 +550,7 @@ function ConversationScreen({
       })
     })
     return entries
-  }, [pastFights, fight, packs, running, fightOn, setBattle])
+  }, [pastFights, fight, packs, bossesLoaded, running, fightOn, setBattle])
 
   async function startNewChat(): Promise<void> {
     setConfirmNew(false)
@@ -626,7 +629,8 @@ function ConversationScreen({
                 battle?.readOnly
                   ? {
                       hp: battleFight.hp,
-                      sprite: battleFight.status === 'defeated' ? 'defeated' : 'idle',
+                      effect: null,
+                      defeated: battleFight.status === 'defeated',
                       pops: [],
                       combo: null,
                       hitsBadge: null
