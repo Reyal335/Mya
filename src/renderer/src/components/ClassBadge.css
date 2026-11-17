@@ -1,0 +1,32 @@
+/* A class badge: the class word on its class color. */
+.class-badge {
+  flex: none;
+  display: inline-block;
+  padding: 3px 5px;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  color: var(--bg);
+  background: var(--class-scout);
+  white-space: nowrap;
+}
+
+.class-badge--sheet {
+  font-size: 10px;
+}
+
+.class-badge--builder {
+  background: var(--class-builder);
+}
+
+.class-badge--mage {
+  background: var(--class-mage);
+}
+
+.class-badge--knight {
+  background: var(--class-knight);
+}
+
+.class-badge--hero {
+  background: var(--class-hero);
+}

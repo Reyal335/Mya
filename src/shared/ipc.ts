@@ -2,9 +2,11 @@
 // Our own small types only: never raw Agent SDK messages.
 
 import type { AccountData } from './account'
+import type { AchievementsData, Equipped, Reward, RewardKind, UnlockNotice } from './achievements'
 import type { PastedImage } from './images'
 import type { MascotStateName, MascotVoice } from './mascotRules'
 import type { ModelChoice, ModelLists } from './models'
+import type { AgentProgress, AgentStats, TaskLoot, TaskXp } from './progression'
 import type { ThemeChoice, ThemeInfo } from './themes'
 
 export const IpcChannel = {
@@ -71,6 +73,8 @@ export const IpcChannel = {
   UiGetPopups: 'ui:get-popups',
   UiSetPopups: 'ui:set-popups',
   UiTestPopup: 'ui:test-popup',
+  UiGetOpenInEditor: 'ui:get-open-in-editor',
+  UiSetOpenInEditor: 'ui:set-open-in-editor',
   // Main to the main window: OPEN on a popup, with the screen to show.
   UiOpen: 'ui:open',
   // The popup window's own channels. Main answers them only from the popup.
@@ -79,7 +83,18 @@ export const IpcChannel = {
   PopupState: 'popup:state',
   PopupAct: 'popup:act',
   PopupHover: 'popup:hover',
-  PopupGetMascot: 'popup:get-mascot'
+  PopupGetMascot: 'popup:get-mascot',
+  PopupGetEquipped: 'popup:get-equipped',
+  // Progression: levels, achievements, and what is equipped.
+  ProgressionAgentStats: 'progression:agent-stats',
+  ProgressionAgentsSummary: 'progression:agents-summary',
+  ProgressionAchievements: 'progression:achievements',
+  ProgressionEquip: 'progression:equip',
+  ProgressionMarkSeen: 'progression:mark-seen',
+  // Main to every window: XP, an unlock, or what is equipped changed.
+  ProgressionChanged: 'progression:changed',
+  // Main to the main window: an achievement unlocked while the app was in front.
+  ProgressionUnlocked: 'progression:unlocked'
 } as const
 
 export type ProjectInfo = {
@@ -189,6 +204,9 @@ export type AgentEvent =
       status: TaskEndStatus
       report: string
       truncated: boolean
+      // What a task that ended as done changed, and the XP its agent earned.
+      loot: TaskLoot | null
+      xp: TaskXp | null
     }
   // A message I sent while the run was going: Claude took it in, or the run ended
   // first. Only for messages sent into a run already going, never the run's first.
@@ -221,6 +239,9 @@ export type TaskSummary = {
   startedAt: number
   endedAt: number | null
   seen: boolean
+  // Set when the task ended as done (loot) and its agent file earned XP (xp).
+  loot: TaskLoot | null
+  xp: TaskXp | null
 }
 
 export type TaskDetail = TaskSummary & {
@@ -259,6 +280,8 @@ export type HistoryItem =
       status: TaskStatus
       activity: string | null
       report: string | null
+      loot: TaskLoot | null
+      xp: TaskXp | null
     }
 
 export type ChatHistory = {
@@ -331,10 +354,24 @@ export type ModelChoiceChange = { model: string; effort: string; asDefault: bool
 // speaker (the dialogue box's name), with no icon.
 export type PopupWho = { kind: 'agent'; name: string; icon: string | null } | { kind: 'speaker' }
 
-export type PopupAction = 'approve' | 'deny' | 'open' | 'details' | 'dismiss'
+export type PopupAction = 'approve' | 'deny' | 'open' | 'details' | 'dismiss' | 'equip'
 
-// Where OPEN takes the main window.
-export type PopupOpenTarget = { screen: 'chat' } | { screen: 'inbox'; taskId: string }
+// Where OPEN takes the main window. `section` scrolls the task detail to ACTIVITY.
+export type PopupOpenTarget =
+  { screen: 'chat' } | { screen: 'inbox'; taskId: string; section?: 'activity' }
+
+// The loot lines on an "agent reported back" popup.
+export type PopupLoot = {
+  items: number
+  added: number
+  removed: number
+  // A read-only quest: how many files it read.
+  found: number
+  // The first two item names, NEW marked.
+  first: { path: string; isNew: boolean }[]
+  xp: number | null
+  levelUp: boolean
+}
 
 export type PopupView =
   | {
@@ -350,7 +387,14 @@ export type PopupView =
       fits: boolean
       detailsOpen: boolean
     }
-  | { id: string; kind: 'finished' | 'error'; who: PopupWho; text: string }
+  | {
+      id: string
+      kind: 'finished' | 'error'
+      who: PopupWho
+      text: string
+      loot?: PopupLoot | null
+    }
+  | { id: string; kind: 'achievement'; name: string; reward: Reward }
 
 // The API the popup's preload exposes as window.myaPopup. Nothing else.
 export type MyaPopupApi = {
@@ -361,6 +405,11 @@ export type MyaPopupApi = {
   hover: (isOver: boolean) => void
   mascot: {
     getActive: () => Promise<MascotsResult<{ mascot: ActiveMascotData }>>
+    onChanged: (callback: () => void) => () => void
+  }
+  // The equipped accessory, drawn over the mascot.
+  equipped: {
+    get: () => Promise<Equipped>
     onChanged: (callback: () => void) => () => void
   }
 }
@@ -664,7 +713,28 @@ export type MyaApi = {
     setPopups: (on: boolean) => Promise<{ ok: boolean }>
     // A sample finished popup for 6 seconds, even with popups off or the app in front.
     testPopup: () => Promise<void>
+    // Launch VS Code on OPEN/CHANGE, on or off, kept in settings.json. Off when never set.
+    getOpenInEditor: () => Promise<boolean>
+    setOpenInEditor: (on: boolean) => Promise<{ ok: boolean }>
     // OPEN on a popup: the screen the main window should show.
     onOpen: (callback: (target: PopupOpenTarget) => void) => () => void
   }
+  progression: {
+    // The STATUS sheet's numbers for an agent file from the list.
+    agentStats: (filePath: string) => Promise<ProgressionResult<{ stats: AgentStats }>>
+    // Class and level per agent file in the party list, keyed by its filePath.
+    agentsSummary: () => Promise<ProgressionResult<{ agents: Record<string, AgentProgress> }>>
+    achievements: () => Promise<AchievementsData>
+    // id null takes that kind off. Only an unlocked reward can be equipped.
+    equip: (change: EquipChange) => Promise<{ ok: boolean }>
+    markAchievementsSeen: () => Promise<void>
+    onChanged: (callback: () => void) => () => void
+    // An unlock while the app is in front: the toast shows it.
+    onUnlocked: (callback: (notice: UnlockNotice) => void) => () => void
+  }
 }
+
+export type EquipChange = { kind: RewardKind; id: string | null }
+
+export type ProgressionResult<T extends object = object> =
+  ({ ok: true } & T) | { ok: false; error: { message: string } }

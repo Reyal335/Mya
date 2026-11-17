@@ -12,7 +12,9 @@ const VERBS: Record<string, string> = {
   Glob: 'Finding',
   Edit: 'Editing',
   Write: 'Writing',
-  Bash: 'Running'
+  Bash: 'Running',
+  WebFetch: 'Fetching',
+  WebSearch: 'Searching the web for'
 }
 
 const BASH_MAX = 80
@@ -52,6 +54,10 @@ function targetOf(name: string, input: ToolInput, projectPath: string | null): s
       const command = stringField(input, 'command')
       return command && command.split(/\r?\n/)[0].slice(0, BASH_MAX)
     }
+    case 'WebFetch':
+      return stringField(input, 'url')
+    case 'WebSearch':
+      return stringField(input, 'query')
     default:
       return null
   }

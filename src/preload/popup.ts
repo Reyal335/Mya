@@ -23,6 +23,16 @@ const api: MyaPopupApi = {
         ipcRenderer.removeListener(IpcChannel.MascotsChanged, listener)
       }
     }
+  },
+  equipped: {
+    get: () => ipcRenderer.invoke(IpcChannel.PopupGetEquipped),
+    onChanged: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(IpcChannel.ProgressionChanged, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.ProgressionChanged, listener)
+      }
+    }
   }
 }
 

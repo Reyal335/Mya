@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mya — an 8-bit desktop skin for Claude Code</title>
+  <meta name="description" content="Mya is a free, open source 8-bit desktop skin for Claude Code, with a pixel mascot, a party of agents, and popup alerts.">
+  <meta name="theme-color" content="#0B132B">
+  <meta name="color-scheme" content="dark">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Mya — an 8-bit desktop skin for Claude Code">
+  <meta property="og:description" content="Mya is a free, open source 8-bit desktop skin for Claude Code, with a pixel mascot, a party of agents, and popup alerts.">
+  <meta property="og:url" content="https://reyal335.github.io/MyClaud/">
+  <meta property="og:image" content="https://reyal335.github.io/MyClaud/assets/tokyo-night.png">
+  <meta property="og:image:width" content="320">
+  <meta property="og:image:height" content="200">
+  <meta property="og:image:alt" content="Pixel art of a city skyline at night with a red and white tower.">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mya — an 8-bit desktop skin for Claude Code">
+  <meta name="twitter:description" content="Mya is a free, open source 8-bit desktop skin for Claude Code, with a pixel mascot, a party of agents, and popup alerts.">
+  <meta name="twitter:image" content="https://reyal335.github.io/MyClaud/assets/tokyo-night.png">
+
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body id="top">
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="brand" href="#top">
+<svg width="40" height="28" viewBox="0 0 10 7" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#5BC0BE" d="M3 0h3v1H3zM2 1h7v1H2zM0 2h10v4H0zM1 6h8v1H1z"></path>
+  <path fill="#0B132B" d="M3 2h1v2H3zM6 2h1v2H6zM4 5h2v1H4z"></path>
+</svg>
+      <span class="brand__name">MYA</span>
+    </a>
+    <nav class="site-nav" aria-label="Site">
+      <a class="site-nav__link" href="#customize">CUSTOMIZE</a>
+      <a class="site-nav__link" href="#popups">POPUPS</a>
+      <a class="site-nav__link" href="#faq">FAQ</a>
+      <a class="site-nav__link site-nav__link--cta" href="https://github.com/Reyal335/MyClaud">GITHUB</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- TITLE SCREEN -->
+<section class="hero" aria-label="Title screen">
+  <img class="hero__bg" src="assets/tokyo-night.png" alt="" aria-hidden="true" width="320" height="200">
+  <div class="hero__fade" aria-hidden="true"></div>
+  <div class="wrap hero__inner">
+    <div class="hero__copy">
+      <h1 class="hero__title">
+        <span class="hero__name">MYA</span>
+        <span class="hero__tagline">Your agents. Your mascot. Your party.</span>
+      </h1>
+      <p class="hero__lede">An 8-bit desktop skin for Claude Code.</p>
+      <ul class="action-list">
+        <li>
+          <a class="btn btn--block btn--primary" href="https://github.com/Reyal335/MyClaud/releases/latest/download/Mya-Setup.exe">
+<svg width="12" height="14" viewBox="0 0 6 7" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="currentColor" d="M0 0h1v7H0zM1 1h2v5H1zM3 2h1v3H3zM4 3h1v1H4z"></path>
+</svg>
+            DOWNLOAD FOR WINDOWS
+          </a>
+        </li>
+        <li>
+          <a class="btn btn--block btn--secondary btn--aligned" href="https://github.com/Reyal335/MyClaud">VIEW SOURCE</a>
+        </li>
+      </ul>
+      <p class="hero__meta">Mya-Setup.exe · v1.0.0</p>
+    </div>
+
+    <div class="hero__preview">
+      <div class="app-window">
+        <div class="app-window__bar" aria-hidden="true">
+<svg width="20" height="14" viewBox="0 0 10 7" shape-rendering="crispEdges">
+  <path fill="#5BC0BE" d="M3 0h3v1H3zM2 1h7v1H2zM0 2h10v4H0zM1 6h8v1H1z"></path>
+  <path fill="#0B132B" d="M3 2h1v2H3zM6 2h1v2H6zM4 5h2v1H4z"></path>
+</svg>
+          <span class="app-window__name">MYA</span>
+          <span class="app-window__spacer"></span>
+          <span class="pill pill--running"><span class="pill__dot"></span>1 RUNNING</span>
+          <span class="pill pill--waiting"><span class="pill__dot"></span>1 WAITING</span>
+        </div>
+        <div class="app-window__body">
+          <div class="stage">
+            <img class="stage__bg" src="assets/tokyo-night.png" alt="" aria-hidden="true" width="320" height="200">
+            <div class="stage__fade" aria-hidden="true"></div>
+            <div class="stage__content">
+              <div class="bubble">Review the auth changes before I open a PR.</div>
+              <div class="chips">
+                <span class="chip">Reading <span class="chip__arg">src/auth.js</span></span>
+                <span class="chip">Running <span class="chip__arg">git diff main</span></span>
+              </div>
+              <div class="stage__talk">
+                <div class="portrait">
+<svg width="80" height="60" viewBox="2 5 20 15" shape-rendering="crispEdges" role="img" aria-label="Mya, talking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v2h-2z"></path>
+</svg>
+                </div>
+                <div class="dialogue">
+                  <span class="dialogue__name">code-reviewer</span>
+                  <span class="dialogue__text">Found 2 issues. The expiry check compares seconds to milliseconds, so tokens never exp<span class="cursor" aria-hidden="true"></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="rail" aria-hidden="true">
+            <span class="rail__label">PARTY</span>
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <rect width="16" height="16" fill="#5BC0BE"></rect>
+  <path fill="#0B132B" d="M5 4h2v2H5zM3 6h2v2H3zM5 8h2v2H5zM9 4h2v2H9zM11 6h2v2h-2zM9 8h2v2H9zM4 12h8v2H4z"></path>
+</svg>
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <rect width="16" height="16" fill="#F2F4F8"></rect>
+  <path fill="#0B132B" d="M3 8h2v2H3zM5 10h2v2H5zM7 8h2v2H7zM9 6h2v2H9zM11 4h2v2h-2z"></path>
+</svg>
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <rect width="16" height="16" fill="#3A506B"></rect>
+  <path fill="#F2F4F8" d="M4 3h8v2H4zM4 7h8v2H4zM4 11h5v2H4z"></path>
+</svg>
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <rect x=".5" y=".5" width="15" height="15" fill="#1C2541" stroke="#3A506B"></rect>
+  <path fill="#A9B6C6" d="M6 3h4v2H6zM10 5h2v2h-2zM8 7h2v2H8zM8 11h2v2H8z"></path>
+</svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero__popup">
+        <div class="popup popup--waiting popup--compact" role="alertdialog" aria-label="code-reviewer needs approval">
+          <div class="popup__row">
+            <div class="portrait portrait--popup">
+<svg width="68" height="62" viewBox="1 0 22 20" shape-rendering="crispEdges" role="img" aria-label="Mya, asking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 12h2v3h-2zM14 12h2v3h-2zM11 15h2v2h-2z"></path>
+  <path fill="#F2F4F8" d="M8 12h1v1h-1zM14 12h1v1h-1z"></path>
+  <path fill="#F2B84B" d="M19 0h3v1h-3zM18 1h1v1h-1zM22 1h1v1h-1zM22 2h1v1h-1zM21 3h1v1h-1zM20 4h1v1h-1zM20 6h1v1h-1z"></path>
+</svg>
+            </div>
+            <div class="popup__bubble">
+              <div class="popup__head">
+<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#5BC0BE"></rect>
+  <path fill="#0B132B" d="M5 4h2v2H5zM3 6h2v2H3zM5 8h2v2H5zM9 4h2v2H9zM11 6h2v2h-2zM9 8h2v2H9zM4 12h8v2H4z"></path>
+</svg>
+                <span class="popup__agent">code-reviewer</span>
+              </div>
+              <div class="popup__text">Can I edit src/auth.js?</div>
+            </div>
+          </div>
+          <div class="popup__actions">
+            <button type="button" class="pop-btn pop-btn--approve">APPROVE</button>
+            <button type="button" class="pop-btn pop-btn--deny">DENY</button>
+            <button type="button" class="pop-btn pop-btn--open">OPEN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AT A GLANCE -->
+<section class="strip" aria-label="At a glance">
+  <dl class="strip__list">
+    <div class="strip__cell"><dt class="strip__term">LOGIN</dt><dd class="strip__def">CLAUDE CODE</dd></div>
+    <div class="strip__cell"><dt class="strip__term">API KEY</dt><dd class="strip__def">NOT NEEDED</dd></div>
+    <div class="strip__cell"><dt class="strip__term">PRICE</dt><dd class="strip__def">FREE</dd></div>
+    <div class="strip__cell"><dt class="strip__term">RUNS ON</dt><dd class="strip__def">WINDOWS</dd></div>
+  </dl>
+</section>
+
+<!-- THE PARTY -->
+<section id="party" class="section" aria-labelledby="party-h">
+  <div class="wrap section__inner split split--party">
+    <div class="party-art">
+      <div class="party-art__grid" aria-hidden="true"></div>
+<svg viewBox="0 0 100 76" role="img" aria-label="Mya the cloud calling GO to four subagent mascots: an owl reviewing a page through a magnifier, a robot ticking off a checklist, and a frog and a cat both going for the same bug">
+  <g transform="translate(3 34) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(44 3) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(93 30) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#6FCF7F" stroke="#6FCF7F" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(60 70) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(2 70) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(34 68) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(95 10) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <g transform="translate(28 30) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 0h1v3h-1zM0 1h3v1h-3z"></path>
+  </g>
+  <path fill="#A9B6C6" stroke="#A9B6C6" stroke-width="0.12" d="M52 55h1v1h-1zM54 54h1v1h-1zM53 64h1v1h-1zM55 65h1v1h-1zM42 55h1v1h-1z"></path>
+  <g transform="translate(88 44) rotate(-14 4.0 5.0) scale(1) translate(0 0)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M0 0h8v10h-8z"></path>
+    <path fill="#3A506B" stroke="#3A506B" stroke-width="0.12" d="M1 2h5v1h-5zM1 6h4v1h-4z"></path>
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 4h6v1h-6zM1 8h3v1h-3z"></path>
+  </g>
+  <g transform="translate(86 62) rotate(16 4.0 5.0) scale(1) translate(0 0)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M0 0h8v10h-8z"></path>
+    <path fill="#3A506B" stroke="#3A506B" stroke-width="0.12" d="M1 2h5v1h-5zM1 6h4v1h-4z"></path>
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 4h6v1h-6zM1 8h3v1h-3z"></path>
+  </g>
+  <g transform="translate(7 6) rotate(-10 10.35 9.77) scale(1.15) translate(0 0)">
+    <path fill="#8E7CC3" stroke="#8E7CC3" stroke-width="0.12" d="M2 0h2v2h-2zM14 0h2v2h-2zM2 2h14v1h-14zM1 3h16v7h-16zM0 10h18v3h-18zM1 13h16v1h-16zM2 14h14v1h-14zM3 15h12v1h-12z"></path>
+    <path fill="#6E5DAA" stroke="#6E5DAA" stroke-width="0.12" d="M0 10h2v3h-2zM16 10h2v3h-2zM2 0h1v1h-1zM15 0h1v1h-1z"></path>
+    <path fill="#D8D0F5" stroke="#D8D0F5" stroke-width="0.12" d="M5 11h8v4h-8z"></path>
+    <path fill="#8E7CC3" stroke="#8E7CC3" stroke-width="0.12" d="M6 12h1v1h-1zM8 12h1v1h-1zM10 12h1v1h-1zM7 13h1v1h-1zM9 13h1v1h-1zM11 13h1v1h-1z"></path>
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M3 4h5v5h-5zM10 4h5v5h-5z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M6 6h2v2h-2zM13 6h2v2h-2z"></path>
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M8 8h2v2h-2zM4 16h3v1h-3zM11 16h3v1h-3z"></path>
+  </g>
+  <g transform="translate(32 6) rotate(8 4.8 6.0) scale(1.2) translate(0 0)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M0 0h8v10h-8z"></path>
+    <path fill="#3A506B" stroke="#3A506B" stroke-width="0.12" d="M1 2h5v1h-5zM1 6h4v1h-4z"></path>
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M1 4h6v1h-6zM1 8h3v1h-3z"></path>
+  </g>
+  <g transform="translate(33 8)">
+    <path fill="#5BC0BE" fill-opacity="0.4" d="M1 1h6v6H1z"></path>
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M1 0h6v1h-6zM0 1h1v6h-1zM7 1h1v6h-1zM1 7h6v1h-6zM-1 7h2v2h-2zM-3 9h2v2h-2zM-5 11h2v2h-2z"></path>
+  </g>
+  <g transform="translate(67 3) rotate(8 13.2 11.0) scale(1.1) translate(0 0)">
+    <path fill="#A9B6C6" stroke="#A9B6C6" stroke-width="0.12" d="M11 3h2v2h-2zM5 5h14v11h-14zM3 9h2v3h-2zM19 9h2v3h-2zM8 16h8v3h-8z"></path>
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M11 1h2v2h-2zM11 17h2v1h-2z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M7 7h10v6h-10z"></path>
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M8 8h2v2h-2zM12 8h2v2h-2zM9 11h4v1h-4zM8 10h1v1h-1zM13 10h1v1h-1z"></path>
+  </g>
+  <g transform="translate(61 12) rotate(-8 4.5 6.0) scale(1) translate(0 0)">
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M0 1h9v11h-9z"></path>
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M1 2h7v9h-7z"></path>
+    <path fill="#A9B6C6" stroke="#A9B6C6" stroke-width="0.12" d="M3 0h3v2h-3z"></path>
+    <path fill="#3FA860" stroke="#3FA860" stroke-width="0.12" d="M2 4h2v1h-2zM2 6h2v1h-2zM2 8h2v1h-2z"></path>
+    <path fill="#3A506B" stroke="#3A506B" stroke-width="0.12" d="M5 4h2v1h-2zM5 6h2v1h-2zM5 8h2v1h-2z"></path>
+  </g>
+  <g transform="translate(64 28) rotate(0 0.0 0.0) scale(1) translate(0 0)">
+    <path fill="#6FCF7F" stroke="#6FCF7F" stroke-width="0.12" d="M0 2h1v1h-1zM1 3h1v1h-1zM2 2h1v1h-1zM3 1h1v1h-1zM4 0h1v1h-1z"></path>
+  </g>
+  <g transform="translate(60 4) rotate(0 0.0 0.0) scale(0.8) translate(0 0)">
+    <path fill="#6FCF7F" stroke="#6FCF7F" stroke-width="0.12" d="M0 2h1v1h-1zM1 3h1v1h-1zM2 2h1v1h-1zM3 1h1v1h-1zM4 0h1v1h-1z"></path>
+  </g>
+  <g transform="translate(5 50) rotate(6 12.0 9.0) scale(1.2) translate(0 0)">
+    <path fill="#6FCF7F" stroke="#6FCF7F" stroke-width="0.12" d="M2 0h5v3h-5zM13 0h5v3h-5zM1 3h18v2h-18zM0 5h20v6h-20zM1 11h18v2h-18zM3 13h14v1h-14zM0 13h4v2h-4zM16 13h4v2h-4z"></path>
+    <path fill="#3FA860" stroke="#3FA860" stroke-width="0.12" d="M2 6h2v1h-2zM16 6h2v1h-2z"></path>
+    <path fill="#C9F2D0" stroke="#C9F2D0" stroke-width="0.12" d="M5 10h10v3h-10z"></path>
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M3 1h3v3h-3zM14 1h3v3h-3z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M4 2h2v2h-2zM15 2h2v2h-2zM7 7h7v2h-7z"></path>
+    <path fill="#F0706A" stroke="#F0706A" stroke-width="0.12" d="M9 8h4v1h-4zM2 8h2v1h-2zM16 8h2v1h-2z"></path>
+  </g>
+  <g transform="translate(62 46) rotate(-6 13.8 11.5) scale(1.15) translate(0 0)">
+    <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M5 4h2v1h-2zM5 5h3v1h-3zM5 6h4v1h-4zM17 4h2v1h-2zM16 5h3v1h-3zM15 6h4v1h-4zM5 7h14v8h-14zM6 15h12v1h-12zM7 16h10v3h-10zM17 17h3v1h-3zM20 15h1v3h-1z"></path>
+    <path fill="#F0706A" stroke="#F0706A" stroke-width="0.12" d="M6 5h1v1h-1zM17 5h1v1h-1zM11 12h2v1h-2z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M8 9h2v2h-2zM14 9h2v2h-2zM10 13h1v1h-1zM11 14h2v1h-2zM13 13h1v1h-1z"></path>
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M2 11h3v1h-3zM2 13h3v1h-3zM19 11h3v1h-3zM19 13h3v1h-3zM9 9h1v1h-1zM15 9h1v1h-1z"></path>
+  </g>
+  <path fill="#F0706A" stroke="#F0706A" stroke-width="0.12" d="M18 61h9v1h-9zM27 60h8v1h-8zM35 59h8v1h-8zM43 58h4v1h-4zM46 57h2v3h-2z"></path>
+  <g transform="translate(47 55) rotate(-12 4.2 2.8) scale(1.4) translate(0 0)">
+    <path fill="#A9B6C6" stroke="#A9B6C6" stroke-width="0.12" d="M0 1h1v1h-1zM5 1h1v1h-1zM0 3h1v1h-1zM5 3h1v1h-1zM1 -1h1v1h-1zM4 -1h1v1h-1z"></path>
+    <path fill="#F0706A" stroke="#F0706A" stroke-width="0.12" d="M1 0h4v4h-4z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M2 1h1v1h-1zM3 2h1v1h-1zM2 3h2v1h-2z"></path>
+  </g>
+  <path fill="#F2B84B" stroke="#F2B84B" stroke-width="0.12" d="M60 60h9v3h-9zM56 58h5v4h-5z"></path>
+  <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M56 59h1v2h-1zM58 61h1v1h-1z"></path>
+  <g transform="translate(34 28) rotate(-3 16.0 12.0) scale(2) translate(-4 -7)">
+    <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+    <path fill="#5BC0BE" stroke="#5BC0BE" stroke-width="0.12" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+    <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v2h-2z"></path>
+  </g>
+  <path fill="#F2F4F8" stroke="#F2F4F8" stroke-width="0.12" d="M43 11h14v11h-14zM49 22h3v1h-3zM49 23h2v1h-2zM49 24h1v1h-1z"></path>
+  <path fill="#0B132B" stroke="#0B132B" stroke-width="0.12" d="M45 14h3v1h-3zM45 15h1v3h-1zM45 18h3v1h-3zM47 16h1v2h-1zM49 14h3v1h-3zM49 15h1v3h-1zM51 15h1v3h-1zM49 18h3v1h-3zM54 14h1v3h-1zM54 18h1v1h-1z"></path>
+</svg>
+    </div>
+    <div class="party-copy">
+      <h2 id="party-h" class="section__title"><span class="marker" aria-hidden="true"></span>THE PARTY</h2>
+      <p class="section__lede">Mya leads. Your subagents do the rest.</p>
+      <ul class="roster" aria-label="Party members">
+        <li class="roster__item">
+          <span class="roster__icon">
+<svg width="40" height="30" viewBox="4 7 16 12" shape-rendering="crispEdges" role="img" aria-label="Mya">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v2h-2z"></path>
+</svg>
+          </span>
+          <span class="roster__name">MYA</span>
+          <span class="roster__role">main agent</span>
+        </li>
+        <li class="roster__item">
+          <span class="roster__icon">
+<svg width="34" height="32" viewBox="0 0 18 17" shape-rendering="crispEdges" role="img" aria-label="Owl mascot">
+  <path fill="#8E7CC3" d="M2 0h2v2h-2zM14 0h2v2h-2zM2 2h14v1h-14zM1 3h16v7h-16zM0 10h18v3h-18zM1 13h16v1h-16zM2 14h14v1h-14zM3 15h12v1h-12z"></path>
+  <path fill="#6E5DAA" d="M0 10h2v3h-2zM16 10h2v3h-2zM2 0h1v1h-1zM15 0h1v1h-1z"></path>
+  <path fill="#D8D0F5" d="M5 11h8v4h-8z"></path>
+  <path fill="#8E7CC3" d="M6 12h1v1h-1zM8 12h1v1h-1zM10 12h1v1h-1zM7 13h1v1h-1zM9 13h1v1h-1zM11 13h1v1h-1z"></path>
+  <path fill="#F2F4F8" d="M3 4h5v5h-5zM10 4h5v5h-5z"></path>
+  <path fill="#0B132B" d="M6 6h2v2h-2zM13 6h2v2h-2z"></path>
+  <path fill="#F2B84B" d="M8 8h2v2h-2zM4 16h3v1h-3zM11 16h3v1h-3z"></path>
+</svg>
+          </span>
+          <span class="roster__name">OWL</span>
+          <span class="roster__role">code-reviewer</span>
+        </li>
+        <li class="roster__item">
+          <span class="roster__icon">
+<svg width="34" height="34" viewBox="3 1 18 18" shape-rendering="crispEdges" role="img" aria-label="Robot mascot">
+  <path fill="#A9B6C6" d="M11 3h2v2h-2zM5 5h14v11h-14zM3 9h2v3h-2zM19 9h2v3h-2zM8 16h8v3h-8z"></path>
+  <path fill="#F2B84B" d="M11 1h2v2h-2zM11 17h2v1h-2z"></path>
+  <path fill="#0B132B" d="M7 7h10v6h-10z"></path>
+  <path fill="#5BC0BE" d="M8 8h2v2h-2zM12 8h2v2h-2zM9 11h4v1h-4zM8 10h1v1h-1zM13 10h1v1h-1z"></path>
+</svg>
+          </span>
+          <span class="roster__name">ROBOT</span>
+          <span class="roster__role">test-writer</span>
+        </li>
+        <li class="roster__item">
+          <span class="roster__icon">
+<svg width="40" height="30" viewBox="0 0 20 15" shape-rendering="crispEdges" role="img" aria-label="Frog mascot">
+  <path fill="#6FCF7F" d="M2 0h5v3h-5zM13 0h5v3h-5zM1 3h18v2h-18zM0 5h20v6h-20zM1 11h18v2h-18zM3 13h14v1h-14zM0 13h4v2h-4zM16 13h4v2h-4z"></path>
+  <path fill="#3FA860" d="M2 6h2v1h-2zM16 6h2v1h-2z"></path>
+  <path fill="#C9F2D0" d="M5 10h10v3h-10z"></path>
+  <path fill="#F2F4F8" d="M3 1h3v3h-3zM14 1h3v3h-3z"></path>
+  <path fill="#0B132B" d="M4 2h2v2h-2zM15 2h2v2h-2zM7 7h7v2h-7z"></path>
+  <path fill="#F0706A" d="M9 8h4v1h-4zM2 8h2v1h-2zM16 8h2v1h-2z"></path>
+</svg>
+          </span>
+          <span class="roster__name">FROG</span>
+          <span class="roster__role">bug-hunter</span>
+        </li>
+        <li class="roster__item">
+          <span class="roster__icon">
+<svg width="40" height="29" viewBox="2 4 21 15" shape-rendering="crispEdges" role="img" aria-label="Cat mascot">
+  <path fill="#F2B84B" d="M5 4h2v1h-2zM5 5h3v1h-3zM5 6h4v1h-4zM17 4h2v1h-2zM16 5h3v1h-3zM15 6h4v1h-4zM5 7h14v8h-14zM6 15h12v1h-12zM7 16h10v3h-10zM17 17h3v1h-3zM20 15h1v3h-1z"></path>
+  <path fill="#F0706A" d="M6 5h1v1h-1zM17 5h1v1h-1zM11 12h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 9h2v2h-2zM14 9h2v2h-2zM10 13h1v1h-1zM11 14h2v1h-2zM13 13h1v1h-1z"></path>
+  <path fill="#F2F4F8" d="M2 11h3v1h-3zM2 13h3v1h-3zM19 11h3v1h-3zM19 13h3v1h-3zM9 9h1v1h-1zM15 9h1v1h-1z"></path>
+</svg>
+          </span>
+          <span class="roster__name">CAT</span>
+          <span class="roster__role">docs-helper</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- CHARACTER SELECT -->
+<section id="customize" class="section section--panel" aria-labelledby="customize-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="customize-h" class="section__title"><span class="marker" aria-hidden="true"></span>CHARACTER SELECT</h2>
+      <p class="section__lede">Mya is the default. Upload your own.</p>
+    </div>
+
+    <div class="select">
+      <div class="showcase">
+<svg width="240" height="200" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, the default mascot">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v1h-2z"></path>
+</svg>
+        <div class="showcase__caption">
+          <span class="showcase__name">MYA</span>
+          <span class="tag">DEFAULT</span>
+        </div>
+      </div>
+      <ul class="tiles" aria-label="Mascots">
+        <li class="tile tile--selected">
+          <span class="tile__badge">1P</span>
+<svg width="112" height="93" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v1h-2z"></path>
+</svg>
+          <span class="tile__name">MYA</span>
+          <span class="tile__note">DEFAULT</span>
+        </li>
+        <li class="tile">
+<svg width="112" height="93" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Example mascot: a robot">
+  <path fill="#A9B6C6" d="M11 3h2v2h-2zM5 5h14v11h-14zM3 9h2v3h-2zM19 9h2v3h-2zM8 16h8v3h-8z"></path>
+  <path fill="#F2B84B" d="M11 1h2v2h-2zM11 17h2v1h-2z"></path>
+  <path fill="#0B132B" d="M7 7h10v6h-10z"></path>
+  <path fill="#5BC0BE" d="M9 8h2v2h-2zM13 8h2v2h-2zM10 11h4v1h-4z"></path>
+</svg>
+          <span class="tile__name">ROBOT</span>
+          <span class="tile__note">EXAMPLE</span>
+        </li>
+        <li class="tile">
+<svg width="112" height="93" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Example mascot: a cat">
+  <path fill="#F2B84B" d="M5 4h2v1h-2zM5 5h3v1h-3zM5 6h4v1h-4zM17 4h2v1h-2zM16 5h3v1h-3zM15 6h4v1h-4zM5 7h14v8h-14zM6 15h12v1h-12zM7 16h10v3h-10zM17 17h3v1h-3zM20 15h1v3h-1z"></path>
+  <path fill="#F0706A" d="M6 5h1v1h-1zM17 5h1v1h-1zM11 12h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 9h2v2h-2zM14 9h2v2h-2zM10 13h1v1h-1zM11 14h2v1h-2zM13 13h1v1h-1z"></path>
+  <path fill="#F2F4F8" d="M2 11h3v1h-3zM2 13h3v1h-3zM19 11h3v1h-3zM19 13h3v1h-3zM8 9h1v1h-1zM14 9h1v1h-1z"></path>
+</svg>
+          <span class="tile__name">CAT</span>
+          <span class="tile__note">EXAMPLE</span>
+        </li>
+        <li class="tile tile--add">
+<svg width="40" height="40" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#5BC0BE" d="M7 2h2v12H7zM2 7h12v2H2z"></path>
+</svg>
+          <span class="tile__name tile__name--accent">YOUR MASCOT</span>
+          <button type="button" class="btn btn--sm btn--primary">UPLOAD SHEET</button>
+        </li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection__head">
+        <h3 class="subsection__title">STATES</h3>
+        <span class="subsection__note">One loop each, for any mascot.</span>
+      </div>
+      <ul class="states" aria-label="Mascot states">
+        <li class="state">
+<svg width="120" height="100" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, idle">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v1h-2z"></path>
+</svg>
+          <span class="state__name state__name--idle">IDLE</span>
+        </li>
+        <li class="state">
+<svg width="120" height="100" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, thinking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14zM17 0h7v3h-7zM18 4h1v1h-1zM17 6h1v1h-1z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M9 12h2v2h-2zM15 12h2v2h-2zM12 15h1v1h-1zM18 1h1v1h-1zM20 1h1v1h-1zM22 1h1v1h-1z"></path>
+</svg>
+          <span class="state__name state__name--thinking">THINKING</span>
+        </li>
+        <li class="state">
+<svg width="120" height="100" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, talking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14zM0 0h8v4h-8zM5 4h1v1h-1z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2zM1 1h6v1h-6zM1 2h4v1h-4z"></path>
+  <path fill="#0B132B" d="M8 13h2v2h-2zM14 13h2v2h-2zM11 15h2v2h-2z"></path>
+</svg>
+          <span class="state__name state__name--talking">TALKING</span>
+        </li>
+        <li class="state">
+<svg width="120" height="100" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, working">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 14h2v2h-2zM14 14h2v2h-2zM11 16h2v1h-2z"></path>
+  <path fill="#F2B84B" d="M11 4h4v1h-4zM10 5h6v1h-6zM8 6h10v1h-10z"></path>
+  <path fill="#6FCF7F" d="M3 3h1v1h-1zM2 4h3v1h-3zM3 5h1v1h-1zM20 1h1v1h-1zM19 2h3v1h-3zM20 3h1v1h-1z"></path>
+</svg>
+          <span class="state__name state__name--working">WORKING</span>
+        </li>
+        <li class="state state--asking">
+<svg width="120" height="100" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, asking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 12h2v3h-2zM14 12h2v3h-2zM11 15h2v2h-2z"></path>
+  <path fill="#F2F4F8" d="M8 12h1v1h-1zM14 12h1v1h-1z"></path>
+  <path fill="#F2B84B" d="M19 0h3v1h-3zM18 1h1v1h-1zM22 1h1v1h-1zM22 2h1v1h-1zM21 3h1v1h-1zM20 4h1v1h-1zM20 6h1v1h-1z"></path>
+</svg>
+          <span class="state__name state__name--asking">ASKING</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection__head">
+        <h3 class="subsection__title">AGENT ICONS</h3>
+        <span class="subsection__note">16x16, one per agent.</span>
+      </div>
+      <ul class="icons" aria-label="Agent icons">
+        <li class="icons__item">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#5BC0BE"></rect>
+  <path fill="#0B132B" d="M5 4h2v2H5zM3 6h2v2H3zM5 8h2v2H5zM9 4h2v2H9zM11 6h2v2h-2zM9 8h2v2H9zM4 12h8v2H4z"></path>
+</svg>
+          <span>code-reviewer</span>
+        </li>
+        <li class="icons__item">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#F2F4F8"></rect>
+  <path fill="#0B132B" d="M3 8h2v2H3zM5 10h2v2H5zM7 8h2v2H7zM9 6h2v2H9zM11 4h2v2h-2z"></path>
+</svg>
+          <span>test-writer</span>
+        </li>
+        <li class="icons__item">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#3A506B"></rect>
+  <path fill="#F2F4F8" d="M4 3h8v2H4zM4 7h8v2H4zM4 11h5v2H4z"></path>
+</svg>
+          <span>docs-helper</span>
+        </li>
+        <li class="icons__item icons__item--add">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#5BC0BE" d="M7 3h2v10H7zM3 7h10v2H3z"></path>
+</svg>
+          <span class="icons__add">ADD ICON</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- NEW MESSAGE POPUPS -->
+<section id="popups" class="section" aria-labelledby="popups-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="popups-h" class="section__title"><span class="marker" aria-hidden="true"></span>NEW MESSAGE!</h2>
+      <p class="section__lede">Your mascot pops up when an agent needs you.</p>
+    </div>
+
+    <div class="desktop-frame">
+      <div class="desktop">
+        <div class="desktop__blur" aria-hidden="true">
+          <div class="desktop__shape desktop__shape--window"></div>
+          <div class="desktop__shape desktop__shape--titlebar"></div>
+          <div class="desktop__shape desktop__shape--line-a"></div>
+          <div class="desktop__shape desktop__shape--line-b"></div>
+          <div class="desktop__shape desktop__shape--code"></div>
+        </div>
+
+        <div class="desktop__popups">
+          <div class="popup popup--done" role="status">
+            <div class="popup__row">
+              <div class="portrait portrait--popup">
+<svg width="68" height="62" viewBox="1 0 22 20" shape-rendering="crispEdges" role="img" aria-label="Mya, happy">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2zM1 2h1v1h-1zM0 3h3v1h-3zM1 4h1v1h-1zM21 1h1v1h-1zM20 2h3v1h-3zM21 3h1v1h-1z"></path>
+  <path fill="#0B132B" d="M7 14h1v1h-1zM8 13h2v1h-2zM10 14h1v1h-1zM13 14h1v1h-1zM14 13h2v1h-2zM16 14h1v1h-1zM10 15h1v1h-1zM13 15h1v1h-1zM11 16h2v1h-2z"></path>
+</svg>
+              </div>
+              <div class="popup__bubble">
+                <div class="popup__head">
+<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#3A506B"></rect>
+  <path fill="#F2F4F8" d="M4 3h8v2H4zM4 7h8v2H4zM4 11h5v2H4z"></path>
+</svg>
+                  <span class="popup__agent">docs-helper</span>
+                </div>
+                <div class="popup__text">All done! README is updated.</div>
+                <span class="status"><span class="status__dot" aria-hidden="true"></span>DONE</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="popup popup--waiting" role="alertdialog" aria-label="code-reviewer needs approval">
+            <div class="popup__row">
+              <div class="portrait portrait--popup">
+<svg width="68" height="62" viewBox="1 0 22 20" shape-rendering="crispEdges" role="img" aria-label="Mya, asking">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M8 12h2v3h-2zM14 12h2v3h-2zM11 15h2v2h-2z"></path>
+  <path fill="#F2F4F8" d="M8 12h1v1h-1zM14 12h1v1h-1z"></path>
+  <path fill="#F2B84B" d="M19 0h3v1h-3zM18 1h1v1h-1zM22 1h1v1h-1zM22 2h1v1h-1zM21 3h1v1h-1zM20 4h1v1h-1zM20 6h1v1h-1z"></path>
+</svg>
+              </div>
+              <div class="popup__bubble">
+                <div class="popup__head">
+<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#5BC0BE"></rect>
+  <path fill="#0B132B" d="M5 4h2v2H5zM3 6h2v2H3zM5 8h2v2H5zM9 4h2v2H9zM11 6h2v2h-2zM9 8h2v2H9zM4 12h8v2H4z"></path>
+</svg>
+                  <span class="popup__agent">code-reviewer</span>
+                </div>
+                <div class="popup__text">Can I edit src/auth.js?</div>
+              </div>
+            </div>
+            <div class="popup__actions">
+              <button type="button" class="pop-btn pop-btn--approve">APPROVE</button>
+              <button type="button" class="pop-btn pop-btn--deny">DENY</button>
+              <button type="button" class="pop-btn pop-btn--open">OPEN</button>
+            </div>
+          </div>
+
+          <div class="popup popup--error" role="alert">
+            <div class="popup__row">
+              <div class="portrait portrait--popup">
+<svg width="68" height="62" viewBox="1 0 22 20" shape-rendering="crispEdges" role="img" aria-label="Mya, oops">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2z"></path>
+  <path fill="#0B132B" d="M7 12h1v1h-1zM9 12h1v1h-1zM8 13h1v1h-1zM7 14h1v1h-1zM9 14h1v1h-1zM14 12h1v1h-1zM16 12h1v1h-1zM15 13h1v1h-1zM14 14h1v1h-1zM16 14h1v1h-1zM10 16h1v1h-1zM11 15h1v1h-1zM12 16h1v1h-1zM13 15h1v1h-1z"></path>
+  <path fill="#F0706A" d="M20 0h2v4h-2zM20 5h2v1h-2z"></path>
+</svg>
+              </div>
+              <div class="popup__bubble">
+                <div class="popup__head">
+<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect x=".5" y=".5" width="15" height="15" fill="#1C2541" stroke="#3A506B"></rect>
+  <path fill="#A9B6C6" d="M6 3h4v2H6zM10 5h2v2h-2zM8 7h2v2H8zM8 11h2v2H8z"></path>
+</svg>
+                  <span class="popup__agent">bug-hunter</span>
+                </div>
+                <div class="popup__text">npm test exited with code 1.</div>
+                <span class="status status--error"><span class="status__dot" aria-hidden="true"></span>ERROR</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="taskbar" aria-hidden="true">
+          <span class="taskbar__tile"></span>
+          <span class="taskbar__tile"></span>
+          <span class="taskbar__app">
+<svg width="20" height="14" viewBox="0 0 10 7" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#5BC0BE" d="M3 0h3v1H3zM2 1h7v1H2zM0 2h10v4H0zM1 6h8v1H1z"></path>
+  <path fill="#0B132B" d="M3 2h1v2H3zM6 2h1v2H6zM4 5h2v1H4z"></path>
+</svg>
+          </span>
+          <span class="taskbar__spacer"></span>
+          <span class="taskbar__clock">3:12 AM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INBOX -->
+<section id="inbox" class="section section--panel" aria-labelledby="inbox-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="inbox-h" class="section__title"><span class="marker" aria-hidden="true"></span>INBOX</h2>
+      <p class="section__lede">Run four agents. Lose track of none.</p>
+    </div>
+    <ul class="inbox" aria-label="Example inbox">
+      <li class="inbox__row inbox__row--unread">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#5BC0BE"></rect>
+  <path fill="#0B132B" d="M5 4h2v2H5zM3 6h2v2H3zM5 8h2v2H5zM9 4h2v2H9zM11 6h2v2h-2zM9 8h2v2H9zM4 12h8v2H4z"></path>
+</svg>
+        <div class="inbox__body">
+          <span class="inbox__name">code-reviewer</span>
+          <span class="inbox__subject">Can I edit src/auth.js?</span>
+        </div>
+        <span class="status status--waiting"><span class="status__dot" aria-hidden="true"></span>WAITING</span>
+      </li>
+      <li class="inbox__row">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#F2F4F8"></rect>
+  <path fill="#0B132B" d="M3 8h2v2H3zM5 10h2v2H5zM7 8h2v2H7zM9 6h2v2H9zM11 4h2v2h-2z"></path>
+</svg>
+        <div class="inbox__body">
+          <span class="inbox__name">test-writer</span>
+          <span class="inbox__subject">6 of 9 test cases done.</span>
+        </div>
+        <span class="status status--running"><span class="status__dot" aria-hidden="true"></span>RUNNING</span>
+      </li>
+      <li class="inbox__row">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect width="16" height="16" fill="#3A506B"></rect>
+  <path fill="#F2F4F8" d="M4 3h8v2H4zM4 7h8v2H4zM4 11h5v2H4z"></path>
+</svg>
+        <div class="inbox__body">
+          <span class="inbox__name">docs-helper</span>
+          <span class="inbox__subject">README is updated.</span>
+        </div>
+        <span class="status"><span class="status__dot" aria-hidden="true"></span>DONE</span>
+      </li>
+      <li class="inbox__row">
+<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+  <rect x=".5" y=".5" width="15" height="15" fill="#1C2541" stroke="#3A506B"></rect>
+  <path fill="#A9B6C6" d="M6 3h4v2H6zM10 5h2v2h-2zM8 7h2v2H8zM8 11h2v2H8z"></path>
+</svg>
+        <div class="inbox__body">
+          <span class="inbox__name">bug-hunter</span>
+          <span class="inbox__subject">npm test exited with code 1.</span>
+        </div>
+        <span class="status status--error"><span class="status__dot" aria-hidden="true"></span>ERROR</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- SAME CLAUDE CODE -->
+<section id="same" class="section" aria-labelledby="same-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="same-h" class="section__title"><span class="marker" aria-hidden="true"></span>SAME CLAUDE CODE</h2>
+      <p class="section__lede">New skin. Same login, limits and approvals.</p>
+    </div>
+
+    <div class="split split--even">
+      <div class="usage" role="group" aria-label="Example usage panel">
+        <div class="usage__head">
+          <h3 class="usage__title">USAGE</h3>
+          <span class="badge">PRO</span>
+        </div>
+
+        <div class="meter" role="group" aria-label="SESSION (5 HR): 52 percent used">
+          <div class="meter__head">
+            <span>SESSION (5 HR)</span>
+            <span>52%</span>
+          </div>
+          <div class="meter__bar" aria-hidden="true">
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span>
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span>
+            <span class="seg"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span>
+            <span class="seg"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span>
+          </div>
+          <span class="meter__reset">Resets in 2 h 18 min</span>
+        </div>
+
+        <div class="meter" role="group" aria-label="WEEKLY (7 DAY): 84 percent used">
+          <div class="meter__head">
+            <span>WEEKLY (7 DAY)</span>
+            <span>84%</span>
+          </div>
+          <div class="meter__bar meter__bar--warn" aria-hidden="true">
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span>
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span>
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg seg--on"></span>
+            <span class="seg seg--on"></span><span class="seg seg--on"></span><span class="seg"></span><span class="seg"></span><span class="seg"></span>
+          </div>
+          <span class="meter__reset">Resets Mon, 8:00 AM</span>
+        </div>
+      </div>
+
+      <div class="same-side">
+        <ul class="features">
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">YOUR LOGIN + PLAN</span>
+          </li>
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">USAGE LIMITS</span>
+          </li>
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">MODELS + THINKING</span>
+          </li>
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">TOOL APPROVALS</span>
+          </li>
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">YOUR AGENT FILES</span>
+          </li>
+          <li class="features__item">
+<svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#6FCF7F" d="M6 1h1v2H6zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM1 3h1v1H1zM2 4h1v1H2z"></path>
+</svg>
+            <span class="features__label">BACKGROUND RUNS</span>
+          </li>
+        </ul>
+        <div class="controls" role="group" aria-label="Example controls">
+          <span class="control control--model">
+            <span class="blocks" aria-hidden="true"><span class="block block--on"></span><span class="block block--on"></span><span class="block"></span><span class="block"></span></span>
+            SONNET <span class="control__dim">· THINK MED</span>
+          </span>
+          <span class="control control--tool">Running <span class="control__arg">npm test</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUEST LOG -->
+<section id="setup" class="section section--panel" aria-labelledby="setup-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="setup-h" class="section__title"><span class="marker" aria-hidden="true"></span>QUEST LOG</h2>
+      <p class="section__lede">Three steps to player one.</p>
+    </div>
+    <ol class="steps">
+      <li class="steps__item">
+        <span class="steps__num">1</span>
+        <span>Run <code>claude</code>, then <code>/login</code></span>
+      </li>
+      <li class="steps__item">
+        <span class="steps__num">2</span>
+        <span>Install Mya-Setup.exe</span>
+      </li>
+      <li class="steps__item">
+        <span class="steps__num">3</span>
+        <span>Open a project folder</span>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="section" aria-labelledby="faq-h">
+  <div class="wrap section__inner section__inner--stack">
+    <div class="section__head">
+      <h2 id="faq-h" class="section__title"><span class="marker" aria-hidden="true"></span>FAQ</h2>
+    </div>
+    <dl class="faq">
+      <div class="faq__item">
+        <dt class="faq__q">Need an API key?</dt>
+        <dd class="faq__a">No. Mya uses your Claude Code login.</dd>
+      </div>
+      <div class="faq__item">
+        <dt class="faq__q">What does it cost?</dt>
+        <dd class="faq__a">Mya is free. Usage counts toward your Claude plan.</dd>
+      </div>
+      <div class="faq__item">
+        <dt class="faq__q">Stuck with the cloud?</dt>
+        <dd class="faq__a">No. Upload any 64x64 spritesheet.</dd>
+      </div>
+      <div class="faq__item">
+        <dt class="faq__q">Made by Anthropic?</dt>
+        <dd class="faq__a">No. An independent project on the Claude Agent SDK.</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- CONTINUE? -->
+<section id="download" class="section section--panel" aria-labelledby="download-h">
+  <div class="wrap section__inner">
+    <div class="cta">
+      <div class="portrait portrait--cta">
+<svg width="112" height="93" viewBox="0 0 24 20" shape-rendering="crispEdges" role="img" aria-label="Mya, happy">
+  <path fill="#F2F4F8" d="M11 7h4v1h-4zM10 8h6v1h-6zM6 9h3v1h-3zM10 9h7v1h-7zM5 10h13v1h-13zM5 11h14v1h-14zM4 12h16v1h-16zM4 13h16v1h-16zM4 14h16v1h-16zM4 15h16v1h-16zM4 16h16v1h-16zM5 17h14v1h-14z"></path>
+  <path fill="#5BC0BE" d="M6 18h12v1h-12zM6 15h2v1h-2zM16 15h2v1h-2zM1 2h1v1h-1zM0 3h3v1h-3zM1 4h1v1h-1zM21 1h1v1h-1zM20 2h3v1h-3zM21 3h1v1h-1z"></path>
+  <path fill="#0B132B" d="M7 14h1v1h-1zM8 13h2v1h-2zM10 14h1v1h-1zM13 14h1v1h-1zM14 13h2v1h-2zM16 14h1v1h-1zM10 15h1v1h-1zM13 15h1v1h-1zM11 16h2v1h-2z"></path>
+</svg>
+      </div>
+      <div class="cta__copy">
+        <h2 id="download-h" class="section__title">CONTINUE?</h2>
+        <p class="cta__note">Free and open source.</p>
+      </div>
+      <div class="cta__actions">
+        <ul class="action-list">
+          <li>
+            <a class="btn btn--block btn--primary" href="https://github.com/Reyal335/MyClaud/releases/latest/download/Mya-Setup.exe">
+<svg width="12" height="14" viewBox="0 0 6 7" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="currentColor" d="M0 0h1v7H0zM1 1h2v5H1zM3 2h1v3H3zM4 3h1v1H4z"></path>
+</svg>
+              DOWNLOAD FOR WINDOWS
+            </a>
+          </li>
+          <li>
+            <a class="btn btn--block btn--secondary btn--aligned" href="https://github.com/Reyal335/MyClaud">VIEW SOURCE</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <div class="site-footer__brand">
+<svg width="20" height="14" viewBox="0 0 10 7" shape-rendering="crispEdges" aria-hidden="true">
+  <path fill="#5BC0BE" d="M3 0h3v1H3zM2 1h7v1H2zM0 2h10v4H0zM1 6h8v1H1z"></path>
+  <path fill="#0B132B" d="M3 2h1v2H3zM6 2h1v2H6zM4 5h2v1H4z"></path>
+</svg>
+      <span class="site-footer__name">MYA</span>
+      <span>Not affiliated with Anthropic.</span>
+    </div>
+    <ul class="site-footer__links">
+      <li><a href="https://github.com/Reyal335/MyClaud">github.com/Reyal335/MyClaud</a></li>
+      <!-- TODO: no LICENSE file in the repo yet. Replace the text with the license name and point the link at the LICENSE file once one is added. -->
+      <li><a href="https://github.com/Reyal335/MyClaud">[LICENSE]</a></li>
+    </ul>
+  </div>
+</footer>
+
+</body>
+</html>

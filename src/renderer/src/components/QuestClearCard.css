@@ -1,0 +1,201 @@
+/* The QUEST CLEAR card: a done task's agent card, grown. */
+.quest {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 78%;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: var(--border) solid var(--waiting);
+  box-shadow: var(--shadow-dialog);
+}
+
+.quest__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quest__heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quest__title {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--waiting);
+}
+
+.quest__who {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.quest__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quest__section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quest__label {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: var(--accent);
+}
+
+.quest__totals {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.quest__add {
+  color: var(--loot-add);
+}
+
+.quest__remove {
+  color: var(--error);
+}
+
+.quest__list {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+.quest__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.quest__list--found .quest__row {
+  color: var(--muted);
+}
+
+.quest__file {
+  flex: none;
+  display: block;
+}
+
+.quest__file-page {
+  fill: var(--muted);
+}
+
+.quest__file-fold {
+  fill: var(--line);
+}
+
+.quest__file--new .quest__file-page {
+  fill: var(--waiting);
+}
+
+.quest__file-plus {
+  fill: var(--bg);
+}
+
+.quest__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest__new {
+  flex: none;
+  padding: 2px 4px;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  color: var(--bg);
+  background: var(--waiting);
+}
+
+.quest__counts {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.quest__more {
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.quest__xp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quest__xp-line {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quest__xp-total {
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  color: var(--waiting);
+}
+
+.quest__breakdown {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.quest__level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest__lv {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+
+.quest__banner {
+  margin: 0;
+  padding: 6px 8px;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--bg);
+  background: var(--waiting);
+  overflow-wrap: anywhere;
+}
+
+.quest__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

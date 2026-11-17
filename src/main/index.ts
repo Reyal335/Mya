@@ -8,6 +8,7 @@ import { closePopups, setupPopups } from './popupWindow'
 import { registerIpc } from './ipc'
 import { prefetchModels } from './models'
 import { getProject, loadProject } from './settings'
+import { loadProgression, useProjectFrom } from './progressionStore'
 import { loadTasks } from './tasks'
 import { loadUsage } from './usage'
 import { watchWindow } from './windowControls'
@@ -113,6 +114,9 @@ app.whenReady().then(async () => {
   prefetchModels(getProject()?.path ?? null)
   // Tasks cut off when the app last closed become stopped before anything reads them.
   await loadTasks()
+  // XP and achievements. A corrupt progression.json is kept aside and the app starts.
+  useProjectFrom(() => getProject()?.path ?? null)
+  await loadProgression()
   // The saved usage numbers come back first; the account is read on its own after that.
   await loadUsage()
   registerIpc()

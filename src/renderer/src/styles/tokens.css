@@ -15,6 +15,14 @@
   --raised: #26335a; /* slightly lighter than panel: inline code, table headers */
   --dim: rgb(11 19 43 / 62%); /* over unpicked cells in the sheet slicer */
 
+  /* Progression: class badges and the loot's added lines */
+  --class-scout: var(--accent);
+  --class-builder: var(--waiting);
+  --class-mage: #b98cf0;
+  --class-knight: #6fcf7f;
+  --class-hero: var(--text);
+  --loot-add: #6fcf7f;
+
   /* Type */
   --font-pixel: 'Press Start 2P', monospace;
   --font-mono: 'IBM Plex Mono', monospace;

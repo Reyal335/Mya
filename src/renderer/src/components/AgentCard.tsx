@@ -1,5 +1,8 @@
 import type { AgentSummary } from '../../../shared/ipc'
+import { CLASS_NAMES, classFor, type AgentProgress } from '../../../shared/progression'
 import AgentIcon from './AgentIcon'
+import ClassBadge from './ClassBadge'
+import XpBar from './XpBar'
 import './AgentCard.css'
 
 type AgentCardProps = {
@@ -10,6 +13,9 @@ type AgentCardProps = {
   // CALL: opens CHAT with this agent called. callBlocked is the reason it cannot be.
   onCall: () => void
   callBlocked: string | null
+  // Class and level, once main has said. STATUS opens the status sheet.
+  progress: AgentProgress | undefined
+  onStatus: () => void
 }
 
 function toolSummary(tools: string[] | null): string {
@@ -25,7 +31,9 @@ function AgentCard({
   onSelect,
   onDelete,
   onCall,
-  callBlocked
+  callBlocked,
+  progress,
+  onStatus
 }: AgentCardProps): React.JSX.Element {
   if (agent.problem) {
     return (
@@ -47,14 +55,19 @@ function AgentCard({
     )
   }
 
-  // The select button keeps the whole card; CALL sits beside it at the right edge,
-  // so neither click ever does the other's job.
+  // The class comes from the tools line as it is now; the level from main.
+  const agentClass = classFor(agent.tools)
+  const level = progress?.level ?? 1
+
+  // The select button keeps the whole card; CALL and STATUS sit beside it at the right
+  // edge, so no click ever does another's job.
   return (
     <div className="agent-card-wrap">
       <button
         type="button"
         className={`agent-card agent-card--callable${selected ? ' agent-card--selected' : ''}`}
         aria-pressed={selected}
+        aria-description={`${CLASS_NAMES[agentClass.id]}, level ${level}`}
         onClick={onSelect}
       >
         <AgentIcon src={agent.icon} size={48} label={`${agent.name} icon`} />
@@ -63,6 +76,11 @@ function AgentCard({
           <span className="agent-card__top">
             <span className="agent-card__name">{agent.name}</span>
             <span className="agent-card__model">{agent.model ?? 'default'}</span>
+          </span>
+          <span className="agent-card__progress">
+            <ClassBadge classId={agentClass.id} reason={agentClass.reason} />
+            <span className="agent-card__level">LV {level}</span>
+            <XpBar intoLevel={progress?.intoLevel ?? 0} toNext={progress?.toNext ?? 1} />
           </span>
           <span className="agent-card__description">{agent.description}</span>
           <span className="agent-card__tools">
@@ -82,6 +100,15 @@ function AgentCard({
         }}
       >
         CALL
+      </button>
+      <button
+        type="button"
+        className="button button--small button--secondary agent-card__status"
+        aria-label={`Status of ${agent.name}`}
+        aria-haspopup="dialog"
+        onClick={onStatus}
+      >
+        STATUS
       </button>
     </div>
   )

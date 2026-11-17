@@ -34,3 +34,11 @@
   background: var(--bg);
   color: var(--text);
 }
+
+/* An 8px red dot: something new to see on this screen. */
+.nav-item__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--error);
+}

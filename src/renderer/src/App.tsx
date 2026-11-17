@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AchievementToast from './components/AchievementToast'
 import AppShell from './components/AppShell'
 import NoProject from './components/NoProject'
 import Sidebar from './components/Sidebar'
@@ -11,6 +12,9 @@ import ConversationScreen from './screens/ConversationScreen'
 import InboxScreen from './screens/InboxScreen'
 import AgentsScreen from './screens/AgentsScreen'
 import MascotsScreen from './screens/MascotsScreen'
+import AchievementsScreen from './screens/AchievementsScreen'
+import { useProgression } from './hooks/useProgression'
+import { accessoryById } from './progression/accessories'
 import { useActiveMascot } from './mascots/useActiveMascot'
 import { useAccount } from './hooks/useAccount'
 import { useConversation, type CallTarget } from './hooks/useConversation'
@@ -32,6 +36,8 @@ function App(): React.JSX.Element {
   const waitingAlert = useWaitingAlert(tasks.tasks, tasks.loaded, screen === 'inbox')
   // Who I am signed in as and the usage numbers: the sidebar meter and ACCOUNT share them.
   const account = useAccount()
+  // Achievements and what is equipped: the nav dot, the screen, and the unlock toast.
+  const progression = useProgression()
   const { clear } = conversation
   // The agent called for my next message, and the task open in INBOX.
   const [call, setCall] = useState<CallTarget | null>(null)
@@ -86,8 +92,16 @@ function App(): React.JSX.Element {
     [confirmLeave]
   )
 
-  const openTask = useCallback((taskId: string): void => {
+  // VIEW CHANGES asks the task detail to scroll to ACTIVITY. The tick makes a second
+  // click on the same task scroll again.
+  const [activityRequest, setActivityRequest] = useState<{ taskId: string; tick: number } | null>(
+    null
+  )
+  const openTask = useCallback((taskId: string, section?: 'activity'): void => {
     setSelectedTaskId(taskId)
+    if (section === 'activity') {
+      setActivityRequest((current) => ({ taskId, tick: (current?.tick ?? 0) + 1 }))
+    }
     setScreen('inbox')
   }, [])
 
@@ -96,7 +110,7 @@ function App(): React.JSX.Element {
     () =>
       window.mya.ui.onOpen((target) => {
         confirmLeave(() => {
-          if (target.screen === 'inbox') openTask(target.taskId)
+          if (target.screen === 'inbox') openTask(target.taskId, target.section)
           else setScreen('chat')
         })
       }),
@@ -131,6 +145,7 @@ function App(): React.JSX.Element {
           onOpenProject={handleSidebarOpenProject}
           chatCount={mainWaiting ? 1 : 0}
           inboxCount={tasks.waitingCount}
+          achievementsDot={progression.unseen}
           meter={
             <UsageMeter
               data={account.data}
@@ -167,13 +182,20 @@ function App(): React.JSX.Element {
           selectedTaskId={selectedTaskId}
           onSelectTask={setSelectedTaskId}
           onAskAgain={callAgent}
+          activityRequest={activityRequest}
         />
       )}
       {screen === 'agents' && (
         <AgentsScreen project={project} setLeaveGuard={setLeaveGuard} onCall={callAgent} />
       )}
       {screen === 'mascots' && <MascotsScreen setLeaveGuard={setLeaveGuard} />}
+      {screen === 'achievements' && <AchievementsScreen progression={progression} />}
       {screen === 'account' && <AccountScreen store={account} />}
+      <AchievementToast
+        mascot={mascot}
+        accessory={accessoryById(progression.equipped.accessory)}
+        onEquip={(notice) => void progression.equip(notice.reward.kind, notice.reward.id)}
+      />
     </AppShell>
   )
 }

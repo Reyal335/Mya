@@ -1,6 +1,7 @@
 import type { MascotLoops } from '../../../shared/ipc'
 import { MASCOT_STATES } from '../../../shared/mascotRules'
 import { useStateCycle } from '../mascots/useStateCycle'
+import type { Accessory } from '../progression/accessories'
 import Mascot from './Mascot'
 import './MascotCard.css'
 
@@ -19,6 +20,8 @@ type MascotCardProps = {
   onEdit?: () => void
   onReset?: () => void
   onDelete?: () => void
+  // The equipped accessory, drawn over every mascot.
+  accessory?: Accessory | null
 }
 
 // One mascot in the gallery from designs/4-mascot-manager.html: its idle loop
@@ -34,7 +37,8 @@ function MascotCard({
   onSetActive,
   onEdit,
   onReset,
-  onDelete
+  onDelete,
+  accessory = null
 }: MascotCardProps): React.JSX.Element {
   const count = MASCOT_STATES.filter((state) => loops[state]).length
   const idle = loops.idle
@@ -57,6 +61,7 @@ function MascotCard({
             reverse={shown.reverse}
             scale={2}
             label={`${name}, ${shownState} loop`}
+            accessory={accessory}
           />
         ) : (
           <span className="mascot-card__broken" aria-hidden="true">

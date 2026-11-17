@@ -400,3 +400,61 @@ button.party__icon[aria-disabled='true'] {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Progression on a row: LV on the name line, the class badge before the smaller line,
+   and a 6px XP bar under them. */
+.party__name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.party__name-line .party__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.party__lv {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+
+.party__row--calling .party__lv {
+  color: var(--bg);
+}
+
+.party__sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.party__names .xp-bar {
+  margin-top: 4px;
+}
+
+/* The level as a small tag at the rail icon's bottom-right corner. */
+.party__icon-level {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 14px;
+  padding: 2px 3px;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+.party__card-rank {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

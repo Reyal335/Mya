@@ -14,25 +14,36 @@ import { is } from '@electron-toolkit/utils'
 import {
   IpcChannel,
   type AgentError,
+  type PopupLoot,
   type PopupOpenTarget,
   type PopupView,
   type PopupWho,
   type TaskAgent
 } from '../shared/ipc'
+import type { UnlockNotice } from '../shared/achievements'
+import type { TaskLoot, TaskXp } from '../shared/progression'
 import { errorText } from '../shared/noticeText'
 import { fitsPopup, popupDetailsHeight } from '../shared/popupFit'
 import { toPlainText } from '../shared/plainText'
 import { labelText, toolLabel } from '../shared/toolLabel'
 import { answerPermission, watchRuns } from './agent'
 import { getActiveMascot } from './mascots'
+import { equip, equippedNow, onUnlock } from './progressionStore'
 import { getPopups } from './settings'
 import * as popups from './popups'
+
+// The ISO time that starts every diagnostic log line.
+const stamp = (): string => new Date().toISOString()
 
 // The card is 340 wide like the mockup. The window is transparent and 6px larger
 // each way for the card's hard shadow. Fixed heights per state, never measured.
 const SHADOW = 6
 const WIDTH = 340 + SHADOW
 const NOTICE_HEIGHT = 168 + SHADOW
+// An agent's finished task with its loot: two more lines under the mascot row.
+const LOOT_HEIGHT = 234 + SHADOW
+// An achievement: the mascot row and the EQUIP and LATER buttons, like a compact approval.
+const ACHIEVEMENT_HEIGHT = 222 + SHADOW
 const APPROVAL_HEIGHT = 222 + SHADOW
 const DETAILS_HEIGHT = 420 + SHADOW
 // Between the mascot row and the short details in a compact approval.
@@ -60,7 +71,8 @@ function alive(window: BrowserWindow | null): window is BrowserWindow {
 }
 
 function heightOf(view: PopupView): number {
-  if (view.kind !== 'approval') return NOTICE_HEIGHT
+  if (view.kind === 'achievement') return ACHIEVEMENT_HEIGHT
+  if (view.kind !== 'approval') return view.loot ? LOOT_HEIGHT : NOTICE_HEIGHT
   if (view.detailsOpen) return DETAILS_HEIGHT
   if (!view.fits) return APPROVAL_HEIGHT
   const { name, input, projectPath } = view.request
@@ -94,6 +106,9 @@ function render(): void {
     } else if (popup.isVisible()) {
       popup.hide()
     }
+    console.log(
+      `${stamp()} [popup] render: success, view=${JSON.stringify(view).substring(0, 100)}`
+    )
   }
 
   const flash = popups.flashOf(state)
@@ -113,9 +128,17 @@ function schedule(): void {
 
 function dispatch(event: popups.PopupEvent): void {
   if (closing) return
-  state = popups.step(state, event, Date.now())
-  render()
-  schedule()
+  try {
+    state = popups.step(state, event, Date.now())
+    render()
+    schedule()
+    console.log(`${stamp()} [popup] dispatch: success`)
+  } catch (err) {
+    console.error(
+      `${stamp()} [popup] dispatch failed: ${err instanceof Error ? err.message : String(err)}`
+    )
+    throw err
+  }
 }
 
 function isBackground(): boolean {
@@ -134,6 +157,20 @@ function firstLine(text: string): string {
       .map((line) => line.trim())
       .find((line) => line !== '') ?? DONE_TEXT
   )
+}
+
+// The loot lines for a finished task's popup, or null when it changed and read nothing.
+function popupLoot(loot: TaskLoot | null, xp: TaskXp | null): PopupLoot | null {
+  if (!loot || (loot.items.length === 0 && loot.foundCount === 0 && !xp)) return null
+  return {
+    items: loot.items.length,
+    added: loot.added,
+    removed: loot.removed,
+    found: loot.foundCount,
+    first: loot.items.slice(0, 2).map((item) => ({ path: item.path, isNew: item.isNew })),
+    xp: xp?.total ?? null,
+    levelUp: xp !== null && xp.after.level > xp.before.level
+  }
 }
 
 function runNotice(outcome: 'done' | AgentError, reply: string): popups.PopupNotice {
@@ -156,7 +193,13 @@ function runNotice(outcome: 'done' | AgentError, reply: string): popups.PopupNot
 
 function watch(): void {
   watchRuns({
-    requestOpened: (request) =>
+    requestOpened: (request) => {
+      // canShow is popups.ts's rule (enabled and background), worked out here from the state.
+      const canShow = state.enabled && state.background
+      const focused = alive(mainWindow) ? mainWindow.isFocused() : 'no window'
+      console.log(
+        `${stamp()} [popup] request_opened: agent=${request.agent?.name ?? 'claude'}, canShow=${canShow}, background=${state.background}, enabled=${state.enabled}, isFocused=${focused}, requests=${state.requests.length}`
+      )
       dispatch({
         type: 'request_opened',
         request: {
@@ -169,7 +212,8 @@ function watch(): void {
           projectPath: request.cwd,
           fits: fitsPopup(request.name, request.input, request.truncated, request.cwd)
         }
-      }),
+      })
+    },
     requestClosed: (permissionId) => dispatch({ type: 'request_closed', permissionId }),
     taskEnded: (task) => {
       if (task.status === 'stopped') return
@@ -182,7 +226,8 @@ function watch(): void {
           kind: done ? 'finished' : 'error',
           who: whoOf(task.agent),
           text: done ? firstLine(task.report) : task.report.trim() || TASK_ERROR_TEXT,
-          open: done ? { screen: 'inbox', taskId: task.taskId } : { screen: 'chat' }
+          open: done ? { screen: 'inbox', taskId: task.taskId } : { screen: 'chat' },
+          loot: done ? popupLoot(task.loot, task.xp) : null
         }
       })
     },
@@ -221,6 +266,16 @@ function act(id: string, action: string): boolean {
     case 'dismiss':
       dispatch({ type: 'act', id, action })
       return true
+    case 'equip': {
+      // EQUIP: the achievement's reward goes on, and the popup closes.
+      const shown = state.shown
+      if (shown?.kind === 'notice' && shown.notice.kind === 'achievement') {
+        const { reward } = shown.notice
+        void equip({ kind: reward.kind, id: reward.id })
+      }
+      dispatch({ type: 'act', id, action })
+      return true
+    }
     case 'open': {
       const target = popups.openTargetOf(state)
       openMain(target)
@@ -249,9 +304,33 @@ function registerPopupIpc(): void {
     if (!fromPopup(event) || !popups.actAllowed(state, id, action)) return { ok: false }
     return { ok: act(id as string, action as string) }
   })
+  ipcMain.handle(IpcChannel.PopupGetEquipped, (event) =>
+    fromPopup(event) ? equippedNow() : { title: null, accessory: null }
+  )
   ipcMain.on(IpcChannel.PopupHover, (event, over: unknown) => {
     if (fromPopup(event) && typeof over === 'boolean') dispatch({ type: 'hover', over })
   })
+}
+
+// --- Achievements ----------------------------------------------------------------
+
+// An unlock shows as a popup with the app in the background (popups on), queued like a
+// finished popup. With the app in front, the main window shows it as a toast.
+function showUnlock(notice: UnlockNotice): void {
+  if (state.enabled && state.background) {
+    dispatch({
+      type: 'achievement',
+      notice: {
+        id: randomUUID(),
+        kind: 'achievement',
+        name: notice.name,
+        reward: notice.reward,
+        open: { screen: 'chat' }
+      }
+    })
+  } else if (alive(mainWindow) && !state.background) {
+    mainWindow.webContents.send(IpcChannel.ProgressionUnlocked, notice)
+  }
 }
 
 // --- Setting and TEST POPUP ----------------------------------------------------
@@ -344,6 +423,7 @@ export function setupPopups(main: BrowserWindow): void {
     ipcRegistered = true
   }
   watch()
+  onUnlock(showUnlock)
 
   const update = (): void => dispatch({ type: 'background', background: isBackground() })
   main.on('focus', update)
@@ -358,13 +438,14 @@ export function setupPopups(main: BrowserWindow): void {
 
   getPopups()
     .then((on) => dispatch({ type: 'enabled', enabled: on }))
-    .catch((err: unknown) => console.error('Could not read the popups setting:', err))
+    .catch((err: unknown) => console.error(`${stamp()} Could not read the popups setting:`, err))
 }
 
 // The main window is gone: the popup goes with it, so nothing keeps the app running.
 export function closePopups(): void {
   closing = true
   watchRuns(null)
+  onUnlock(null)
   if (timer) clearTimeout(timer)
   timer = null
   screen.off('display-metrics-changed', onDisplaysChanged)

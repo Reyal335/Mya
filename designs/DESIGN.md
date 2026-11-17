@@ -217,8 +217,8 @@ cells; the slicer itself disables USE instead).
 ## Party and inbox
 
 See `8-chat-party.html`, `8b-party-states.html`, `8c-party-rail.html`, and
-`1-inbox.html`. The sidebar reads CHAT, INBOX, AGENTS, MASCOTS, and the app
-opens on CHAT. CHAT shows a count of 1 while a request from the main
+`1-inbox.html`. The sidebar reads CHAT, INBOX, AGENTS, MASCOTS, ACHIEVEMENTS (see
+Progression), and the app opens on CHAT. CHAT shows a count of 1 while a request from the main
 conversation itself is pending; INBOX shows the number of waiting tasks. Both
 are hidden at zero. Under the project name sits the account meter, which opens
 ACCOUNT (see Account and usage).
@@ -1135,8 +1135,9 @@ The text comes from a model and can hold anything.
 
 - PNG, square, 16x16 to 32x32. Reject anything else: "Icon must be a square
   PNG from 16x16 to 32x32." Do not auto-resize.
-- Displayed at 16px (chips, bubbles), 32px (inbox rows), 48px (cards,
-  headers), or 64px (edit form preview), whatever the source size.
+- Displayed at 16px (chips, bubbles), 32px (inbox rows), 40px (the QUEST CLEAR
+  card), 48px (cards, headers), 64px (edit form preview), or 80px (the status
+  sheet), whatever the source size.
 - Agents without an icon get the default question-mark icon.
 - The icons in the mockups are placeholders drawn as inline SVG.
 
@@ -1149,3 +1150,218 @@ The text comes from a model and can hold anything.
 - Border color follows the variant: text color for finished, waiting color
   for approval, error color for error.
 - Approval variant has Approve, Deny, and Open buttons.
+- An agent's finished popup with loot is 234px tall (plus its 6px shadow): under the
+  mascot row, two lines: "+<a> −<r> lines" and "+<xp> XP" (with "LV UP!" when it leveled),
+  then the first two item names (NEW marked) and "+<n> more". The bubble reads "<agent> got
+  <n> items." (or "<agent> found <n> files." for a read-only quest). The bubble beside the
+  128px mascot holds about 17 characters a line, so the loot needs its own row.
+- Achievement variant (see Progression): `--waiting` border, 222px tall like a compact
+  approval, EQUIP and LATER.
+
+## Progression
+
+Agents are party members I raise. Each agent file shows a class from its tools, a level,
+and an XP bar. A task that ends as done shows a QUEST CLEAR card with what it changed and
+the XP it earned. Achievements unlock titles and mascot accessories. All of it is
+cosmetic: it never changes what an agent may do or how approvals work. The mockups are
+on the canvas ("17. Party classes and levels", "17b. Quest clear loot", "17c.
+Achievements"); there are no HTML files for them.
+
+### Classes
+
+A class comes from the agent file's `tools:` line. Nothing is stored for it. One function,
+`classFor(tools)` in `src/shared/progression.ts`, is used by main and the window.
+
+- Edit-type tools: Edit, Write, MultiEdit, NotebookEdit. Shell tools: Bash, PowerShell.
+  Read-type: everything else. An entry such as `Bash(git:*)` counts by its tool name.
+- tools is null (no tools line, inherits everything): HERO.
+- has an edit-type tool and a shell tool: KNIGHT.
+- has an edit-type tool and no shell tool: BUILDER.
+- has a shell tool and no edit-type tool: MAGE.
+- otherwise: SCOUT. An empty tools line, and a line of only MCP tools or Agent, are SCOUT.
+
+Each class has a one-line reason for the tooltip, for example "Has Bash, no Edit or
+Write" or "No tools line: inherits every tool".
+
+| Class | Token | Color |
+| --- | --- | --- |
+| SCOUT | `--class-scout` | the accent |
+| BUILDER | `--class-builder` | `--waiting` |
+| MAGE | `--class-mage` | `#B98CF0` |
+| KNIGHT | `--class-knight` | `#6FCF7F` |
+| HERO | `--class-hero` | `--text` |
+
+A badge is the class word in the pixel font, 7px in rows and 10px on the status sheet,
+dark text (`--bg`) on the class color, padding 3px 5px. These class colors and
+`--loot-add` (`#6FCF7F`) are the only new hex values.
+
+### XP and levels
+
+- `userData/progression.json`: `{ version: 1, agents, achievements, equipped, counters }`.
+  Written through a temporary file and a rename. A missing or corrupt file starts empty; a
+  bad file is kept aside as `progression.json.bad`. Nothing is written into agent files.
+- agents is keyed by the agent file path, normalized exactly as the icon map normalizes
+  it. Each entry: xp (total), questsByProject (`{ projectPath: count }`), toolUse
+  (`{ toolName: count }`), itemsTotal, bossesDefeated, joinedAt (first time the entry was
+  made).
+- A global agent's path is the same in every project, so its XP is shared. A project
+  agent's path includes its project, so it levels on its own. Agents that match no file
+  (built-in ones such as general-purpose) earn nothing. The main conversation (the mascot)
+  counts toward achievements but has no level.
+- When AGENTS moves an agent (project to global or back), its entry moves with it, as the
+  icon mapping does. Deleting an agent drops its entry. A file renamed outside the app
+  starts again at level 1.
+- Level from total XP: level 1 starts at 0. Going from level L to L+1 costs 100 + 50 * L
+  XP. Cap at 99. One pure function `levelFor(xp)` returns `{ level, intoLevel, toNext }`
+  (toNext is 0 at the cap).
+- XP is earned when a task ends as done (never on error or stopped):
+  - quest: 50
+  - items: 5 per changed file, at most 50
+  - read-only quest (no changed files): 2 per distinct file read, at most 20
+  - clean: 25 when none of the task's tool calls failed and none of its requests were
+    denied
+  Step 18 adds a boss bonus through the same function (`xpFor`).
+- The task's tool calls are counted into toolUse by name, 1 is added to questsByProject
+  for the open project, and the item count is added to itemsTotal.
+
+Example: a BUILDER that adds a line to notes.txt and creates todo.md with no errors earns
+Quest +50 · 2 items +10 · No errors +25 = 85 XP.
+
+### Loot
+
+One pure function, `lootFor` in `src/main/loot.ts`, reads a finished task's own tool calls.
+Git is never run. **The counts are approximate**: they come from the Edit and Write inputs,
+so they are close but not exact. An Edit with `replace_all` counts once, and lines an edit
+leaves unchanged count as both added and removed.
+
+- Each Edit (and MultiEdit) adds to its file: + the line count of new_string, − the line
+  count of old_string, per edit.
+- Each Write adds + the line count of content. If the first call that touches a file in
+  this task is a Write and that file did not exist when the task started, the item is NEW.
+  The file is checked when the Write's tool call arrives, before the tool runs (Write waits
+  for my approval).
+- Only calls that ended as done count. Denied and failed calls do not.
+- Lines are counted at newlines; one trailing newline is ignored; empty text is 0.
+- Paths are shown relative to the project when inside it, with forward slashes.
+- Items keep the order of first touch. The result: items `[{ path, added, removed, isNew }]`,
+  plus for read-only quests the distinct files read (Read calls), and the XP lines.
+- The loot and the XP lines are saved on the task in tasks.json when it ends, so a QUEST
+  CLEAR card looks the same after a restart. The calls themselves stay in memory only.
+
+### QUEST CLEAR card
+
+When a task ends as done, its agent card in the CHAT history grows into the QUEST CLEAR
+card. INBOX's task detail shows the same card above REPORT, at the detail's full width. A
+built-in agent's task keeps the plain agent card (it earns no XP).
+
+- Border 4px `--waiting` with the 6px 6px 0 hard shadow. Header: the agent icon at 40px,
+  "QUEST CLEAR!" in the pixel font at 14px in `--waiting`, then "<agent> · <task label>"
+  muted at 13px, and the class badge on the right (the class when the quest ended).
+- ITEMS OBTAINED (pixel font 9px, accent) with "<n> items · +<a> −<r>" on the right (+ in
+  `--loot-add`, − in `--error`). Then a bordered list on `--bg`, one row per item: a 16px
+  pixel file icon (yellow with a plus for NEW, muted otherwise), the path, a NEW tag (pixel
+  7px, `--waiting` fill) when new, then +added and −removed right-aligned. Show at most 8
+  rows and "+<n> more" after that.
+- A read-only quest shows FOUND instead of ITEMS OBTAINED: the files read, at most 8,
+  muted, no counts.
+- XP: "+<xp> XP" in the pixel font at 12px in `--waiting`, then the breakdown muted ("Quest
+  +50 · 4 items +20 · No errors +25"). Under it "LV <n>", a 14px bar with the old fill in
+  the accent and the gained part in `--waiting`, and "LV <n+1>". The bar shows the level the
+  agent was in; a level up fills it to the end. If the task leveled the agent up, a banner
+  in `--waiting` fill: "LEVEL UP! <AGENT> IS LV <n>".
+- Buttons: VIEW CHANGES (opens the INBOX detail on ACTIVITY) and OPEN IN INBOX (CHAT only).
+- The "agent reported back" popup gains the loot (see Popup notification).
+
+### Party panel, rail, and AGENTS
+
+- Each party row adds, under the name line: the class badge and the role, and on the name
+  line "LV <n>" on the right (pixel 8px, muted). Under them a 6px XP bar (2px border, accent
+  fill; on the called row, dark fill). Rows stay at least 56px tall. Hovering the badge
+  shows the reason as a tooltip, and the detail area at the bottom of the panel adds
+  "<CLASS> · <reason>" for the hovered, focused, or called member. A row's accessible name
+  adds "<CLASS>, level <n>".
+- Rail icons: the level as a small corner tag "<n>" in the pixel font at 7px (bottom right;
+  the working marker keeps the top right). Their hover card adds the badge and level.
+- Agent cards on AGENTS: badge, level, XP bar, and a STATUS button under CALL.
+- STATUS opens the status sheet as a dialog (focus trap, Escape, focus returns): the icon
+  at 80px, the name in the pixel font at 18px, the class badge, the model tag, "<role> ·
+  project agent" or "global agent", LEVEL in big pixel digits in `--waiting`, a 20-segment
+  XP bar with "<into> / <toNext>" and "<n> to LV <n+1>", SKILLS (the tools as chips, the
+  class-deciding tools starred and in the class color, with the reason under them), and
+  RECORD: Quests cleared (total, and "(<n> in this project)"), Bosses defeated, Most used
+  skill ("Read ×214"), Joined the party (date).
+- A built-in agent row (no file) shows no badge, level, or bar.
+
+### Achievements
+
+Definitions live in `src/shared/achievements.ts`. Each has id, name, description, hidden,
+goal, and reward. Triggers are pure functions in `src/main/achievementRules.ts`.
+
+| Achievement | Unlocks when | Goal | Reward |
+| --- | --- | --- | --- |
+| FIRST QUEST | a task ends as done | 1 | title "Rookie" |
+| PARTY OF 5 | 5 or more agents in the party list at once | 5 | accessory party-hat |
+| NIGHT OWL | a run or task ends as done between 02:00 and 04:59 local time | 1 | accessory nightcap |
+| FLAWLESS | 10 tasks in a row end as done with the clean bonus. A task ending as error, or done without the clean bonus, resets the streak; stopped does not | 10 | title "Flawless" |
+| FULL PARTY | every runnable agent in the party (one that can be called) has a task started in one local day; needs at least 2 | party size that day | title "Leader" |
+| HOARDER | itemsTotal over all agents reaches 100 | 100 | accessory backpack |
+| BOSS SLAYER | step 18 | 1 | accessory crown |
+| SPEEDRUN (hidden) | a task ends as done less than 30 seconds after it started | 1 | title "Speedrunner" |
+| SECOND WIND (hidden) | a task ends as done after at least one of its requests was denied | 1 | title "Persistent" |
+
+- "Called" for FULL PARTY means a task started for that agent file, whether I called it
+  from the party panel or Claude chose it.
+- Each id keeps `{ unlockedAt, progress, seen }`, and counters keeps the streak, the day,
+  the agents called that day, and the runnable party. They are checked after each task end,
+  run end, task start, and party list load. An event that changes nothing is not saved.
+  Unlocks are never taken back.
+- Night Owl gives the nightcap. Theme rewards wait until there are more built-in themes.
+
+### Accessories and titles
+
+- `designs/accessories/` is copied into `src/renderer/src/assets/accessories/`. Nothing is
+  loaded from `designs/` at runtime. Each accessory is a 16x16 PNG drawn over the mascot at
+  its anchor (x, y in 64px frame pixels), at the mascot's scale, with `image-rendering:
+  pixelated`, on every mascot in CHAT, the popup, the toast, and the mascot manager's cards.
+- Anchors: party-hat, nightcap, and crown at (24, 0); backpack at (46, 46), on the default
+  mascot's right shoulder (the default mascot is a portrait that fills the frame).
+- equipped: `{ title, accessory }`, each null or one unlocked id. One of each at a time.
+- The title shows under the mascot's state caption on CHAT, in the pixel font at 7px in
+  `--waiting`, for example "ROOKIE".
+- Accessories are drawn over custom mascots too; a hat may sit wrong on a custom mascot.
+
+### ACHIEVEMENTS screen
+
+A nav item ACHIEVEMENTS under MASCOTS, same NavItem look. It shows a red dot (8px,
+`--error`) while there is an unlock I have not seen.
+
+- Header: "ACHIEVEMENTS" (pixel 14px), "<n> of <total> unlocked" muted, and a segmented bar
+  with one segment per achievement on the right. Border-bottom 4px `--line`.
+- A grid, 3 columns at full width and 2 under 900px of content width, 16px gap. Each card:
+  4px border, panel fill, 14px padding, a 40px pixel medal (ribbon in the accent, medal in
+  `--waiting`, its own little mark per achievement), the name (pixel 9px), the date or "NEW
+  · today", the description, and "Reward: <reward>" in `--waiting`.
+- Unlocked cards: `--waiting` border. The newest unseen one gets a second outer ring
+  (box-shadow 0 0 0 4px `--bg`, 0 0 0 8px `--waiting`).
+- Locked cards: `--line` border, muted text, a grey medal, "<p> / <goal>" and an 8px
+  progress bar.
+- Hidden locked cards: dashed `--line` border on `--bg`, a "?" medal, "???", and "Hidden.
+  Keep playing to find it." Their reward is not shown.
+- Right column (340px): UNLOCKED REWARDS, one row per unlocked title or accessory with an
+  ON/OFF toggle button (aria-pressed). Turning one on turns the other of its kind off. Under
+  it one muted line: "Accessories are drawn over any mascot, so they work with custom ones
+  too." Under 760px of content width (the smallest windows) the column moves under the
+  grid, so the cards keep room.
+- Opening the screen marks all unlocks seen. The cards that were unseen keep "NEW · today"
+  and the ring while the screen stays open.
+
+### Unlock notice
+
+- App in front: a toast in the bottom-right of the main window, the same card as the popup
+  below, for 8 seconds, hover pauses, one at a time. It never takes focus.
+- App in the background: the popup's achievement variant, queued like a finished popup:
+  `--waiting` border, the mascot (talking loop), "ACHIEVEMENT UNLOCKED" (pixel 8px,
+  `--waiting`), the name, the reward, and EQUIP and LATER. EQUIP equips the reward. LATER
+  closes. It follows every popup rule (never takes focus, the popups setting, the queue). An
+  unlock still queued when the app comes to the front is dropped like any queued popup; the
+  red dot still shows it.

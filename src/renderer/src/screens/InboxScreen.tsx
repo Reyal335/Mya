@@ -21,6 +21,8 @@ type InboxScreenProps = {
   selectedTaskId: string | null
   onSelectTask: (taskId: string | null) => void
   onAskAgain: (call: CallTarget) => void
+  // VIEW CHANGES on a QUEST CLEAR card: scroll this task's detail to ACTIVITY.
+  activityRequest: { taskId: string; tick: number } | null
 }
 
 type Confirm = { kind: 'delete'; taskId: string; label: string } | { kind: 'clear' }
@@ -35,7 +37,8 @@ function InboxScreen({
   tasks,
   selectedTaskId,
   onSelectTask,
-  onAskAgain
+  onAskAgain,
+  activityRequest
 }: InboxScreenProps): React.JSX.Element {
   const { agents } = useAgents(project?.path ?? null)
   const [detail, setDetail] = useState<TaskDetailData | null>(null)
@@ -156,6 +159,7 @@ function InboxScreen({
             onAnswer={conversation.answerPermission}
             onAskAgain={agentFile ? () => onAskAgain(callTargetOf(agentFile)) : null}
             askAgainBlocked={agentFile ? (callBlock(agentFile, agents)?.message ?? null) : null}
+            activityRequest={activityRequest?.taskId === selected.id ? activityRequest.tick : 0}
           />
         ) : (
           <p className="inbox__pick">

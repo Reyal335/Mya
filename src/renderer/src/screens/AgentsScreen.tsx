@@ -4,9 +4,11 @@ import { callBlock } from '../../../shared/agentGate'
 import type { CallTarget } from '../hooks/useConversation'
 import { callTargetOf } from '../conversation/callTarget'
 import { useAgents } from '../hooks/useAgents'
+import { useAgentProgress } from '../hooks/useProgression'
 import AgentCard from '../components/AgentCard'
 import AgentForm, { type FormTarget } from '../components/AgentForm'
 import Dialog from '../components/Dialog'
+import StatusSheet from '../components/StatusSheet'
 import type { LeaveGuard } from './types'
 import './AgentsScreen.css'
 
@@ -37,6 +39,9 @@ function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): Re
   const [dirty, setDirty] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  // The agent whose status sheet is open, by file path.
+  const [statusOf, setStatusOf] = useState<string | null>(null)
+  const progress = useAgentProgress(agents)
   const nonce = useRef(0)
   const titleRef = useRef<HTMLHeadingElement>(null)
 
@@ -102,6 +107,9 @@ function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): Re
   }
 
   const selectedPath = selection?.target.kind === 'edit' ? selection.target.filePath : null
+  const statusAgent = statusOf
+    ? (agents.find((agent) => agent.filePath === statusOf) ?? null)
+    : null
 
   function renderSection(scope: AgentScope): React.JSX.Element {
     const list = agents.filter((agent) => agent.scope === scope)
@@ -151,6 +159,8 @@ function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): Re
             }
             onCall={() => onCall(callTargetOf(agent))}
             callBlocked={callBlock(agent, agents)?.message ?? null}
+            progress={progress[agent.filePath]}
+            onStatus={() => setStatusOf(agent.filePath)}
           />
         ))}
       </section>
@@ -196,6 +206,8 @@ function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): Re
           onReload={reloadForm}
         />
       )}
+
+      {statusAgent && <StatusSheet agent={statusAgent} onClose={() => setStatusOf(null)} />}
 
       {dialog?.kind === 'discard' && (
         <Dialog

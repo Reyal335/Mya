@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react'
 import type { PermissionDecision, TaskDetail as TaskDetailData } from '../../../shared/ipc'
 import type { ToolItem } from '../hooks/useConversation'
 import { clockTime, durationLabel } from '../conversation/timeLabel'
 import AgentIcon from './AgentIcon'
 import HarnessNote from './HarnessNote'
+import QuestClearCard from './QuestClearCard'
 import Markdown from './Markdown'
 import { splitHarnessNote } from '../../../shared/plainText'
 import { PermissionActions, PermissionDetails } from './PermissionRow'
@@ -20,6 +22,8 @@ type TaskDetailProps = {
   // ASK AGAIN: null hides it (the agent no longer exists).
   onAskAgain: (() => void) | null
   askAgainBlocked: string | null
+  // Changes when ACTIVITY should scroll into view (VIEW CHANGES from CHAT). 0 is none.
+  activityRequest: number
 }
 
 function scopeText(task: TaskDetailData, projectName: string): string {
@@ -37,8 +41,16 @@ function TaskDetail({
   projectPath,
   onAnswer,
   onAskAgain,
-  askAgainBlocked
+  askAgainBlocked,
+  activityRequest
 }: TaskDetailProps): React.JSX.Element {
+  const activityRef = useRef<HTMLElement>(null)
+  // VIEW CHANGES on this card itself, counted like the request from CHAT.
+  const [localRequest, setLocalRequest] = useState(0)
+  useEffect(() => {
+    if (activityRequest === 0 && localRequest === 0) return
+    activityRef.current?.scrollIntoView({ block: 'start' })
+  }, [activityRequest, localRequest])
   const request = pending[0] ?? null
   const ended = task.endedAt !== null
   // A done report is the agent's Markdown. An error or stopped one is plain text.
@@ -97,7 +109,11 @@ function TaskDetail({
         {task.promptTruncated && <p className="task-detail__note">Shown in part.</p>}
       </section>
 
-      <section className="task-detail__section" aria-labelledby="task-detail-activity">
+      <section
+        ref={activityRef}
+        className="task-detail__section"
+        aria-labelledby="task-detail-activity"
+      >
         <h3 id="task-detail-activity" className="task-detail__label">
           ACTIVITY
         </h3>
@@ -115,6 +131,16 @@ function TaskDetail({
           <p className="task-detail__note">No tool calls.</p>
         )}
       </section>
+
+      {task.status === 'done' && task.loot && task.xp && (
+        <QuestClearCard
+          agent={task.agent}
+          description={task.description}
+          loot={task.loot}
+          xp={task.xp}
+          onViewChanges={() => setLocalRequest((n) => n + 1)}
+        />
+      )}
 
       <section className="task-detail__section" aria-labelledby="task-detail-report">
         <h3 id="task-detail-report" className="task-detail__label">

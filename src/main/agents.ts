@@ -33,6 +33,7 @@ import {
 } from './agentIcons'
 import { forgetRole, loadRoles, saveRole } from './agentRoles'
 import { normalizePath } from './pathMap'
+import { forgetProgress, moveProgress } from './progressionStore'
 import { createFileSafely, writeFileSafely } from './safeWrite'
 import { getProject } from './settings'
 
@@ -415,6 +416,8 @@ export function updateAgent(
       return target
     })
     await saveRole(path, filePath, draft.role)
+    // Moved to the other scope: its XP goes with it, like its icon and role.
+    if (filePath !== path) await moveProgress(path, filePath)
     return { filePath }
   })
 }
@@ -425,6 +428,7 @@ export function removeAgent(rawPath: unknown): Promise<AgentsResult> {
     await shell.trashItem(path)
     await forgetIcon(path)
     await forgetRole(path)
+    await forgetProgress(path)
     return {}
   })
 }

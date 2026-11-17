@@ -1,6 +1,7 @@
 // Runs the conversation on the Claude Agent SDK. The renderer and preload never import it.
 import { randomUUID, type UUID } from 'crypto'
 import type { WebContents } from 'electron'
+import { access } from 'fs/promises'
 import type {
   CanUseTool,
   HookCallback,
@@ -23,6 +24,7 @@ import {
   type TaskEndStatus,
   type ToolInput
 } from '../shared/ipc'
+import type { TaskLoot, TaskXp } from '../shared/progression'
 import { callBlock, hookBlock, winningAgent } from '../shared/agentGate'
 import { withCall } from '../shared/callAgent'
 import { labelText, toolLabel } from '../shared/toolLabel'
@@ -31,9 +33,11 @@ import { listAgents } from './agents'
 import { getChatSession, setChatChoice, setChatSession, setChatTheme } from './chats'
 import { historyItems, type RecordedMessage, type SavedTask } from './history'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
+import { callFacts } from './loot'
 import { getActiveVoice } from './mascots'
 import { choiceForRun } from './modelChoice'
 import { userContent, type SendImage } from './pastedImages'
+import { recordRunEnd, recordTaskStart } from './progressionStore'
 import { childEnv, claudeExecutable, loadSdk, type Sdk } from './sdk'
 import { getDefaultChoice } from './settings'
 import { voiceAppend } from './voice'
@@ -49,18 +53,23 @@ import {
 import {
   endTask,
   savedTasks,
+  type TaskAgentFile,
   startTask,
   taskActivity,
+  taskCall,
   taskRequestClosed,
   taskRequestOpened
 } from './tasks'
 
-// Reading never asks. Editing, writing, and shell commands wait for the user's
+// The ISO time that starts every diagnostic log line.
+const stamp = (): string => new Date().toISOString()
+
+// Reading never asks. Editing, writing, shell commands, and web access wait for the user's
 // Approve or Deny through canUseTool. `tools` limits which built-ins exist at all.
 // Agent lets Claude bring in my agents. It is not in allowedTools, and the agent
 // gate below decides which ones may run.
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob']
-const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'Agent']
+const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch', 'Agent']
 
 const NOT_FOUND_NOTICE =
   'The saved conversation was not found. This reply starts from a fresh context.'
@@ -139,6 +148,8 @@ export type RunWatcher = {
     status: TaskEndStatus
     report: string
     agent: TaskAgent
+    loot: TaskLoot | null
+    xp: TaskXp | null
   }) => void
   runEnded: (run: {
     runId: string
@@ -159,7 +170,11 @@ function notify(call: (watcher: RunWatcher) => void): void {
   try {
     call(watcher)
   } catch (err) {
-    console.error('[agent] A run watcher failed:', err)
+    console.error(
+      `${stamp()} [agent] A run watcher failed in requestOpened:`,
+      errorMessage(err),
+      err instanceof Error ? err.stack : undefined
+    )
   }
 }
 
@@ -204,6 +219,22 @@ function lookOf(agents: AgentSummary[], name: string): TaskAgent {
   return file
     ? { name, scope: file.scope, filePath: file.filePath, icon: file.icon, role: file.role }
     : { name, scope: null, filePath: null, icon: null, role: null }
+}
+
+// The agent file behind an agent name, for XP. null for a built-in agent.
+function agentFileOf(agents: AgentSummary[], name: string): TaskAgentFile {
+  const file = winningAgent(agents, name)
+  return file ? { filePath: file.filePath, tools: file.tools } : null
+}
+
+// Whether a file is there. Asked before a Write runs, for the NEW mark on its loot.
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Answers one pending request. Returns false for an unknown or already answered id.
@@ -498,6 +529,10 @@ function permissionHandler(run: Run): CanUseTool {
           cwd: run.cwd
         })
       )
+      // notify returns nothing, so log whether a watcher was there to hear the request.
+      console.log(
+        `${stamp()} [agent] permission_request: who=${agentName ?? 'claude'}, agentID=${agentID ?? 'none'}, tool=${toolName}, watcher=${watcher !== null}`
+      )
     })
 }
 
@@ -592,22 +627,32 @@ async function endRunTask(
   if (agentName === undefined) return
   run.openTasks.delete(taskId)
   const shown = report.length > 20_000
+  // The loot and XP are worked out and saved first, so the card has them at once.
+  const { loot, xp } = await endTask(
+    taskId,
+    status,
+    status === 'stopped' ? null : report,
+    agentFileOf(run.agents, agentName)
+  )
   emit(run, {
     requestId: run.requestId,
     type: 'task_end',
     taskId,
     status,
     report: shown ? report.slice(0, 20_000) : report,
-    truncated: shown
+    truncated: shown,
+    loot,
+    xp
   })
-  await endTask(taskId, status, status === 'stopped' ? null : report)
   notify((w) =>
     w.taskEnded({
       runId: run.requestId,
       taskId,
       status,
       report,
-      agent: lookOf(run.agents, agentName)
+      agent: lookOf(run.agents, agentName),
+      loot,
+      xp
     })
   )
 }
@@ -678,7 +723,7 @@ async function execute(run: Run): Promise<void> {
     try {
       voice = await getActiveVoice()
     } catch (err) {
-      console.error('[agent] Could not read the active mascot voice:', errorMessage(err))
+      console.error(`${stamp()} [agent] Could not read the active mascot voice:`, errorMessage(err))
       voice = { name: null, voice: null }
     }
     const append = voiceAppend(voice.name, voice.voice)
@@ -727,7 +772,7 @@ async function execute(run: Run): Promise<void> {
         case 'system':
           if (message.subtype === 'init') {
             // Not a secret: it names where the credential came from, not the credential.
-            console.log(`[agent] apiKeySource: ${message.apiKeySource}`)
+            console.log(`${stamp()} [agent] apiKeySource: ${message.apiKeySource}`)
             if (message.apiKeySource !== ACCOUNT_LOGIN_SOURCE) {
               run.failure = {
                 code: 'api_key_in_use',
@@ -839,6 +884,18 @@ async function execute(run: Run): Promise<void> {
                 taskId
               })
               taskActivity(taskId, block.id, toolLabel(block.name, input, run.cwd), 'running')
+              // What the loot needs, from the full input. A Write's file is checked now,
+              // before the tool runs: Write waits for my approval.
+              const facts = callFacts(block.name, input, run.cwd)
+              const existed =
+                block.name === 'Write' && facts.path !== null ? await fileExists(facts.path) : null
+              taskCall(taskId, {
+                toolId: block.id,
+                name: block.name,
+                ...facts,
+                existed,
+                state: 'running'
+              })
             }
             break
           }
@@ -876,6 +933,7 @@ async function execute(run: Run): Promise<void> {
                 description,
                 prompt: typeof input.prompt === 'string' ? input.prompt : ''
               })
+              void recordTaskStart(agent.filePath, run.agents)
               continue
             }
             const shown = forIpc(input)
@@ -965,7 +1023,7 @@ async function execute(run: Run): Promise<void> {
     denyAllPending()
     for (const taskId of [...run.openTasks.keys()]) {
       await endRunTask(run, taskId, 'stopped', '').catch((err: unknown) =>
-        console.error('[agent] Could not stop a task:', err)
+        console.error(`${stamp()} [agent] Could not stop a task:`, err)
       )
     }
     // A resumed session that Claude Code could not find: start fresh next time.
@@ -996,6 +1054,7 @@ async function execute(run: Run): Promise<void> {
       emit(run, { requestId: run.requestId, type: 'error', ...ended })
     }
     notify((w) => w.runEnded({ runId: run.requestId, outcome: ended, reply: run.reply }))
+    void recordRunEnd(ended === 'done')
     // Last: a message waiting to start a new run goes ahead only after this run's events.
     run.settleDone()
   }
@@ -1041,7 +1100,10 @@ export async function applyChoiceToRun(next: ModelChoice): Promise<void> {
       })
     }
   } catch (err) {
-    console.error('[agent] Could not apply the model choice to the run:', errorMessage(err))
+    console.error(
+      `${stamp()} [agent] Could not apply the model choice to the run:`,
+      errorMessage(err)
+    )
   }
 }
 
@@ -1076,7 +1138,7 @@ export async function loadChatHistory(cwd: string): Promise<ChatHistory> {
     })
     return { items, truncated: messages.length > HISTORY_LIMIT, unavailable: false }
   } catch (err) {
-    console.error('[agent] Could not load the conversation history:', errorMessage(err))
+    console.error(`${stamp()} [agent] Could not load the conversation history:`, errorMessage(err))
     return { ...empty, unavailable: true }
   }
 }

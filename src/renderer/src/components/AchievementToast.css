@@ -1,0 +1,11 @@
+/* The popup's achievement card as a toast in the main window's bottom-right corner.
+   The popup card fills its window; the toast sets its own size: 340 by 222, like the
+   achievement popup. */
+.popup-card.achievement-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  width: 340px;
+  height: 222px;
+}
