@@ -353,7 +353,7 @@ export const fightText = {
   escaped: (boss: string, hp: number): string => `${boss} got away. ${hp} tests still failing.`,
   back: (boss: string, hp: number, maxHp: number): string =>
     `${boss} is back! ${hp} of ${maxHp} tests left.`,
-  noBoss: 'No boss yet. One appears when a test run fails.',
+  noBoss: 'No boss yet. One appears the first time you run your tests.',
   testCommandHint: 'Leave empty to use the usual runners.'
 }
 

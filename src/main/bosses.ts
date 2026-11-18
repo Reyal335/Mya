@@ -225,7 +225,7 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
       `[bosses] test run: runner=${run.runner}, parsed=${run.parsed}, failed=${run.failed}, total=${run.total}, files=${run.files.length}`
     )
     const existing = current.fights[key]
-    let result: { fight: Fight; round: FightRound } | null
+    let result: { fight: Fight; round: FightRound }
     if (existing && existing.status !== 'defeated') {
       result = applyRun(existing, input, await bossNameFor(existing))
     } else {
@@ -253,7 +253,6 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
         input,
         Math.random
       )
-      if (!result) return
       // A finished fight in the same conversation moves to its past.
       if (existing) archive(current, existing)
       current.lastBoss[report.projectPath] = bossId

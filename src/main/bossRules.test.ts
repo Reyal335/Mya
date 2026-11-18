@@ -102,13 +102,21 @@ test('encounter: hp is what fails, maxHp the whole suite', () => {
   assert.equal(fight.notices[0].taskId, 'task-1')
 })
 
-test('encounter: a passing run starts nothing', () => {
-  const none = startFight(
+test('encounter: a passing run still appears, already defeated', () => {
+  const started = startFight(
     { key: 'k', projectPath: 'C:/p', sessionId: 's', bossId: 'x', bossName: BOSS, party },
     input(named([], 40), 'npm test', builder, 0),
     fixed
   )
-  assert.equal(none, null)
+  assert.equal(started.fight.status, 'defeated')
+  assert.equal(started.fight.hp, 0)
+  assert.equal(started.fight.maxHp, 40)
+  assert.deepEqual(started.fight.log, [
+    'A wild The Red Suite appears! 0 of 40 tests left.',
+    'The Red Suite is defeated! All 40 tests pass.'
+  ])
+  assert.equal(started.fight.finalHit, builder.id)
+  assert.equal(started.round.kind, 'encounter')
 })
 
 test('encounter: exit code only, with an unknown total', () => {

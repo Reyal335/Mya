@@ -36,12 +36,6 @@ export type TestRunInput = {
 // A number from 0 (inclusive) to 1 (exclusive), like Math.random.
 export type Random = () => number
 
-// The run says some tests fail: a count above 0, or a failing exit with nothing parsed.
-export function runFails(run: TestRun, exitCode: number): boolean {
-  if (run.parsed === 'exit-code') return exitCode !== 0
-  return (run.failed ?? 0) > 0
-}
-
 function sameCommand(a: string, b: string): boolean {
   return a.trim().replace(/\s+/g, ' ') === b.trim().replace(/\s+/g, ' ')
 }
@@ -177,19 +171,20 @@ export type Encounter = {
   party: Attacker[]
 }
 
-// The first failing test run in a conversation with no active fight.
+// The first test run in a conversation with no active fight, whatever it finds: a boss
+// always appears, win or lose.
 export function startFight(
   encounter: Encounter,
   input: TestRunInput,
   random: Random
-): { fight: Fight; round: FightRound } | null {
+): { fight: Fight; round: FightRound } {
   const { run } = input
-  if (!runFails(run, input.exitCode)) return null
   const files = filesOfRun(run)
   const hp = run.failed ?? Math.max(1, hpOf(files))
-  const maxHp = Math.max(run.total ?? 0, hp)
+  const maxHp = Math.max(run.total ?? 0, hp, 1)
   if (run.parsed === 'exit-code') files[''] = { failing: null, failedCount: hp, total: null }
   const still = stillFailing(files)
+  const victory = hp <= 0
   const round: FightRound = {
     n: 1,
     kind: 'encounter',
@@ -205,29 +200,34 @@ export function startFight(
     passed: run.passed,
     total: run.total
   }
-  const line = fightText.appears(encounter.bossName, hp, maxHp)
+  const lines = [fightText.appears(encounter.bossName, hp, maxHp)]
+  const notices = [notice(input, 'encounter', lines[0])]
+  if (victory) {
+    lines.push(fightText.defeated(encounter.bossName, run.total ?? maxHp))
+    notices.push(notice(input, 'victory', lines[1]))
+  }
   const fight: Fight = {
     key: encounter.key,
     projectPath: encounter.projectPath,
     sessionId: encounter.sessionId,
     bossId: encounter.bossId,
     bossName: encounter.bossName,
-    status: 'active',
+    status: victory ? 'defeated' : 'active',
     maxHp,
     hp,
     startHp: hp,
     round: 1,
     runner: run.runner,
     command: input.command,
-    files,
+    files: victory ? {} : files,
     lineup: pickLineup(input.attacker, encounter.party, random),
     active: input.attacker.id,
-    log: [line],
-    notices: [notice(input, 'encounter', line)],
+    log: lines,
+    notices,
     lastRound: round,
     startedAt: input.at,
-    endedAt: null,
-    finalHit: null,
+    endedAt: victory ? input.at : null,
+    finalHit: victory ? input.attacker.id : null,
     xpAwarded: 0
   }
   return { fight, round }

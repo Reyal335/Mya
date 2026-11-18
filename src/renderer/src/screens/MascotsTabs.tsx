@@ -7,7 +7,7 @@ const TABS: { id: MascotsTab; label: string }[] = [
   { id: 'bosses', label: 'BOSSES' }
 ]
 
-export const BOSSES_TAB_NOTE = 'A random boss from the pool appears when a test run fails.'
+export const BOSSES_TAB_NOTE = 'A random boss from the pool appears the first time you run your tests.'
 
 type MascotsTabsProps = {
   tab: MascotsTab

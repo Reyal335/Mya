@@ -1383,10 +1383,11 @@ A nav item ACHIEVEMENTS under MASCOTS, same NavItem look. It shows a red dot (8p
 
 ## Boss battles
 
-When an agent (or Claude itself) runs the project's tests and some fail, a boss appears
-for that conversation. Its HP is the number of tests still not passing. Each later test
-run deals one hit per test that now passes and heals the boss for each test that broke. A
-full run with nothing failing defeats it. The fight only reads output the agent already
+The first time an agent (or Claude itself) runs the project's tests in a conversation, a
+boss appears, whatever the run finds. Its HP is the number of tests still not passing: 0
+when the first run is already clean, which defeats the boss in the same breath it
+appears. Each later test run deals one hit per test that now passes and heals the boss
+for each test that broke. A full run with nothing failing defeats it. The fight only reads output the agent already
 produced: it never runs a command, never changes what an agent may do, and costs no extra
 usage. The mockups are on the canvas: "20. BOSS tab in the party panel" and "20b/20c/20d.
 Battle view" (one per default boss). Only the HP rules of "18. Boss battle" carry over.
@@ -1436,9 +1437,11 @@ temporary file and a rename; a missing or corrupt file starts empty and a bad on
 as `boss-fights.json.bad`). `past` keeps the fights the conversation finished, so their
 notices and end cards stay in its history.
 
-- Encounter: the first test run in a conversation with no active fight that has failures
-  (or a non-zero exit with nothing parsed). maxHp is the count of tests (or the failures
-  when that is unknown; 1 for an exit code alone), hp the failures, round 1.
+- Encounter: the first test run in a conversation with no active fight, whatever it
+  finds. maxHp is the count of tests (or the failures when that is unknown; 1 when
+  nothing is known), hp the failures (0 for a clean run), round 1. A clean encounter logs
+  both lines, "appears" then "is defeated", and shows the defeated look at once, with no
+  animation, the same as any fight already defeated when its view opens.
 - A full run: its count covers maxHp, or it is the same command that started the fight.
   Otherwise it is partial.
 - Each later test run is a round:
@@ -1567,7 +1570,7 @@ CSS on a wrapper, not art.
   the rows.
 - The selected tab is remembered for the session, not across restarts. It never switches
   by itself.
-- No fight: "No boss yet. One appears when a test run fails." muted, then TEST COMMAND (a
+- No fight: "No boss yet. One appears the first time you run your tests." muted, then TEST COMMAND (a
   40px text field, saved on blur) with the hint "Leave empty to use the usual runners."
   muted.
 - Active fight, top to bottom, 10px gap: the boss box (4px border in the boss accent,
@@ -1697,8 +1700,8 @@ described under Boss battles (Packs, Boss effects); this section is the screen.
   shadow. Selected BOSSES: `--error` fill, dark text, 4px `--text` border, 4px hard shadow.
   Unselected: `--bg` fill, `--text`, 4px `--line` border. Arrow keys (and Home and End) move
   between the tabs and select the one they land on; only the selected tab is in the Tab order.
-- Next to the tabs on BOSSES, one muted 12px line: "A random boss from the pool appears when
-  a test run fails."
+- Next to the tabs on BOSSES, one muted 12px line: "A random boss from the pool appears the
+  first time you run your tests."
 - The mascot gallery and editor are under the MASCOTS tab, unchanged.
 - The tab is remembered for the session, not across restarts. The title bar reads "MASCOTS /
   Bosses" on the BOSSES tab and "MASCOTS" on the other.
