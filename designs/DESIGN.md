@@ -1710,24 +1710,27 @@ described under Boss battles (Packs, Boss effects); this section is the screen.
 
 - "BOSSES" (pixel 14px) and "<n> of <total> in the pool" muted. The total counts valid
   bosses; a problem card is not one.
-- A 2-column grid, 14px gap (1 column when the tab is narrower than 360px). The built-in
-  bosses first, then custom ones oldest first, then the ADD BOSS card.
-- A boss card: 10px padding, panel fill, 4px `--line` border, 8px gap. The card being edited:
+- A grid of cards at least 150px wide, 14px gap, filling as many columns as fit (typically
+  3-4, down to 1 when the tab is narrow). The built-in bosses first, then custom ones oldest
+  first, then the ADD BOSS card.
+- A boss card: 10px padding, panel fill, 4px `--line` border, 6px gap. The card being edited:
   4px `--text` border and a `4px 4px 0` shadow in the boss's accent. A card that is out of the
   pool is drawn at 75% opacity.
-  - Thumbnail: 104px tall, 2px border in the accent, the background drawn by the rule in
-    Packs, a bottom gradient from transparent to `--bg` at 70% over the lower half, and the
+  - Thumbnail: 72px tall, 2px border in the accent, the background drawn by the rule in
+    Packs, a bottom gradient from transparent to `--bg` at 85% over the lower 60%, and the
     BossSprite at scale 1 (64px), centered, 6px above the bottom, playing idle.
-  - A row: a 10px square in the accent, then the name (13px, 600).
-  - A row: "Built-in" or "Custom" (11px muted, plus " · editing" while it is open in the
-    editor), and on the right the POOL toggle: a button, 32px tall, padding 0 8px, pixel font
-    7px, `aria-pressed`, `aria-label` "<name> in the random pool", reading POOL: ON (accent
-    fill, dark text, 2px accent border) or POOL: OFF (`--bg`, muted, 2px `--line` border).
-  - Custom cards only: EDIT and DELETE, side by side, 32px tall. DELETE uses the danger style
-    (`--error` text and border on `--bg`).
+  - A row: a 10px square in the accent, the name (13px, 600), and on the right "Built-in" or
+    "Custom" (11px muted, plus " · editing" while it is open in the editor). Wraps if the card
+    is too narrow for all three.
+  - A row: the POOL toggle, a button, 32px tall, padding 0 8px, pixel font 7px,
+    `aria-pressed`, `aria-label` "<name> in the random pool", reading POOL: ON (accent fill,
+    dark text, 2px accent border) or POOL: OFF (`--bg`, muted, 2px `--line` border). Custom
+    cards only: EDIT and DELETE follow in the same row, 32px tall, each sized to its own text
+    rather than stretched. DELETE uses the danger style (`--error` text and border on `--bg`).
+    The row wraps onto a second line if a narrow card can't fit every button.
 - A problem card (a pack that failed a rule): the reason in `--error`, the folder name, and
   DELETE only. Built-in bosses are never problem cards.
-- ADD BOSS: a button card, min-height 220px, `--bg`, 4px dashed `--error` border, `--error`
+- ADD BOSS: a button card, min-height 150px, `--bg`, 4px dashed `--error` border, `--error`
   text, a "+" at 28px over "ADD BOSS" in the pixel font at 10px.
 - Under the grid, a box with a 4px `--line` border and 12px muted text: "Turn POOL off to
   keep a boss out of the draw. At least one boss stays in the pool. Built-in bosses can't be

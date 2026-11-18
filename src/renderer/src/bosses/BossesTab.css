@@ -37,26 +37,17 @@
   overflow-wrap: anywhere;
 }
 
-/* Two columns, one when the tab is narrower than 360px. */
-.bosses__grid-wrap {
-  container-type: inline-size;
-}
-
+/* Cards are at least 150px wide, so the grid fills 3-4 columns on a typical
+   width and falls to fewer, down to one, as the tab narrows. */
 .bosses__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
   align-items: stretch;
 }
 
-@container (max-width: 359px) {
-  .bosses__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .bosses__add {
-  min-height: 220px;
+  min-height: 150px;
   padding: 14px;
   display: flex;
   flex-direction: column;

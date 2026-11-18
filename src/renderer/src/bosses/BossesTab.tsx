@@ -130,38 +130,36 @@ function BossesTab({ setLeaveGuard }: BossesTabProps): React.JSX.Element {
         </p>
       )}
 
-      <div className="bosses__grid-wrap">
-        <div className="bosses__grid">
-          {entries.map((entry) =>
-            entry.kind === 'problem' ? (
-              <BossProblemCard
-                key={entry.id}
-                id={entry.id}
-                problem={entry.problem}
-                busy={busy}
-                onDelete={() => void askDelete(entry.id, entry.id)}
-              />
-            ) : (
-              <BossCard
-                key={entry.pack.id}
-                pack={entry.pack}
-                builtIn={entry.builtIn}
-                inPool={entry.inPool}
-                editing={entry.pack.id === editingId}
-                busy={busy || !loaded}
-                onTogglePool={() => void togglePool(entry.pack.id, !entry.inPool)}
-                onEdit={() => openEditor({ kind: 'edit', entry })}
-                onDelete={() => void askDelete(entry.pack.id, entry.pack.name)}
-              />
-            )
-          )}
-          <button type="button" className="bosses__add" onClick={() => openEditor({ kind: 'new' })}>
-            <span className="bosses__add-plus" aria-hidden="true">
-              +
-            </span>
-            ADD BOSS
-          </button>
-        </div>
+      <div className="bosses__grid">
+        {entries.map((entry) =>
+          entry.kind === 'problem' ? (
+            <BossProblemCard
+              key={entry.id}
+              id={entry.id}
+              problem={entry.problem}
+              busy={busy}
+              onDelete={() => void askDelete(entry.id, entry.id)}
+            />
+          ) : (
+            <BossCard
+              key={entry.pack.id}
+              pack={entry.pack}
+              builtIn={entry.builtIn}
+              inPool={entry.inPool}
+              editing={entry.pack.id === editingId}
+              busy={busy || !loaded}
+              onTogglePool={() => void togglePool(entry.pack.id, !entry.inPool)}
+              onEdit={() => openEditor({ kind: 'edit', entry })}
+              onDelete={() => void askDelete(entry.pack.id, entry.pack.name)}
+            />
+          )
+        )}
+        <button type="button" className="bosses__add" onClick={() => openEditor({ kind: 'new' })}>
+          <span className="bosses__add-plus" aria-hidden="true">
+            +
+          </span>
+          ADD BOSS
+        </button>
       </div>
 
       <p className="bosses__note">{BOSS_POOL_NOTE}</p>

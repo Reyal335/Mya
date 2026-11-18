@@ -47,12 +47,12 @@ function BossCard({
       <div className="boss-card__name-row">
         <span className="boss-card__swatch" aria-hidden="true" />
         <h3 className="boss-card__name">{pack.name}</h3>
-      </div>
-      <div className="boss-card__kind-row">
         <span className="boss-card__kind">
           {builtIn ? 'Built-in' : 'Custom'}
           {editing ? ' · editing' : ''}
         </span>
+      </div>
+      <div className="boss-card__controls">
         <button
           type="button"
           className={`boss-card__pool${inPool ? ' boss-card__pool--on' : ''}`}
@@ -63,29 +63,29 @@ function BossCard({
         >
           {inPool ? 'POOL: ON' : 'POOL: OFF'}
         </button>
+        {!builtIn && (
+          <>
+            <button
+              type="button"
+              className="button button--small button--secondary boss-card__button"
+              aria-label={`Edit ${pack.name}`}
+              disabled={busy}
+              onClick={onEdit}
+            >
+              EDIT
+            </button>
+            <button
+              type="button"
+              className="button button--small button--danger boss-card__button"
+              aria-label={`Delete ${pack.name}`}
+              disabled={busy}
+              onClick={onDelete}
+            >
+              DELETE
+            </button>
+          </>
+        )}
       </div>
-      {!builtIn && (
-        <div className="boss-card__actions">
-          <button
-            type="button"
-            className="button button--small button--secondary boss-card__button"
-            aria-label={`Edit ${pack.name}`}
-            disabled={busy}
-            onClick={onEdit}
-          >
-            EDIT
-          </button>
-          <button
-            type="button"
-            className="button button--small button--danger boss-card__button"
-            aria-label={`Delete ${pack.name}`}
-            disabled={busy}
-            onClick={onDelete}
-          >
-            DELETE
-          </button>
-        </div>
-      )}
     </article>
   )
 }
@@ -107,7 +107,7 @@ export function BossProblemCard({
     <article className="boss-card boss-card--problem">
       <p className="boss-card__problem">{problem}</p>
       <p className="boss-card__folder">{id}</p>
-      <div className="boss-card__actions">
+      <div className="boss-card__controls">
         <button
           type="button"
           className="button button--small button--danger boss-card__button"
