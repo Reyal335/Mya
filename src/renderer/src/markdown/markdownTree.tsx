@@ -19,6 +19,7 @@ import {
   type TreeNode
 } from './MarkdownElements'
 import { safeUrl } from './safeUrl'
+import { lastLine } from '../../../shared/shownText'
 
 // Markdown source to React elements, for components/Markdown.tsx. Each text is
 // parsed once and cached. Typing cuts the element tree after N visible
@@ -317,6 +318,27 @@ export function useMarkdownBlocks(
       : [{ key: 0, parsed: parse(source) }]
     return { blocks, length: blocks.reduce((sum, block) => sum + block.parsed.length, 0) }
   }, [source, tailStart, finished])
+}
+
+// The last line of the text the first `shown` visible characters make, as plain text: what the
+// collapsed dialogue bar types. Only the blocks that are reached are cut, last one first, so a
+// long reply costs one block per tick, and a block with no text (a rule) gives way to the one
+// before it.
+export function shownLastLine({ blocks, length }: MarkdownBlocks, shown: number): string {
+  let left = shown >= length ? Infinity : shown
+  const reached: { block: MarkdownBlock; take: number }[] = []
+  for (const block of blocks) {
+    if (left <= 0) break
+    reached.push({ block, take: left })
+    left -= block.parsed.length
+  }
+  for (let i = reached.length - 1; i >= 0; i--) {
+    const { block, take } = reached[i]
+    const state: CutState = { left: take, cursor: null, placed: false }
+    const line = lastLine(cut(block.parsed.element, state))
+    if (line !== '') return line
+  }
+  return ''
 }
 
 // The elements to draw: every block in full, or, while typing, the first

@@ -1,12 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import {
-  ASKING_LINE,
-  barView,
-  IDLE_PROMPT,
-  type BarInput,
-  type BarView
-} from './dialogueBar.ts'
+import { ASKING_LINE, barView, IDLE_PROMPT, type BarInput, type BarView } from './dialogueBar.ts'
 
 const base: BarInput = {
   state: 'idle',
@@ -76,7 +70,12 @@ test('working: the text the box shows', () => {
 
 test('after an error or a stop: the notice in its own color', () => {
   const error = view({ kind: 'notice', notice: { text: 'Something broke.', tone: 'error' } })
-  assert.deepEqual(error.line, { type: 'text', text: 'Something broke.', tone: 'error', cursor: false })
+  assert.deepEqual(error.line, {
+    type: 'text',
+    text: 'Something broke.',
+    tone: 'error',
+    cursor: false
+  })
   const stopped = view({ kind: 'notice', notice: { text: 'Stopped.', tone: 'muted' } })
   assert.deepEqual(stopped.line, { type: 'text', text: 'Stopped.', tone: 'muted', cursor: false })
   assert.equal(stopped.fullReplyNote, false)

@@ -35,10 +35,14 @@ test('a component stands in for its element through props.node', () => {
 })
 
 test('a table row joins its cells with a dot', () => {
-  const tree = el(() => null, [
-    el('tr', [el('th', 'Name'), el('th', 'Age')], 'tr'),
-    el('tr', [el('td', 'Ann'), el('td', '31')], 'tr')
-  ], 'table')
+  const tree = el(
+    () => null,
+    [
+      el('tr', [el('th', 'Name'), el('th', 'Age')], 'tr'),
+      el('tr', [el('td', 'Ann'), el('td', '31')], 'tr')
+    ],
+    'table'
+  )
   assert.deepEqual(textLines(tree), ['Name · Age', 'Ann · 31'])
   assert.equal(lastLine(tree), 'Ann · 31')
 })
