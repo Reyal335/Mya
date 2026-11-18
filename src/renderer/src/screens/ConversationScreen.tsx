@@ -1,4 +1,13 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import type { ExtraProps } from 'react-markdown'
 import type { ProjectInfo } from '../../../shared/ipc'
 import { splitFenced } from '../../../shared/composerMessage'
@@ -36,8 +45,9 @@ import AgentTaskCard from '../components/AgentTaskCard'
 import Composer from '../components/Composer'
 import Dialog from '../components/Dialog'
 import ToolCard from '../components/ToolCard'
-import Mascot from '../components/Mascot'
-import DialogueBox from '../components/DialogueBox'
+import DialogueStage from '../components/DialogueStage'
+import { useDialogueCollapse } from '../hooks/useDialogueCollapse'
+import { useHistoryScroll } from '../hooks/useHistoryScroll'
 import Markdown from '../components/Markdown'
 import { MarkdownCodeBlock } from '../markdown/MarkdownElements'
 import { toPlainText } from '../../../shared/plainText'
@@ -143,6 +153,9 @@ type HistoryProps = {
   lists: ModelLists | null
   // Battle notices and end cards, each placed after its test run's tool card or task.
   battle: BattleEntry[]
+  // The reply text that is last while the dialogue box is collapsed: it is also drawn here, with
+  // a LATEST tag, so it can be read without opening the box.
+  latestId: number | null
 }
 
 // A battle notice or end card in the history. anchor is 'tool:<id>' or 'task:<id>'.
@@ -160,7 +173,8 @@ function HistoryList({
   note,
   onOpenTask,
   lists,
-  battle
+  battle,
+  latestId
 }: HistoryProps): React.JSX.Element {
   const blocks = toBlocks(items)
   // An entry goes after its card; one whose card is not in the history goes at the end.
@@ -245,9 +259,15 @@ function HistoryList({
       }
       case 'text': {
         const tag = item.meta ? replyTag(item.meta, lists) : ''
+        const latest = item.id === latestId
         return (
           <div key={item.id} className="conversation__reply">
-            {tag !== '' && <span className="conversation__tag">{tag}</span>}
+            {(tag !== '' || latest) && (
+              <div className="conversation__reply-head">
+                {tag !== '' && <span className="conversation__tag">{tag}</span>}
+                {latest && <span className="conversation__latest">LATEST</span>}
+              </div>
+            )}
             <Markdown source={item.text} />
           </div>
         )
@@ -292,6 +312,7 @@ const History = memo(
     a.lists === b.lists &&
     a.onOpenTask === b.onOpenTask &&
     a.battle === b.battle &&
+    a.latestId === b.latestId &&
     a.items.length === b.items.length &&
     a.items.every((item, i) => item === b.items[i])
 )
@@ -312,9 +333,6 @@ const BADGES: Partial<Record<MascotStateName, string>> = {
   victory: '!',
   hurt: '><'
 }
-
-// How close to the bottom (px) still counts as "at the bottom" for auto-scroll.
-const STICK_THRESHOLD = 24
 
 // The most agents working at once. Main refuses a call past this, and Claude
 // Code's own limit is set to the same.
@@ -361,10 +379,8 @@ function ConversationScreen({
   const [typing, setTyping] = useState(false)
   const [confirmNew, setConfirmNew] = useState(false)
   const [newChatError, setNewChatError] = useState<string | null>(null)
-  const historyRef = useRef<HTMLDivElement>(null)
   // The input box's text, so focus can be moved there from outside it.
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const stickToBottom = useRef(true)
   // Bumped when the input should take focus once the screen has settled.
   const [inputFocus, setInputFocus] = useState(0)
   // Boss battles: the packs, the replay of the latest round, the battle view (open on the
@@ -413,7 +429,6 @@ function ConversationScreen({
   // reply text or a notice. It moves up once something comes after it.
   const last = items[items.length - 1]
   const boxItem = last && (last.kind === 'text' || last.kind === 'notice') ? last : null
-  const historyItems = useMemo(() => (boxItem ? items.slice(0, -1) : items), [items, boxItem])
   // The tag of the reply in the dialogue box: the model that answered and the level.
   const boxTag =
     boxItem?.kind === 'text' && boxItem.meta ? replyTag(boxItem.meta, modelChoice.lists) : ''
@@ -425,6 +440,25 @@ function ConversationScreen({
       items.filter((item): item is ToolItem => item.kind === 'tool' && item.permission !== null),
     [items]
   )
+
+  // The dialogue box folds to a bar so the history can use the room. A request that waits keeps it
+  // open; a run, or the first text of a reply, opens it again (see useDialogueCollapse).
+  const box = useDialogueCollapse({
+    running,
+    locked: pending.length > 0,
+    reply:
+      boxItem?.kind === 'text'
+        ? { id: boxItem.id, length: boxItem.text.length, instant: boxItem.instant }
+        : null
+  })
+  // While the box is open its last item (reply text or a notice) lives there and not in the
+  // history. Collapsed, it is also drawn at the end of the history, so nothing has to be opened to
+  // be read; a reply there carries a LATEST tag.
+  const historyItems = useMemo(
+    () => (boxItem && box.open ? items.slice(0, -1) : items),
+    [items, boxItem, box.open]
+  )
+  const latestId = !box.open && boxItem?.kind === 'text' ? boxItem.id : null
   const askingTask = pending[0]?.taskId ? views.get(pending[0].taskId) : undefined
   const asker = askingTask ? askingTask.item.agent : null
 
@@ -466,23 +500,35 @@ function ConversationScreen({
   // Read as plain text, so no Markdown marks are read out.
   const announce = useMemo(() => toPlainText(announced), [announced])
 
-  // Keep the history scrolled to the bottom while it grows, unless the user scrolled up.
+  // The history sticks to the bottom only while I am within 8px of it, so new items never pull
+  // me down when I have scrolled up. It tells the box how far the bottom is out of view, and
+  // whether the scroll was mine.
+  const { attach, repin, follow, pinNow, jump, markChange } = useHistoryScroll(box.report)
+  // The box opened or closed, which changes the history's height: for 300ms my scrolling does not
+  // count for AUTO, so the box cannot flip back and forth.
+  useLayoutEffect(() => {
+    markChange()
+  }, [box.open, markChange])
+  // The history grew or the box swapped its last item in or out: keep it at the bottom if it was.
   useEffect(() => {
-    const el = historyRef.current
-    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
-  }, [historyItems, views])
+    repin()
+  }, [historyItems, views, repin])
+  // A run started or its first text arrived: scroll to the bottom.
+  useEffect(() => {
+    if (box.pin > 0) pinNow()
+  }, [box.pin, pinNow])
 
-  function handleScroll(): void {
-    const el = historyRef.current
-    if (!el) return
-    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD
+  // ↓ LATEST: to the bottom, and with AUTO on the box opens.
+  function jumpToLatest(): void {
+    box.latest()
+    jump(reducedMotion)
   }
 
   // Sending works during a run too: main puts the message into the run, and Claude
   // reads it once the agent that is working has finished.
   function submit(message: string, images: OutgoingImage[]): void {
     if (message.trim() === '' && images.length === 0) return
-    stickToBottom.current = true
+    follow()
     send(message, call, images)
     // One agent per message: the chip clears after I send.
     onCallChange(null)
@@ -504,10 +550,10 @@ function ConversationScreen({
   const fightOn = useCallback(async (): Promise<void> => {
     if (running) return
     if (await resumeFight()) {
-      stickToBottom.current = true
+      follow()
       send(FIGHT_ON_MESSAGE, null, [])
     }
-  }, [running, resumeFight, send])
+  }, [running, resumeFight, send, follow])
 
   const liveStart = fight?.startedAt ?? null
   const toggleBattle = (): void => {
@@ -564,7 +610,9 @@ function ConversationScreen({
     const error = await newChat()
     setNewChatError(error ? error.message : null)
     if (!error) {
-      stickToBottom.current = true
+      follow()
+      // Every chat starts with the box open.
+      box.reset()
       // The new chat starts from the saved defaults, so the control changes with it.
       modelChoice.reload()
       // And with no theme of its own: it shows the default theme.
@@ -652,73 +700,69 @@ function ConversationScreen({
               onFightOn={() => void fightOn()}
             />
           ) : (
-            <div className="conversation__frame">
+            <div
+              className={`conversation__frame${box.open ? '' : ' conversation__frame--collapsed'}`}
+            >
               {/* The theme behind the history and the stage, under its fade. */}
               <ThemeBackdrop image={chatTheme.entry.image} fade={chatTheme.active?.fade ?? 0} />
-              <div
-                ref={historyRef}
-                className="conversation__history"
-                onScroll={handleScroll}
-                aria-label="History"
-              >
-                <History
-                  items={historyItems}
-                  projectPath={project.path}
-                  views={views}
-                  note={conversation.historyNote}
-                  onOpenTask={onOpenTask}
-                  lists={modelChoice.lists}
-                  battle={battleEntries}
-                />
+              <div className="conversation__history-wrap">
+                <div ref={attach} className="conversation__history" aria-label="History">
+                  <History
+                    items={historyItems}
+                    projectPath={project.path}
+                    views={views}
+                    note={conversation.historyNote}
+                    onOpenTask={onOpenTask}
+                    lists={modelChoice.lists}
+                    battle={battleEntries}
+                    latestId={latestId}
+                  />
+                </div>
+                {/* Shown whenever the history's bottom is more than 48px out of view. */}
+                {box.far && (
+                  <button
+                    type="button"
+                    className="conversation__jump"
+                    aria-label="Jump to the latest message"
+                    onClick={jumpToLatest}
+                  >
+                    ↓ LATEST
+                  </button>
+                )}
               </div>
 
-              <div className="conversation__stage">
-                <div className="stage__mascot">
-                  <div className="stage__frame">
-                    <Mascot
-                      src={loop.src}
-                      frames={loop.frames}
-                      fps={loop.fps}
-                      reverse={loop.reverse}
-                      scale={2}
-                      label={`Mascot, ${shownState}`}
-                      accessory={accessory}
-                    />
-                    {badge && (
-                      <span
-                        className={`stage__badge stage__badge--${shownState}`}
-                        aria-hidden="true"
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`stage__tag stage__tag--${shownState}`}>
-                    {shownState.toUpperCase()}
-                  </div>
-                  {title && <div className="stage__title">{title.toUpperCase()}</div>}
-                </div>
-                <DialogueBox
-                  agentName={speaker}
-                  reply={
-                    boxItem?.kind === 'text'
-                      ? { id: boxItem.id, text: boxItem.text, instant: boxItem.instant }
-                      : null
-                  }
-                  notice={boxItem?.kind === 'notice' ? boxItem.notice : null}
-                  tag={boxTag}
-                  pending={pending}
-                  asker={asker}
-                  working={working}
-                  running={running}
-                  empty={items.length === 0}
-                  announce={announce}
-                  projectPath={project.path}
-                  reducedMotion={reducedMotion}
-                  onAnswer={answerPermission}
-                  onTypingChange={setTyping}
-                />
-              </div>
+              <DialogueStage
+                open={box.open}
+                locked={box.locked}
+                auto={box.auto}
+                unseen={box.unseen}
+                onAuto={box.setAuto}
+                onCollapse={box.collapse}
+                onExpand={box.expand}
+                loop={loop}
+                accessory={accessory}
+                state={shownState}
+                badge={badge}
+                title={title}
+                speaker={speaker}
+                reply={
+                  boxItem?.kind === 'text'
+                    ? { id: boxItem.id, text: boxItem.text, instant: boxItem.instant }
+                    : null
+                }
+                notice={boxItem?.kind === 'notice' ? boxItem.notice : null}
+                tag={boxTag}
+                pending={pending}
+                asker={asker}
+                working={working}
+                running={running}
+                empty={items.length === 0}
+                announce={announce}
+                projectPath={project.path}
+                reducedMotion={reducedMotion}
+                onAnswer={answerPermission}
+                onTypingChange={setTyping}
+              />
             </div>
           )}
 

@@ -11,11 +11,35 @@
   box-shadow: var(--shadow-dialog);
 }
 
+/* The name on the left, AUTO and COLLAPSE pushed to the right. When the box is narrow the
+   buttons wrap under the name, still at the right. */
+.dialogue__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 10px;
+}
+
 .dialogue__name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--font-pixel);
   font-size: 10px;
   line-height: 1.5;
   color: var(--accent);
+}
+
+/* The buttons are 32px tall but the name's row is 15px, so the controls count as 15px and the
+   buttons overflow it evenly, into the box's padding and the gap under the row. The open box is
+   exactly as tall as it was. Wrapped under the name in a narrow box, the 14px row gap keeps them
+   clear of it, and of the reply tag, which sticks out of its line by a couple of pixels. */
+.dialogue__controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 15px;
+  margin-left: auto;
 }
 
 /* The model and level that answered, beside the name. */

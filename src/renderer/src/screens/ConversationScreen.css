@@ -137,8 +137,22 @@
 }
 
 /* History */
-/* It may shrink to nothing and scrolls, so it is the first thing to give way when the
-   window is short or the input box has grown. */
+/* The wrapper holds the scrolling history and ↓ LATEST, which stays put while the history
+   scrolls. The history may shrink to nothing and scrolls, so it is the first thing to give way
+   when the window is short or the input box has grown. With the dialogue box collapsed to its
+   bar it keeps at least 80px, so there is something to read back. */
+.conversation__history-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation__frame--collapsed .conversation__history-wrap {
+  min-height: 80px;
+}
+
 .conversation__history {
   position: relative;
   flex: 1 1 0;
@@ -260,6 +274,25 @@
   color: var(--text);
 }
 
+/* The line above a reply's text: the model and level that answered on the left, LATEST on the
+   right while the dialogue box is collapsed. */
+.conversation__reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.conversation__latest {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: var(--border-thin) solid var(--accent);
+  font-family: var(--font-pixel);
+  font-size: 6px;
+  line-height: 1;
+  color: var(--accent);
+}
+
 /* The model and level that answered, above the reply text. */
 .conversation__tag {
   align-self: flex-start;
@@ -299,6 +332,36 @@
   flex-wrap: wrap;
   gap: 10px;
   align-self: stretch;
+}
+
+/* ↓ LATEST: the bottom right corner of the history, 12px in. */
+.conversation__jump {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border) solid var(--accent);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 var(--shadow);
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.conversation__jump:hover {
+  border-color: var(--text);
+}
+
+/* What sits under the history: the stage or, collapsed, the bar. It never changes the stage's own
+   layout; it only holds the screen reader live region. */
+.conversation__stage-slot {
+  position: relative;
+  flex: none;
 }
 
 /* Stage: the mascot beside the dialogue box. */

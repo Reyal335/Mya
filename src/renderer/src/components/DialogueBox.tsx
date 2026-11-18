@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { PermissionDecision, TaskAgent } from '../../../shared/ipc'
 import type { ConversationItem } from '../hooks/useConversation'
-import { useTypewriter } from '../hooks/useTypewriter'
+import type { BoxKind } from '../../../shared/dialogueBar'
 import { errorText, STOPPED_TEXT } from '../../../shared/noticeText'
 import AgentIcon from './AgentIcon'
 import Markdown from './Markdown'
-import { needsWholeParse, useMarkdownBlocks } from '../markdown/markdownTree'
+import type { MarkdownBlocks } from '../markdown/markdownTree'
 import { PermissionActions, PermissionDetails } from './PermissionRow'
 import type { ToolLabel } from '../../../shared/toolLabel'
 import './DialogueBox.css'
@@ -15,9 +15,15 @@ type NoticeItem = Extract<ConversationItem, { kind: 'notice' }>
 
 type DialogueBoxProps = {
   agentName: string
-  // The last item when it is reply text. It types out here and is not in the history,
-  // unless it is `instant`: text loaded from a saved conversation shows at once.
-  reply: { id: number; text: string; instant: boolean } | null
+  // What the box shows (see boxKind). The stage decides it, since the collapsed bar follows the
+  // same answer.
+  kind: BoxKind
+  // The reply being typed, and how much of it shows. The stage owns the typewriter, so it keeps
+  // typing while the box is collapsed.
+  markdown: MarkdownBlocks
+  shown: number
+  typing: boolean
+  skip: () => void
   // The last item when it is a notice (stopped or error).
   notice: NoticeItem['notice'] | null
   // The reply's tag, "<MODEL> · <LEVEL>", shown beside the name while the reply is
@@ -29,17 +35,12 @@ type DialogueBoxProps = {
   asker: Pick<TaskAgent, 'name' | 'icon'> | null
   // The label of the running tool card, if one is running.
   working: ToolLabel | null
-  // A run is in progress.
-  running: boolean
   // Nothing has been sent yet.
   empty: boolean
-  // The most recent reply text that is complete, for screen readers.
-  announce: string
   projectPath: string
-  reducedMotion: boolean
+  // AUTO and ▼ COLLAPSE, at the right end of the header row.
+  controls: ReactNode
   onAnswer: (permissionId: string, decision: PermissionDecision) => void
-  // Called only when typing starts or stops, never per character.
-  onTypingChange: (typing: boolean) => void
 }
 
 // Position of the oldest pending request among all requests seen since the queue
@@ -57,51 +58,28 @@ function useRequestPosition(pending: ToolItem[]): { index: number; total: number
   return { index: ids.length > 0 ? next.indexOf(ids[0]) : 0, total: next.length }
 }
 
-// The RPG dialogue box from designs/2-conversation.html. Per-character typing
-// updates stay inside this component; the history does not re-render for them.
+// The RPG dialogue box from designs/2-conversation.html. Per-character typing updates stay in
+// the stage and this box; the history does not re-render for them.
 function DialogueBox({
   agentName,
-  reply,
+  kind,
+  markdown,
+  shown,
+  typing,
+  skip,
   notice,
   tag,
   pending,
   asker,
   working,
-  running,
   empty,
-  announce,
   projectPath,
-  reducedMotion,
-  onAnswer,
-  onTypingChange
+  controls,
+  onAnswer
 }: DialogueBoxProps): React.JSX.Element {
-  const instant = reducedMotion || Boolean(reply?.instant)
-  // While the run goes on the reply can still grow: only its last block is parsed
-  // again. When the run ends the blocks stay, unless the reply has definitions
-  // that cross blocks: then it is parsed whole, exactly as the history shows it.
-  const text = reply?.text ?? ''
-  const whole = instant || (!running && needsWholeParse(text))
-  const markdown = useMarkdownBlocks(text, reply?.id ?? null, whole)
-  const { shown, typing, skip } = useTypewriter(markdown.length, reply?.id ?? null, instant)
   const bodyRef = useRef<HTMLDivElement>(null)
   const position = useRequestPosition(pending)
-
-  useEffect(() => {
-    onTypingChange(typing)
-  }, [typing, onTypingChange])
-
   const request = pending[0] ?? null
-  const kind = request
-    ? 'asking'
-    : reply
-      ? 'reply'
-      : notice
-        ? 'notice'
-        : working
-          ? 'working'
-          : running
-            ? 'thinking'
-            : 'idle'
 
   // Reply text stays scrolled to the bottom while it types. A new request starts at the top.
   useLayoutEffect(() => {
@@ -192,9 +170,15 @@ function DialogueBox({
       onClick={skip}
       onKeyDown={handleKeyDown}
     >
-      <div className="dialogue__name">
-        {agentName}
-        {kind === 'reply' && tag !== '' && <span className="dialogue__tag">{tag}</span>}
+      <div className="dialogue__head">
+        <div className="dialogue__name">
+          {agentName}
+          {kind === 'reply' && tag !== '' && <span className="dialogue__tag">{tag}</span>}
+        </div>
+        {/* A click on a button here is not a click on the box: it must not skip the typing. */}
+        <div className="dialogue__controls" onClick={(event) => event.stopPropagation()}>
+          {controls}
+        </div>
       </div>
       <div ref={bodyRef} className={`dialogue__body dialogue__body--${kind}`}>
         {body}
@@ -208,9 +192,6 @@ function DialogueBox({
           onAnswer={onAnswer}
         />
       )}
-      <p className="visually-hidden" aria-live="polite">
-        {announce}
-      </p>
     </section>
   )
 }

@@ -1,0 +1,115 @@
+/* The collapsed dialogue box: one row, always the same height. Solid panel fill, so the chat theme
+   behind the frame never shows through. */
+.dialogue-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: var(--border) solid var(--text);
+  box-shadow: var(--shadow-hard);
+}
+
+/* The 64px mascot (scale 1) in a 3px box. line-height 0 so the box hugs the picture. */
+.dialogue-bar__mascot {
+  flex: none;
+  background: var(--panel);
+  border: 3px solid var(--text);
+  line-height: 0;
+}
+
+/* The middle: the name row and one line of text, 6px apart. It gives way before the buttons. */
+.dialogue-bar__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dialogue-bar__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.dialogue-bar__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+/* The same chip the caption uses, at 7px. */
+.dialogue-bar .stage__tag.dialogue-bar__chip {
+  flex: none;
+  font-size: 7px;
+}
+
+.dialogue-bar__new {
+  flex: none;
+  padding: 2px 4px;
+  background: var(--waiting);
+  color: var(--bg);
+  font-family: var(--font-pixel);
+  font-size: 6px;
+  line-height: 1;
+}
+
+/* It gives way first when the bar is narrow. */
+.dialogue-bar__note {
+  flex: 0 10 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* One line, 13px, cut with an ellipsis, never wrapping. The cursor stays after the cut text. */
+.dialogue-bar__line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 20px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.dialogue-bar__text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogue-bar__text--muted {
+  color: var(--muted);
+}
+
+.dialogue-bar__text--error {
+  color: var(--error);
+}
+
+.dialogue-bar .dialogue__cursor.dialogue-bar__cursor {
+  flex: none;
+  width: 8px;
+  height: 14px;
+  margin-left: 4px;
+}
+
+/* AUTO, then ▲ EXPAND. */
+.dialogue-bar__controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
