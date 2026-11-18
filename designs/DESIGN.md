@@ -838,6 +838,162 @@ The composer is the one place that breaks these rules:
 
 This is a deliberate exception for the composer only. The textarea itself is at least 44px.
 
+## Collapsible dialogue box
+
+The stage on CHAT (the mascot and the dialogue box) takes about two thirds of the chat's height,
+so reading back through the history happened in a thin strip at the top. The dialogue box can
+collapse to a one-line bar at the bottom of the stage, and the history gets the space. The
+mockups are on the canvas: "22. Chat, reading back with the dialogue box collapsed" and "22b.
+Collapsible dialogue box: states and rules". There are no HTML files for them.
+
+### State
+
+Kept in the window, in `useDialogueCollapse`; the rules are one pure function, `boxStep` in
+`src/shared/dialogueCollapse.ts`, with its tests.
+
+- `open`: true or false. Every chat starts open, including after NEW CHAT, after leaving CHAT
+  and coming back, and after a restart. It is not saved.
+- `auto`: settings.json `dialogueAutoCollapse`, true when missing. It is the only thing saved.
+  Saving it goes through the settings IPC (`ui.getDialogueAutoCollapse` and
+  `ui.setDialogueAutoCollapse`, a boolean only).
+- `locked`: true while at least one approval request is pending, from the main conversation or
+  from an agent. While locked, the box is open.
+- `hasUnseen` (`unseen` in the code): the NEW tag. True when reply text arrives while the box is
+  collapsed and the end of the history is out of view (the history is not within 8px of its
+  bottom). Cleared when the box opens, and whenever the history comes within 8px of its bottom,
+  whoever scrolled it there. If the history is already at the bottom, the new text is in view
+  in the LATEST copy and NEW does not show.
+- One pure function, `barView` in `src/shared/dialogueBar.ts`, decides what the bar shows, so it
+  can be tested without a screen.
+
+### When it opens and closes
+
+- ▼ COLLAPSE and ▲ EXPAND work at any time, AUTO on or off, except that COLLAPSE does nothing
+  while locked.
+- AUTO on:
+  - I scroll the history up so its bottom is more than 48px out of view: collapse. Only my own
+    scrolling counts (wheel, keys, the scrollbar, touch), never a scroll the app makes.
+  - I scroll back to within 8px of the bottom, or press ↓ LATEST: open.
+  - A run starts (the mascot goes to THINKING) or reply text starts arriving (TALKING): open, and
+    scroll the history to the bottom. For the reply text this happens once per run: the first
+    reply text of a run opens the box, and later text in the same run (after a tool, say) does
+    not, so reading back during a long run is never undone.
+- AUTO off: nothing opens or closes by itself, except for approvals.
+- An approval request becomes pending: open, at once, whatever the setting. When the last
+  pending request is answered, the box stays open.
+- Opening or closing changes the history's height. For 300ms after any change the app makes,
+  ignore scroll events for the AUTO rule, so the box cannot flip back and forth.
+- Text loaded from a saved chat never opens the box.
+- With the box open, the history keeps step 4's rules. With it collapsed, see History while
+  collapsed.
+- The switch is instant. No animation.
+
+### The bar
+
+It sits where the stage (the mascot and the dialogue box) was, inside the stage frame, under the
+history. Its height never changes with its content.
+
+- One row: padding 8px 10px, `--panel` fill, 4px `--text` border, 4px 4px 0 hard shadow, 12px gap,
+  align center. Square corners. About 94px tall.
+- Left: the mascot at scale 1 (64px) in a box with a 3px `--text` border, playing the current
+  state's loop, with the equipped accessory on it. No caption and no title under it in the bar.
+- Middle (flex 1, min-width 0), two lines with a 6px gap:
+  - The speaker name (pixel 9px, accent), the state as a chip (pixel 7px, the same chip the
+    caption uses: IDLE, THINKING, TALKING, WORKING, ASKING, and step 18's VICTORY and HURT), and
+    when `hasUnseen` is true a NEW tag (pixel 6px, `--waiting` fill, dark text, padding 2px 4px).
+    When idle after a reply, add "· full reply is in the history" muted at 11px; it gives way
+    first when the bar is narrow.
+  - One line of text at 13px, cut with an ellipsis, never wrapping:
+    - idle after a reply: the first line of the reply, Markdown stripped to plain text.
+    - idle before anything was sent: "What should we work on?" muted.
+    - thinking: the cycling dots the box uses.
+    - talking: the last line of the text typed so far, with the block cursor, read from the same
+      rendered blocks the open box draws.
+    - working: the same text the box shows ("<agent> is working: <activity>" or the tool label).
+    - after an error or a stop: the notice, in its color (error for an error, muted for a stop).
+  - The chip follows the mascot's shown state (which holds each state for 400ms). The line
+    follows what the open box would show, so they can differ for a moment. A boss mood
+    (VICTORY, HURT) changes the chip only.
+  - ASKING can only show for the 400ms after a request is answered, while the mascot still holds
+    it: the line reads "Waiting for approval", muted.
+- Right: the AUTO toggle, then ▲ EXPAND.
+  - AUTO: a button, 32px tall, padding 0 8px, pixel font 7px, `aria-pressed`, title "Collapse while
+    I scroll back, open for new replies". On: "AUTO: ON", accent text, 2px accent border, `--bg`
+    fill. Off: "AUTO: OFF", muted text, 2px `--line` border.
+  - ▲ EXPAND: 44px tall, padding 0 12px, accent fill, dark text, 4px `--text` border, 3px 3px 0 hard
+    shadow, pixel font 8px, `aria-expanded="false"`, `aria-controls` pointing at the stage
+    wrapper (`dialogue-stage`), which holds the box or the bar; the box itself is not in the page
+    while collapsed.
+- Clicking anywhere on the bar outside the two buttons does nothing.
+- The chat theme stays behind it; the bar has a solid fill.
+
+### The open box
+
+Everything step 4 and later built stays. The box's header row adds, pushed to the right: the AUTO
+toggle (as above) and ▼ COLLAPSE (32px tall, padding 0 10px, `--bg` fill, `--text`, 2px `--muted`
+border, pixel font 7px, `aria-expanded="true"`, `aria-controls` as ▲ EXPAND). While locked, ▼
+COLLAPSE has `aria-disabled="true"`, reads muted, and has the title "Answer the request first".
+It stays a button you can reach, so the reason can be read.
+
+The buttons are taller than the name's row, so they count as 15px and overflow it evenly into the
+box's padding: the open box is exactly as tall as it was. In a narrow box (the window at 960px
+with the party panel open) they wrap under the name and the reply tag, with a 14px row gap, and
+the box is about 25px taller. A click on either button does not skip the typing.
+
+### History while collapsed
+
+This changes step 4's rule. Step 4 keeps the last item (reply text or a notice) only in the
+dialogue box. While the box is collapsed it is also drawn at the end of the history:
+
+- The last reply text is rendered with the history's Markdown renderer, fully (no typewriter),
+  growing as text arrives, with a LATEST tag on the right of its header (pixel 6px, 2px accent
+  border, accent text, padding 2px 4px). The model tag stays on the left of the same row.
+- The last item, when it is a notice (an error, a stop, an info line), is drawn as the usual
+  plain line, with no tag. The bar's one line would cut a long error, and nothing should have to
+  be expanded to be read.
+- When the box opens again, that copy leaves the history, and the history stays scrolled to the
+  bottom if it was there, so nothing jumps.
+- Nothing else in the history changes. Nothing is ever shown twice on screen at once in full: the
+  bar's one line does not count.
+- The history sticks to the bottom only while I am within 8px of it (it was 24px). If I have
+  scrolled up, new items never pull me down. It also stays at the bottom when its own height
+  changes (the box opening or closing, the input box growing, the window resizing).
+- The scroll events the app makes itself are told apart from mine: they land exactly where the
+  app put the history, and they never decide whether I was at the bottom.
+
+### ↓ LATEST
+
+- Shown whenever the history's bottom is more than 48px out of view, open or collapsed: in the
+  bottom right corner of the history, 12px in from the right and 12px above the history's own
+  bottom edge (the 16px gap under it is not counted).
+- A button, 36px tall, padding 0 10px, `--bg` fill, `--text`, 4px accent border, 3px 3px 0 hard
+  shadow, pixel font 7px, "↓ LATEST", with the accessible name "Jump to the latest message".
+- It scrolls the history to the bottom (instantly with reduced motion, otherwise in 300ms at
+  most, by the app's own animation) and, with AUTO on, opens the box. Scrolling by me ends the
+  jump at once, and while it runs the box opening does not snap the history to the bottom.
+
+### Focus and screen readers
+
+- After ▼ COLLAPSE, focus goes to ▲ EXPAND. After ▲ EXPAND, focus goes to ▼ COLLAPSE. Opening or
+  closing by itself never moves focus, and an approval opening the box does not move focus to
+  APPROVE (step 3's rule).
+- The visually hidden live region from step 4 lives in the stage wrapper, not in the box, so it
+  keeps announcing each finished reply, open or collapsed. The bar's line is `aria-hidden`.
+- AUTO, ▼ COLLAPSE and ▲ EXPAND have the visible focus ring the other buttons use.
+- The typewriter also lives in the stage wrapper, so a reply keeps typing, the mascot keeps its
+  TALKING timing, and the bar types the current line while the box is collapsed.
+
+### Layout
+
+- Collapsed, the stage frame holds the history and the bar. The history takes everything above the
+  bar and keeps at least 80px; the bar is flex none. Open, the layout is exactly what it is today.
+- At 960x600, with the party panel open or as a rail, and with the composer at 10 lines, the bar
+  stays fully visible and the history keeps at least 80px.
+- At the narrowest (960px with the party panel open) the bar's middle is about 100px wide, so the
+  name and the line are cut short. Nothing leaves the bar.
+- The battle view from step 18 replaces the stage frame as before. BACK TO CHAT returns to the
+  box in whatever state it was in.
+
 ## Title bar
 
 See `12-title-bar.html`. The main window has no system title bar. The app draws its own,
