@@ -1,0 +1,5 @@
+{
+  "command": "npm test",
+  "exitCode": 1,
+  "output": "\n> test\n> vitest run\n\n\n RUN  v5.1.0 C:/fx/project\n\n ❯ src/strings.test.js (4 tests | 1 failed | 1 skipped) 27ms\n   ❯ strings (3)\n     × trim 19ms\n ❯ src/math.test.js (5 tests | 2 failed) 33ms\n   ❯ math (5)\n     × multiplies 20ms\n     × rounds down 2ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/math.test.js > math > multiplies\nAssertionError: expected 6 to be 7 // Object.is equality\n\n- Expected\n+ Received\n\n- 7\n+ 6\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  src/math.test.js > math > rounds down\nAssertionError: expected 2 to be 3 // Object.is equality\n\n- Expected\n+ Received\n\n- 3\n+ 2\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  src/strings.test.js > strings > trim\nAssertionError: expected 'a' to be 'a ' // Object.is equality\n\nExpected: \"a \"\nReceived: \"a\"\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n\n Test Files  2 failed (2)\n      Tests  3 failed | 5 passed | 1 skipped (9)\n   Start at  13:32:02\n   Duration  927ms (transform 39%, import 30%, tests 19%, worker 11%, environment 1%)\n\n"
+}

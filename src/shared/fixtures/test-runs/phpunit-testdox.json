@@ -1,0 +1,5 @@
+{
+  "command": "php vendor/bin/phpunit --testdox tests",
+  "exitCode": 1,
+  "output": "PHPUnit 13.4.7 by Sebastian Bergmann and contributors.\r\n\r\nRuntime:       PHP 8.5.10\n\r\n.F.S.F                                                              6 / 6 (100%)\r\n\r\nTime: 00:00.008, Memory: 20.00 MB\r\n\r\nMath\r\n ✔ Adds\r\n ✘ Multiplies\r\n   │\r\n   │ Failed asserting that 6 is identical to 7.\r\n   │\r\n   │ C:\\fx\\project\\tests\\MathTest.php:6\r\n   │\r\n ✔ Divides\r\n ↩ Pads\r\n\r\nString\r\n ✔ Upper\r\n ✘ Trim\r\n   │\r\n   │ Failed asserting that two strings are identical.\r\n   │ --- Expected\r\n   │ +++ Actual\r\n   │ @@ @@\r\n   │ -'a '\r\n   │ +'a'\r\n   │\r\n   │ C:\\fx\\project\\tests\\StringTest.php:6\r\n   │\r\n\r\nFAILURES!\r\nTests: 6, Assertions: 5, Failures: 2, Skipped: 1.\r\n"
+}

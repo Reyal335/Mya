@@ -1,9 +1,23 @@
 // Rules for mascots and their spritesheets, used by the upload dialog for quick
 // feedback and by the main process, which checks everything again.
 
-// In the order the dialog shows them.
-export const MASCOT_STATES = ['idle', 'thinking', 'talking', 'working', 'asking'] as const
+// In the order the dialog shows them. victory and hurt come with boss battles: both are
+// optional, like every state but idle.
+export const MASCOT_STATES = [
+  'idle',
+  'thinking',
+  'talking',
+  'working',
+  'asking',
+  'victory',
+  'hurt'
+] as const
 export type MascotStateName = (typeof MASCOT_STATES)[number]
+
+// The state a missing loop plays instead. Everything else plays idle.
+export const STATE_FALLBACK: Partial<Record<MascotStateName, MascotStateName>> = {
+  victory: 'talking'
+}
 
 export function isMascotState(value: unknown): value is MascotStateName {
   return (MASCOT_STATES as readonly unknown[]).includes(value)

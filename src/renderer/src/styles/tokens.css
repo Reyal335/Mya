@@ -23,6 +23,9 @@
   --class-hero: var(--text);
   --loot-add: #6fcf7f;
 
+  /* Boss battles: the active lineup card's fill */
+  --lineup-active: #2a3558;
+
   /* Type */
   --font-pixel: 'Press Start 2P', monospace;
   --font-mono: 'IBM Plex Mono', monospace;

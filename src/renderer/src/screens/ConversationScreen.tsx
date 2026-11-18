@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ExtraProps } from 'react-markdown'
 import type { ProjectInfo } from '../../../shared/ipc'
 import { splitFenced } from '../../../shared/composerMessage'
@@ -41,7 +41,17 @@ import DialogueBox from '../components/DialogueBox'
 import Markdown from '../components/Markdown'
 import { MarkdownCodeBlock } from '../markdown/MarkdownElements'
 import { toPlainText } from '../../../shared/plainText'
-import PartyPanel from '../components/PartyPanel'
+import PartyPanel, { type PartyTab } from '../components/PartyPanel'
+import { FIGHT_ON_MESSAGE, type Fight } from '../../../shared/bosses'
+import type { BossFightStore } from '../hooks/useBossFight'
+import { useBosses } from '../bosses/useBosses'
+import { fightPack as packForFight } from '../../../shared/bosses'
+import { useRoundReplay } from '../bosses/useRoundReplay'
+import BossTab from '../bosses/BossTab'
+import { fileLabel } from '../bosses/fightView'
+import BattleView from '../bosses/BattleView'
+import { BattleNotice, BossEndCard } from '../bosses/BattleNotices'
+import { BossFace, HpBar } from '../bosses/BossParts'
 import './ConversationScreen.css'
 
 type ConversationScreenProps = {
@@ -53,6 +63,10 @@ type ConversationScreenProps = {
   // Changes when another screen wants the input focused.
   focusRequest: number
   onOpenTask: (taskId: string, section?: 'activity') => void
+  // The open conversation's boss fight, and the party panel's tab (kept by the app).
+  boss: BossFightStore
+  partyTab: PartyTab
+  onPartyTab: (tab: PartyTab) => void
 }
 
 // Consecutive tool cards share one wrapping row, as in the mockup. Tool calls
@@ -126,6 +140,16 @@ type HistoryProps = {
   onOpenTask: (taskId: string, section?: 'activity') => void
   // The models, to name the model on each reply's tag.
   lists: ModelLists | null
+  // Battle notices and end cards, each placed after its test run's tool card or task.
+  battle: BattleEntry[]
+}
+
+// A battle notice or end card in the history. anchor is 'tool:<id>' or 'task:<id>'.
+export type BattleEntry = { key: string; anchor: string | null; node: React.ReactNode }
+
+function anchorsOf(block: Block): string[] {
+  if (block.kind === 'tools') return block.tools.map((tool) => `tool:${tool.toolId}`)
+  return block.item.kind === 'task' ? [`task:${block.item.taskId}`] : []
 }
 
 function HistoryList({
@@ -134,8 +158,25 @@ function HistoryList({
   views,
   note,
   onOpenTask,
-  lists
+  lists,
+  battle
 }: HistoryProps): React.JSX.Element {
+  const blocks = toBlocks(items)
+  // An entry goes after its card; one whose card is not in the history goes at the end.
+  const present = new Set(blocks.flatMap(anchorsOf))
+  const placed = new Map<string, BattleEntry[]>()
+  const loose: BattleEntry[] = []
+  for (const entry of battle) {
+    if (entry.anchor !== null && present.has(entry.anchor)) {
+      placed.set(entry.anchor, [...(placed.get(entry.anchor) ?? []), entry])
+    } else {
+      loose.push(entry)
+    }
+  }
+  const after = (block: Block): React.ReactNode[] =>
+    anchorsOf(block).flatMap((anchor) =>
+      (placed.get(anchor) ?? []).map((entry) => <Fragment key={entry.key}>{entry.node}</Fragment>)
+    )
   return (
     <>
       {note === 'truncated' && (
@@ -144,92 +185,100 @@ function HistoryList({
       {note === 'unavailable' && (
         <p className="conversation__muted">Earlier messages are not available.</p>
       )}
-      {toBlocks(items).map((block) => {
-        if (block.kind === 'tools') {
-          return (
-            <div key={block.id} className="conversation__tools">
-              {block.tools.map((tool) => (
-                <ToolCard
-                  key={tool.id}
-                  name={tool.name}
-                  input={tool.input}
-                  state={tool.state}
-                  projectPath={projectPath}
-                />
-              ))}
-            </div>
-          )
-        }
-        const { item } = block
-        switch (item.kind) {
-          case 'user': {
-            // A saved conversation does not keep the pictures, only how many there were.
-            const missing = item.imageCount - item.images.length
-            return (
-              <div key={item.id} className="conversation__mine">
-                {item.call && <AgentChip agent={item.call} />}
-                {item.images.length > 0 && (
-                  <div className="conversation__images">
-                    {item.images.map((url) => (
-                      <img key={url} className="conversation__image" src={url} alt="Pasted image" />
-                    ))}
-                  </div>
-                )}
-                {missing > 0 && (
-                  <span className="conversation__attached">
-                    {missing} {missing === 1 ? 'image' : 'images'} attached
-                  </span>
-                )}
-                {/* A message of images alone has no text line. */}
-                {item.text.trim() !== '' && <UserText text={item.text} />}
-                {item.delivery === 'queued' && (
-                  <span className="conversation__delivery">QUEUED</span>
-                )}
-                {item.delivery === 'not_delivered' && (
-                  <span className="conversation__undelivered">Not delivered. The run ended.</span>
-                )}
-              </div>
-            )
-          }
-          case 'text': {
-            const tag = item.meta ? replyTag(item.meta, lists) : ''
-            return (
-              <div key={item.id} className="conversation__reply">
-                {tag !== '' && <span className="conversation__tag">{tag}</span>}
-                <Markdown source={item.text} />
-              </div>
-            )
-          }
-          case 'task': {
-            const view = views.get(item.taskId)
-            return view ? <AgentTaskCard key={item.id} view={view} onOpen={onOpenTask} /> : null
-          }
-          case 'notice':
-            if (item.notice.type === 'stopped') {
-              return (
-                <p key={item.id} className="conversation__stopped">
-                  {STOPPED_TEXT}
-                </p>
-              )
-            }
-            if (item.notice.type === 'info') {
-              return (
-                <p key={item.id} className="conversation__muted">
-                  {item.notice.text}
-                </p>
-              )
-            }
-            return (
-              <p key={item.id} className="conversation__error">
-                {errorText(item.notice.error)}
-              </p>
-            )
-          default:
-            return null
-        }
-      })}
+      {blocks.map((block) => (
+        <Fragment key={block.kind === 'tools' ? `t${block.id}` : `i${block.item.id}`}>
+          {renderBlock(block)}
+          {after(block)}
+        </Fragment>
+      ))}
+      {loose.map((entry) => (
+        <Fragment key={entry.key}>{entry.node}</Fragment>
+      ))}
     </>
   )
+
+  function renderBlock(block: Block): React.ReactNode {
+    if (block.kind === 'tools') {
+      return (
+        <div key={block.id} className="conversation__tools">
+          {block.tools.map((tool) => (
+            <ToolCard
+              key={tool.id}
+              name={tool.name}
+              input={tool.input}
+              state={tool.state}
+              projectPath={projectPath}
+            />
+          ))}
+        </div>
+      )
+    }
+    const { item } = block
+    switch (item.kind) {
+      case 'user': {
+        // A saved conversation does not keep the pictures, only how many there were.
+        const missing = item.imageCount - item.images.length
+        return (
+          <div key={item.id} className="conversation__mine">
+            {item.call && <AgentChip agent={item.call} />}
+            {item.images.length > 0 && (
+              <div className="conversation__images">
+                {item.images.map((url) => (
+                  <img key={url} className="conversation__image" src={url} alt="Pasted image" />
+                ))}
+              </div>
+            )}
+            {missing > 0 && (
+              <span className="conversation__attached">
+                {missing} {missing === 1 ? 'image' : 'images'} attached
+              </span>
+            )}
+            {/* A message of images alone has no text line. */}
+            {item.text.trim() !== '' && <UserText text={item.text} />}
+            {item.delivery === 'queued' && <span className="conversation__delivery">QUEUED</span>}
+            {item.delivery === 'not_delivered' && (
+              <span className="conversation__undelivered">Not delivered. The run ended.</span>
+            )}
+          </div>
+        )
+      }
+      case 'text': {
+        const tag = item.meta ? replyTag(item.meta, lists) : ''
+        return (
+          <div key={item.id} className="conversation__reply">
+            {tag !== '' && <span className="conversation__tag">{tag}</span>}
+            <Markdown source={item.text} />
+          </div>
+        )
+      }
+      case 'task': {
+        const view = views.get(item.taskId)
+        return view ? <AgentTaskCard key={item.id} view={view} onOpen={onOpenTask} /> : null
+      }
+      case 'notice':
+        if (item.notice.type === 'stopped') {
+          return (
+            <p key={item.id} className="conversation__stopped">
+              {STOPPED_TEXT}
+            </p>
+          )
+        }
+        if (item.notice.type === 'info') {
+          return (
+            <p key={item.id} className="conversation__muted">
+              {item.notice.text}
+            </p>
+          )
+        }
+        return (
+          <p key={item.id} className="conversation__error">
+            {errorText(item.notice.error)}
+          </p>
+        )
+      default:
+        return null
+    }
+  }
 }
 
 // Re-renders only when the items it shows change, not while the box types.
@@ -241,6 +290,7 @@ const History = memo(
     a.views === b.views &&
     a.lists === b.lists &&
     a.onOpenTask === b.onOpenTask &&
+    a.battle === b.battle &&
     a.items.length === b.items.length &&
     a.items.every((item, i) => item === b.items[i])
 )
@@ -257,7 +307,9 @@ const BADGES: Partial<Record<MascotStateName, string>> = {
   thinking: '...',
   talking: 'Aa',
   working: '>_',
-  asking: '?'
+  asking: '?',
+  victory: '!',
+  hurt: '><'
 }
 
 // How close to the bottom (px) still counts as "at the bottom" for auto-scroll.
@@ -276,7 +328,10 @@ function ConversationScreen({
   call,
   onCallChange,
   focusRequest,
-  onOpenTask
+  onOpenTask,
+  boss,
+  partyTab,
+  onPartyTab
 }: ConversationScreenProps): React.JSX.Element {
   const { items, status, running, send, stop, answerPermission, loadHistory, newChat } =
     conversation
@@ -306,6 +361,23 @@ function ConversationScreen({
   const stickToBottom = useRef(true)
   // Bumped when the input should take focus once the screen has settled.
   const [inputFocus, setInputFocus] = useState(0)
+  // Boss battles: the packs, the replay of the latest round, the battle view (open on the
+  // live fight, or read-only on a finished one), and text a weak point puts in the box.
+  // A fight is drawn only once main has listed the bosses: a custom boss is never shown as The
+  // Red Suite while the list is on its way. A boss that was deleted is drawn as The Red Suite.
+  const { packs, loaded: bossesLoaded } = useBosses()
+  const { current: fight, past: pastFights, fightOn: resumeFight, dismiss: dismissFight } = boss
+  const fightPack = fight && bossesLoaded ? packForFight(packs, fight) : null
+  const replayView = useRoundReplay(fight, boss.replay, reducedMotion)
+  // live: the fight it was opened on (its start time), so a later fight never opens the
+  // view by itself and an ended conversation shows CHAT again.
+  const [battle, setBattle] = useState<{ readOnly: Fight | null; live: number | null } | null>(null)
+  const [insert, setInsert] = useState<{ text: string; tick: number } | null>(null)
+  const battleFight = battle
+    ? (battle.readOnly ?? (fight && fight.startedAt === battle.live ? fight : null))
+    : null
+  const battlePack = battleFight && bossesLoaded ? packForFight(packs, battleFight) : null
+  const battleOpen = battleFight !== null && battlePack !== null
 
   // The saved conversation comes back once per project, when nothing is in memory.
   useEffect(() => {
@@ -327,7 +399,7 @@ function ConversationScreen({
   const views = useMemo(() => taskViews(items, project.path), [items, project.path])
   const work = useMemo(() => partyWork(views), [views])
 
-  const target = mascotState({ items, status, typing })
+  const target = mascotState({ items, status, typing, mood: boss.mood })
   const shownState = useHeldMascotState(target)
   const loop = loopFor(mascot, shownState)
 
@@ -410,8 +482,79 @@ function ConversationScreen({
     onCallChange(null)
   }
 
+  // Escape goes back to CHAT from the battle view, unless a dialog is open over it.
+  useEffect(() => {
+    if (!battleOpen) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (document.querySelector('[role="dialog"]')) return
+      setBattle(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [battleOpen])
+
+  // FIGHT ON: the boss that got away is active again, then the one message goes out.
+  const fightOn = useCallback(async (): Promise<void> => {
+    if (running) return
+    if (await resumeFight()) {
+      stickToBottom.current = true
+      send(FIGHT_ON_MESSAGE, null, [])
+    }
+  }, [running, resumeFight, send])
+
+  const liveStart = fight?.startedAt ?? null
+  const toggleBattle = (): void => {
+    setBattle((open) => (open && !open.readOnly ? null : { readOnly: null, live: liveStart }))
+  }
+
+  // The battle notices and end cards of this conversation's fights, oldest first.
+  const battleEntries = useMemo(() => {
+    const entries: BattleEntry[] = []
+    const fights = [...pastFights, ...(fight ? [fight] : [])]
+    fights.forEach((each, f) => {
+      const pack = bossesLoaded ? packForFight(packs, each) : null
+      if (!pack) return
+      const ending =
+        each.status === 'defeated'
+          ? each.notices.map((n) => n.kind).lastIndexOf('victory')
+          : each.status === 'escaped'
+            ? each.notices.map((n) => n.kind).lastIndexOf('escape')
+            : -1
+      each.notices.forEach((notice, n) => {
+        const anchor = notice.taskId
+          ? `task:${notice.taskId}`
+          : notice.toolId
+            ? `tool:${notice.toolId}`
+            : null
+        entries.push({
+          key: `battle-${f}-${each.startedAt}-${n}`,
+          anchor,
+          node: <BattleNotice pack={pack} notice={notice} />
+        })
+        if (n === ending) {
+          entries.push({
+            key: `battle-end-${f}-${each.startedAt}`,
+            anchor,
+            node: (
+              <BossEndCard
+                pack={pack}
+                fight={each}
+                running={running}
+                onBattleLog={() => setBattle({ readOnly: each, live: null })}
+                onFightOn={() => void fightOn()}
+              />
+            )
+          })
+        }
+      })
+    })
+    return entries
+  }, [pastFights, fight, packs, bossesLoaded, running, fightOn, setBattle])
+
   async function startNewChat(): Promise<void> {
     setConfirmNew(false)
+    setBattle(null)
     const error = await newChat()
     setNewChatError(error ? error.message : null)
     if (!error) {
@@ -478,70 +621,100 @@ function ConversationScreen({
 
       <div className="conversation__body">
         <div className="conversation__main">
-          <div className="conversation__frame">
-            {/* The theme behind the history and the stage, under its fade. */}
-            <ThemeBackdrop image={chatTheme.entry.image} fade={chatTheme.active?.fade ?? 0} />
-            <div
-              ref={historyRef}
-              className="conversation__history"
-              onScroll={handleScroll}
-              aria-label="History"
-            >
-              <History
-                items={historyItems}
-                projectPath={project.path}
-                views={views}
-                note={conversation.historyNote}
-                onOpenTask={onOpenTask}
-                lists={modelChoice.lists}
-              />
-            </div>
-
-            <div className="conversation__stage">
-              <div className="stage__mascot">
-                <div className="stage__frame">
-                  <Mascot
-                    src={loop.src}
-                    frames={loop.frames}
-                    fps={loop.fps}
-                    reverse={loop.reverse}
-                    scale={2}
-                    label={`Mascot, ${shownState}`}
-                    accessory={accessory}
-                  />
-                  {badge && (
-                    <span className={`stage__badge stage__badge--${shownState}`} aria-hidden="true">
-                      {badge}
-                    </span>
-                  )}
-                </div>
-                <div className={`stage__tag stage__tag--${shownState}`}>
-                  {shownState.toUpperCase()}
-                </div>
-                {title && <div className="stage__title">{title.toUpperCase()}</div>}
+          {battleOpen && battleFight && battlePack ? (
+            <BattleView
+              fight={battleFight}
+              pack={battlePack}
+              view={
+                battle?.readOnly
+                  ? {
+                      hp: battleFight.hp,
+                      effect: null,
+                      defeated: battleFight.status === 'defeated',
+                      pops: [],
+                      combo: null,
+                      hitsBadge: null
+                    }
+                  : replayView
+              }
+              mascot={mascot}
+              speaker={speaker}
+              agents={agents}
+              running={running}
+              readOnly={battle?.readOnly !== null && battle?.readOnly !== undefined}
+              onBack={() => setBattle(null)}
+              onFightOn={() => void fightOn()}
+            />
+          ) : (
+            <div className="conversation__frame">
+              {/* The theme behind the history and the stage, under its fade. */}
+              <ThemeBackdrop image={chatTheme.entry.image} fade={chatTheme.active?.fade ?? 0} />
+              <div
+                ref={historyRef}
+                className="conversation__history"
+                onScroll={handleScroll}
+                aria-label="History"
+              >
+                <History
+                  items={historyItems}
+                  projectPath={project.path}
+                  views={views}
+                  note={conversation.historyNote}
+                  onOpenTask={onOpenTask}
+                  lists={modelChoice.lists}
+                  battle={battleEntries}
+                />
               </div>
-              <DialogueBox
-                agentName={speaker}
-                reply={
-                  boxItem?.kind === 'text'
-                    ? { id: boxItem.id, text: boxItem.text, instant: boxItem.instant }
-                    : null
-                }
-                notice={boxItem?.kind === 'notice' ? boxItem.notice : null}
-                tag={boxTag}
-                pending={pending}
-                asker={asker}
-                working={working}
-                running={running}
-                empty={items.length === 0}
-                announce={announce}
-                projectPath={project.path}
-                reducedMotion={reducedMotion}
-                onAnswer={answerPermission}
-                onTypingChange={setTyping}
-              />
+
+              <div className="conversation__stage">
+                <div className="stage__mascot">
+                  <div className="stage__frame">
+                    <Mascot
+                      src={loop.src}
+                      frames={loop.frames}
+                      fps={loop.fps}
+                      reverse={loop.reverse}
+                      scale={2}
+                      label={`Mascot, ${shownState}`}
+                      accessory={accessory}
+                    />
+                    {badge && (
+                      <span
+                        className={`stage__badge stage__badge--${shownState}`}
+                        aria-hidden="true"
+                      >
+                        {badge}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`stage__tag stage__tag--${shownState}`}>
+                    {shownState.toUpperCase()}
+                  </div>
+                  {title && <div className="stage__title">{title.toUpperCase()}</div>}
+                </div>
+                <DialogueBox
+                  agentName={speaker}
+                  reply={
+                    boxItem?.kind === 'text'
+                      ? { id: boxItem.id, text: boxItem.text, instant: boxItem.instant }
+                      : null
+                  }
+                  notice={boxItem?.kind === 'notice' ? boxItem.notice : null}
+                  tag={boxTag}
+                  pending={pending}
+                  asker={asker}
+                  working={working}
+                  running={running}
+                  empty={items.length === 0}
+                  announce={announce}
+                  projectPath={project.path}
+                  reducedMotion={reducedMotion}
+                  onAnswer={answerPermission}
+                  onTypingChange={setTyping}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <Composer
             key={project.path}
@@ -577,6 +750,7 @@ function ConversationScreen({
             }
             onSend={submit}
             onStop={stop}
+            insert={insert}
           />
         </div>
 
@@ -591,6 +765,40 @@ function ConversationScreen({
           onToggle={toggle}
           onOpenTask={onOpenTask}
           progress={progress}
+          tab={partyTab}
+          onTab={onPartyTab}
+          bossDot={fight?.status === 'active'}
+          bossTab={
+            <BossTab
+              fight={fight}
+              pack={fightPack}
+              view={replayView}
+              expanded={battleOpen && !battle?.readOnly}
+              running={running}
+              onToggleBattle={toggleBattle}
+              onFightOn={() => void fightOn()}
+              onDismiss={() => void dismissFight()}
+              onWeakPoint={(file) =>
+                setInsert((current) => ({
+                  text: `Focus on ${fileLabel(file)}.`,
+                  tick: (current?.tick ?? 0) + 1
+                }))
+              }
+            />
+          }
+          railBoss={
+            fight && fightPack ? (
+              <button
+                type="button"
+                className="party__rail-boss"
+                aria-label={`${fightPack.name}, ${replayView.hp} of ${fight.maxHp} tests left`}
+                onClick={() => setBattle({ readOnly: null, live: liveStart })}
+              >
+                <BossFace pack={fightPack} size={64} />
+                <HpBar hp={replayView.hp} maxHp={fight.maxHp} height={4} />
+              </button>
+            ) : null
+          }
         />
       </div>
 

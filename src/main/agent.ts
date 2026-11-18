@@ -34,12 +34,15 @@ import { getChatSession, setChatChoice, setChatSession, setChatTheme } from './c
 import { historyItems, type RecordedMessage, type SavedTask } from './history'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
 import { callFacts } from './loot'
+import { recordTestRun, runEnded } from './bosses'
+import { shellResult } from './testOutput'
+import { isTestCommand } from '../shared/testRuns'
 import { getActiveVoice } from './mascots'
 import { choiceForRun } from './modelChoice'
 import { userContent, type SendImage } from './pastedImages'
 import { recordRunEnd, recordTaskStart } from './progressionStore'
 import { childEnv, claudeExecutable, loadSdk, type Sdk } from './sdk'
-import { getDefaultChoice } from './settings'
+import { getDefaultChoice, getTestCommand } from './settings'
 import { voiceAppend } from './voice'
 import { AUTO, AUTO_CHOICE, isEffortLevel, type ModelChoice } from '../shared/models'
 import {
@@ -66,10 +69,15 @@ const stamp = (): string => new Date().toISOString()
 
 // Reading never asks. Editing, writing, shell commands, and web access wait for the user's
 // Approve or Deny through canUseTool. `tools` limits which built-ins exist at all.
-// Agent lets Claude bring in my agents. It is not in allowedTools, and the agent
-// gate below decides which ones may run.
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob']
-const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch', 'Agent']
+// Agent lets Claude bring in my agents; it is pre-approved alongside reading, so
+// a subagent starts the moment Claude calls it, with no Approve/Deny in the way.
+// The agent gate below still runs first and still decides which agents may run
+// at all (file problems, unsafe permission modes, background mode). Once a
+// subagent is running, its own Edit/Write/Bash/web calls still wait for the
+// user, same as the main conversation's; only the decision to start it is automatic.
+const PRE_APPROVED_TOOLS = [...READ_ONLY_TOOLS, 'Agent']
+const TOOLS = [...PRE_APPROVED_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch']
 
 const NOT_FOUND_NOTICE =
   'The saved conversation was not found. This reply starts from a fresh context.'
@@ -117,6 +125,10 @@ type Run = {
   agentTask: Map<string, string>
   // The text of Claude's latest reply in the main conversation, for the finished popup.
   reply: string
+  // The project's own test command ('' for the usual runners), read when the run starts.
+  testCommand: string
+  // Shell calls that run the tests, by tool call id, until their results arrive.
+  testCalls: Map<string, { command: string; taskId: string | null }>
 }
 
 type PendingPermission = {
@@ -237,6 +249,63 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+const SHELL_TOOLS = ['Bash', 'PowerShell']
+
+// A shell call that runs the project's tests is remembered until its result arrives.
+// Background calls have no output to read.
+function noteTestCall(
+  run: Run,
+  toolId: string,
+  name: string,
+  input: Record<string, unknown>,
+  taskId: string | null
+): void {
+  if (!SHELL_TOOLS.includes(name) || input.run_in_background === true) return
+  const command = typeof input.command === 'string' ? input.command : ''
+  if (command !== '' && isTestCommand(command, run.testCommand)) {
+    run.testCalls.set(toolId, { command, taskId })
+  }
+}
+
+// Who ran the tests: the task's agent, or the main speaker.
+function attackerOf(run: Run, taskId: string | null): { id: string; name: string } {
+  const name = taskId ? run.openTasks.get(taskId) : undefined
+  if (!name) return { id: 'main', name: '' }
+  const look = lookOf(run.agents, name)
+  return { id: look.filePath ?? `builtin:${name}`, name }
+}
+
+// A test run's result arrived, done or failed: the boss fight reads it. Denied and
+// stopped calls are ignored. Nothing here can touch the run.
+async function readTestRun(
+  run: Run,
+  block: ResultBlock,
+  toolUseResult: unknown,
+  state: 'done' | 'failed' | 'denied'
+): Promise<void> {
+  const call = run.testCalls.get(block.tool_use_id)
+  if (!call) return
+  run.testCalls.delete(block.tool_use_id)
+  if (state === 'denied' || !run.sessionId) return
+  try {
+    const result = await shellResult(resultText(block), block.is_error === true, toolUseResult)
+    if (!result) return
+    await recordTestRun({
+      projectPath: run.cwd,
+      sessionId: run.sessionId,
+      toolId: block.tool_use_id,
+      taskId: call.taskId,
+      command: call.command,
+      output: result.output,
+      exitCode: result.exitCode,
+      attacker: attackerOf(run, call.taskId),
+      party: run.agents
+    })
+  } catch (err) {
+    console.error(`${stamp()} [agent] Could not read a test run:`, errorMessage(err))
+  }
+}
+
 // Answers one pending request. Returns false for an unknown or already answered id.
 function settlePermission(permissionId: string, decision: PermissionDecision): boolean {
   const pending = pendingPermissions.get(permissionId)
@@ -349,7 +418,9 @@ function newRun(cwd: string, sender: WebContents): Run {
     openTasks: new Map(),
     toolTask: new Map(),
     agentTask: new Map(),
-    reply: ''
+    reply: '',
+    testCommand: '',
+    testCalls: new Map()
   }
 }
 
@@ -712,6 +783,7 @@ async function execute(run: Run): Promise<void> {
     // The chat's model and thinking choice. AUTO means leave the option out, so
     // Claude Code uses its own default. A saved choice that no longer fits is
     // replaced, with a line saying so once.
+    run.testCommand = await getTestCommand(run.cwd).catch(() => '')
     const picked = await choiceForRun(run.cwd)
     run.choice = picked.choice
     for (const text of picked.notices) emit(run, { requestId: run.requestId, type: 'notice', text })
@@ -732,7 +804,7 @@ async function execute(run: Run): Promise<void> {
       cwd: run.cwd,
       includePartialMessages: true,
       tools: TOOLS,
-      allowedTools: READ_ONLY_TOOLS,
+      allowedTools: PRE_APPROVED_TOOLS,
       permissionMode: 'default',
       canUseTool: permissionHandler(run),
       hooks: { PreToolUse: [{ matcher: 'Agent|Task', hooks: [agentGate(run)] }] },
@@ -896,6 +968,7 @@ async function execute(run: Run): Promise<void> {
                 existed,
                 state: 'running'
               })
+              noteTestCall(run, block.id, block.name, input, taskId)
             }
             break
           }
@@ -936,6 +1009,7 @@ async function execute(run: Run): Promise<void> {
               void recordTaskStart(agent.filePath, run.agents)
               continue
             }
+            noteTestCall(run, block.id, block.name, input, null)
             const shown = forIpc(input)
             emit(run, {
               requestId: run.requestId,
@@ -972,6 +1046,14 @@ async function execute(run: Run): Promise<void> {
               : block.is_error
                 ? 'failed'
                 : 'done'
+            if (run.testCalls.has(block.tool_use_id)) {
+              await readTestRun(
+                run,
+                block,
+                (message as { tool_use_result?: unknown }).tool_use_result,
+                state
+              )
+            }
             emit(run, {
               requestId: run.requestId,
               type: 'tool_end',
@@ -1055,6 +1137,7 @@ async function execute(run: Run): Promise<void> {
     }
     notify((w) => w.runEnded({ runId: run.requestId, outcome: ended, reply: run.reply }))
     void recordRunEnd(ended === 'done')
+    await runEnded(run.cwd, run.sessionId)
     // Last: a message waiting to start a new run goes ahead only after this run's events.
     run.settleDone()
   }

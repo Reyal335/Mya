@@ -1,0 +1,5 @@
+{
+  "command": "php vendor/bin/phpunit tests",
+  "exitCode": 1,
+  "output": "PHPUnit 13.4.7 by Sebastian Bergmann and contributors.\r\n\r\nRuntime:       PHP 8.5.10\n\r\n.F.S.F                                                              6 / 6 (100%)\r\n\r\nTime: 00:00.008, Memory: 20.00 MB\r\n\r\nThere were 2 failures:\n\n1) MathTest::testMultiplies\nFailed asserting that 6 is identical to 7.\n\r\nC:\\fx\\project\\tests\\MathTest.php:6\n\n2) StringTest::testTrim\nFailed asserting that two strings are identical.\n--- Expected\n+++ Actual\n@@ @@\n-'a '\n+'a'\n\r\nC:\\fx\\project\\tests\\StringTest.php:6\n\nFAILURES!\r\nTests: 6, Assertions: 5, Failures: 2, Skipped: 1.\r\n"
+}

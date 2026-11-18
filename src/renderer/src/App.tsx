@@ -12,8 +12,11 @@ import ConversationScreen from './screens/ConversationScreen'
 import InboxScreen from './screens/InboxScreen'
 import AgentsScreen from './screens/AgentsScreen'
 import MascotsScreen from './screens/MascotsScreen'
+import type { MascotsTab } from './screens/mascotsTabIds'
 import AchievementsScreen from './screens/AchievementsScreen'
 import { useProgression } from './hooks/useProgression'
+import { useBossFight } from './hooks/useBossFight'
+import type { PartyTab } from './components/PartyPanel'
 import { accessoryById } from './progression/accessories'
 import { useActiveMascot } from './mascots/useActiveMascot'
 import { useAccount } from './hooks/useAccount'
@@ -38,6 +41,11 @@ function App(): React.JSX.Element {
   const account = useAccount()
   // Achievements and what is equipped: the nav dot, the screen, and the unlock toast.
   const progression = useProgression()
+  // The open conversation's boss fight, and the party panel's tab for this session.
+  const boss = useBossFight(project?.path ?? null)
+  const [partyTab, setPartyTab] = useState<PartyTab>('party')
+  // MASCOTS or BOSSES: remembered for the session, not across restarts.
+  const [mascotsTab, setMascotsTab] = useState<MascotsTab>('mascots')
   const { clear } = conversation
   // The agent called for my next message, and the task open in INBOX.
   const [call, setCall] = useState<CallTarget | null>(null)
@@ -118,7 +126,7 @@ function App(): React.JSX.Element {
   )
 
   const openTaskSummary = tasks.tasks.find((task) => task.id === selectedTaskId) ?? null
-  const crumb = titleBarCrumb(screen, speakerName(mascot), project, openTaskSummary)
+  const crumb = titleBarCrumb(screen, speakerName(mascot), project, openTaskSummary, mascotsTab)
 
   const mainWaiting = conversation.items.some(
     (item) => item.kind === 'tool' && item.permission !== null && item.taskId === null
@@ -146,6 +154,7 @@ function App(): React.JSX.Element {
           chatCount={mainWaiting ? 1 : 0}
           inboxCount={tasks.waitingCount}
           achievementsDot={progression.unseen}
+          chatDot={boss.current?.status === 'active' && screen !== 'chat'}
           meter={
             <UsageMeter
               data={account.data}
@@ -168,6 +177,9 @@ function App(): React.JSX.Element {
             onCallChange={setCall}
             focusRequest={focusRequest}
             onOpenTask={openTask}
+            boss={boss}
+            partyTab={partyTab}
+            onPartyTab={setPartyTab}
           />
         ) : (
           <NoProject title="CHAT" onOpenProject={() => void handleOpenProject()} />
@@ -188,7 +200,9 @@ function App(): React.JSX.Element {
       {screen === 'agents' && (
         <AgentsScreen project={project} setLeaveGuard={setLeaveGuard} onCall={callAgent} />
       )}
-      {screen === 'mascots' && <MascotsScreen setLeaveGuard={setLeaveGuard} />}
+      {screen === 'mascots' && (
+        <MascotsScreen tab={mascotsTab} onTab={setMascotsTab} setLeaveGuard={setLeaveGuard} />
+      )}
       {screen === 'achievements' && <AchievementsScreen progression={progression} />}
       {screen === 'account' && <AccountScreen store={account} />}
       <AchievementToast

@@ -1,8 +1,8 @@
-import { app, BrowserWindow, dialog, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { randomUUID } from 'crypto'
 import type { Dirent } from 'fs'
 import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
-import { basename, join } from 'path'
+import { join } from 'path'
 import {
   IpcChannel,
   type ActiveMascotData,
@@ -16,12 +16,9 @@ import {
   type PickSheetResult,
   type SliceSheetResult
 } from '../shared/ipc'
-import { checkSlice, SLICE_EMPTY_MESSAGE } from '../shared/sliceRules'
-import { cutFrames } from './sheetSlice'
 import {
   canReverse,
   DEFAULT_MASCOT_ID,
-  FRAME_SIZE,
   isEmojiLevel,
   isMascotState,
   isValidFps,
@@ -30,21 +27,15 @@ import {
   type MascotVoice,
   MAX_FPS,
   MAX_SHEET_BYTES,
-  MAX_SOURCE_SIDE,
   MIN_FPS,
-  SHEET_NOT_IMAGE,
-  SHEET_NOT_PNG,
-  sheetSizeProblem,
   sheetTooBigMessage,
-  sourceTooLargeMessage,
   voiceEmojiError,
   voiceError,
   type MascotStateName
 } from '../shared/mascotRules'
-import { pngSize, readPngHeader, toPngDataUrl, type PngSize } from './png'
-import { PendingFiles } from './pendingFiles'
 import { renameWithRetry, writeFileSafely } from './safeWrite'
 import { getActiveMascotId, setActiveMascotId } from './settings'
+import { checkSheet, createSheetPicker, stripUrl } from './sheetPicker'
 
 // Uploaded mascots. Each one is a folder userData/mascots/<uuid>/ holding
 // manifest.json and one PNG per uploaded state (idle.png, thinking.png, ...).
@@ -145,172 +136,35 @@ function broadcastChanged(): void {
 
 // --- Sheet rules ---------------------------------------------------------
 
-type SheetCheck = { ok: true; frames: number; width: number } | { ok: false; message: string }
+// Picked and sliced sheets wait behind tokens in the picker until the mascot is saved. The
+// dialog has seven rows, and a replaced pick is discarded by the renderer, so a few slots are
+// enough.
+const picker = createSheetPicker({
+  title: 'Choose a spritesheet: a PNG strip or grid',
+  maxPicks: 10
+})
 
-// All the rules, in order, on a whole file. The frame count comes from the width.
-// The bytes are never changed.
-function checkSheet(bytes: Buffer): SheetCheck {
-  if (bytes.length > MAX_SHEET_BYTES)
-    return { ok: false, message: sheetTooBigMessage(bytes.length) }
-  const size = pngSize(bytes)
-  if (!size) return { ok: false, message: SHEET_NOT_PNG }
-  const problem = sheetSizeProblem(size.width, size.height)
-  if (problem) return { ok: false, message: problem }
-  if (!decodes(bytes, size)) return { ok: false, message: SHEET_NOT_IMAGE }
-  return { ok: true, frames: size.width / FRAME_SIZE, width: size.width }
-}
-
-// Chromium does not load a URL longer than this.
-const MAX_URL_LENGTH = 2 * 1024 * 1024
-
-// A legal strip as a data: URL for the window. A strip is at most 1024x64, so a
-// file too big for a data: URL is mostly extra chunks; the copy shown is then
-// re-encoded without them. The stored file is never changed.
-function stripUrl(bytes: Buffer): string {
-  const url = toPngDataUrl(bytes)
-  if (url.length <= MAX_URL_LENGTH) return url
-  return toPngDataUrl(nativeImage.createFromBuffer(bytes).toPNG())
-}
-
-// True when the bytes decode to an image of the size the PNG header gives.
-function decodes(bytes: Buffer, size: PngSize): boolean {
-  const image = nativeImage.createFromBuffer(bytes)
-  const decoded = image.isEmpty() ? null : image.getSize()
-  return decoded !== null && decoded.width === size.width && decoded.height === size.height
-}
-
-// Picked and sliced sheets wait here until the mascot is saved. The dialog has
-// five rows, and a replaced pick is discarded by the renderer, so a few slots are enough.
-const pendingSheets = new PendingFiles<Buffer>(10)
-
-// A sheet in another layout, waiting to be sliced. It stays until the dialog
-// closes, so it can feed several states. The latest one is enough.
-type SourceSheet = { bytes: Buffer; width: number; height: number }
-const pendingSources = new PendingFiles<SourceSheet>(1)
-
-export async function pickSheet(window: BrowserWindow | null): Promise<PickSheetResult> {
-  const options: Electron.OpenDialogOptions = {
-    title: 'Choose a spritesheet: a PNG strip or grid',
-    properties: ['openFile'],
-    filters: [{ name: 'PNG image', extensions: ['png'] }]
-  }
-  const result = window
-    ? await dialog.showOpenDialog(window, options)
-    : await dialog.showOpenDialog(options)
-  if (result.canceled || result.filePaths.length === 0) return { ok: true, canceled: true }
-
-  const path = result.filePaths[0]
-  const fileName = basename(path)
-  const refuse = (message: string): PickSheetResult => ({
-    ok: false,
-    error: { code: 'invalid', message }
-  })
-  try {
-    // Refusals, in order. Only the header and the file size are read before
-    // the file is known to be a PNG under the size limit.
-    const header = pngSize(await readPngHeader(path))
-    if (!header) return refuse(SHEET_NOT_PNG)
-    const { size } = await stat(path)
-    if (size > MAX_SHEET_BYTES) return refuse(sheetTooBigMessage(size))
-    if (header.width > MAX_SOURCE_SIDE || header.height > MAX_SOURCE_SIDE) {
-      return refuse(sourceTooLargeMessage(header.width, header.height))
-    }
-    const bytes = await readFile(path)
-    if (bytes.length > MAX_SHEET_BYTES) return refuse(sheetTooBigMessage(bytes.length))
-    if (!decodes(bytes, header)) return refuse(SHEET_NOT_IMAGE)
-
-    // A legal strip is used as it is; the slicer never opens.
-    if (sheetSizeProblem(header.width, header.height) === null) {
-      const check = checkSheet(bytes)
-      if (!check.ok) return refuse(check.message)
-      return {
-        ok: true,
-        canceled: false,
-        kind: 'strip',
-        token: pendingSheets.add(bytes),
-        preview: stripUrl(bytes),
-        frames: check.frames,
-        width: check.width,
-        fileName
-      }
-    }
-
-    // Anything else is cut up in the slicer first.
-    return {
-      ok: true,
-      canceled: false,
-      kind: 'needs_slice',
-      sourceToken: pendingSources.add({ bytes, width: header.width, height: header.height }),
-      fileName,
-      width: header.width,
-      height: header.height,
-      bytes
-    }
-  } catch (err) {
-    console.error('Could not read the sheet:', err)
-    return { ok: false, error: { code: 'io_error', message: 'The sheet file could not be read.' } }
-  }
+export function pickSheet(window: BrowserWindow | null): Promise<PickSheetResult> {
+  return picker.pick(window)
 }
 
 export function discardSheet(token: string): void {
-  pendingSheets.delete(token)
+  picker.discard(token)
 }
 
 export function dropSources(): void {
-  pendingSources.clear()
+  picker.dropSources()
 }
 
-const SLICE_FAILED = 'The sheet could not be cut into frames.'
-
 // Cuts the picked cells out of a source sheet into an ordinary strip of 64x64
-// frames, which then waits behind a token like a picked sheet. Every argument
-// is checked again; nothing is written to disk.
+// frames, which then waits behind a token like a picked sheet.
 export function sliceSheet(
   rawToken: unknown,
   columns: unknown,
   rows: unknown,
   cells: unknown
 ): SliceSheetResult {
-  const source = typeof rawToken === 'string' ? pendingSources.get(rawToken) : undefined
-  if (!source) {
-    return {
-      ok: false,
-      error: { code: 'not_found', message: 'This sheet is no longer loaded. Upload it again.' }
-    }
-  }
-  const status = checkSlice(source.width, source.height, columns, rows, cells)
-  if (!status.canUse) {
-    const message = status.level === 'error' ? status.message : SLICE_EMPTY_MESSAGE
-    return { ok: false, error: { code: 'invalid_slice', message } }
-  }
-  // checkSlice has proved these are whole numbers in range.
-  const grid = { columns: columns as number, cells: cells as number[] }
-  try {
-    const bitmap = nativeImage.createFromBuffer(source.bytes).toBitmap()
-    if (bitmap.length !== source.width * source.height * 4)
-      throw new Error('Unexpected bitmap size')
-    const cellSize = source.width / grid.columns
-    const strip = cutFrames(bitmap, source.width, grid.columns, cellSize, grid.cells)
-    const png = nativeImage
-      .createFromBitmap(strip, { width: FRAME_SIZE * grid.cells.length, height: FRAME_SIZE })
-      .toPNG()
-    // The cut must pass the same rules as any picked sheet. If not, it is a bug in the cut.
-    const check = checkSheet(png)
-    if (!check.ok || check.frames !== grid.cells.length) {
-      throw new Error(
-        `Sliced sheet failed the sheet rules: ${check.ok ? 'frame count' : check.message}`
-      )
-    }
-    return {
-      ok: true,
-      token: pendingSheets.add(png),
-      frames: check.frames,
-      preview: toPngDataUrl(png)
-    }
-  } catch (err) {
-    console.error('[mascots] Could not slice the sheet:', err)
-    return { ok: false, error: { code: 'io_error', message: SLICE_FAILED } }
-  }
+  return picker.slice(rawToken, columns, rows, cells)
 }
 
 // --- Reading mascots -----------------------------------------------------
@@ -607,7 +461,7 @@ function readDraft(raw: unknown): CleanDraft {
     if (typeof entry.reverse !== 'boolean') invalid(`The ${state} reverse setting is not valid.`)
     const sheet = readSheetChange(entry.sheet)
     if (!sheet) invalid(`The ${state} sheet change is not valid.`)
-    if (sheet.type === 'token' && !pendingSheets.has(sheet.token)) {
+    if (sheet.type === 'token' && !picker.has(sheet.token)) {
       invalid(`The ${state} sheet is no longer available. Upload it again.`)
     }
     states[state] = { fps: entry.fps, reverse: entry.reverse, sheet }
@@ -649,7 +503,7 @@ function planSave(
     const current = existing?.[state]
     const file = sheetFile(state)
     if (sheet.type === 'token') {
-      const bytes = pendingSheets.get(sheet.token)
+      const bytes = picker.get(sheet.token)
       if (!bytes) invalid(`The ${state} sheet is no longer available. Upload it again.`)
       const check = checkSheet(bytes)
       if (!check.ok) invalid(`${state}: ${check.message}`)
@@ -764,7 +618,7 @@ export function createMascot(rawDraft: unknown): Promise<MascotsResult<{ id: str
     const plan = planSave(draft, null, true)
     const id = randomUUID()
     await writeNewFolder(folderOf(id), draft.name, draft.voice, plan)
-    for (const token of plan.tokens) pendingSheets.delete(token)
+    for (const token of plan.tokens) picker.discard(token)
     return { id }
   })
 }
@@ -780,7 +634,7 @@ async function updateDefault(rawDraft: unknown): Promise<{ id: string }> {
   const folder = folderOf(DEFAULT_MASCOT_ID)
   if (edits.edited) await writeExistingFolder(folder, draft.name, draft.voice, plan)
   else await writeNewFolder(folder, draft.name, draft.voice, plan)
-  for (const token of plan.tokens) pendingSheets.delete(token)
+  for (const token of plan.tokens) picker.discard(token)
   // The default also stands in for a missing or broken active mascot, so always tell.
   broadcastChanged()
   return { id: DEFAULT_MASCOT_ID }
@@ -799,7 +653,7 @@ export function updateMascot(
     const draft = readDraft(rawDraft)
     const plan = planSave(draft, existing.loops, true)
     await writeExistingFolder(folderOf(id), draft.name, draft.voice, plan)
-    for (const token of plan.tokens) pendingSheets.delete(token)
+    for (const token of plan.tokens) picker.discard(token)
 
     if ((await getActiveMascotId()) === id) broadcastChanged()
     return { id }

@@ -14,7 +14,8 @@ type MascotProps = {
   fps: number
   // Play forward, then back, then forward again. Needs three or more frames.
   reverse?: boolean
-  // Whole-number display scale: the mascot is drawn at 64 * scale pixels square.
+  // Whole-number display scale: the mascot is drawn at 64 * scale pixels square. 0.5
+  // draws it at 32px (the boss test log): nearest-neighbour, so hard edges, never blurred.
   scale?: number
   label: string
   // An equipped accessory: a 16x16 picture drawn over the frame with its top-left
@@ -40,9 +41,11 @@ function Mascot({
   accessory = null
 }: MascotProps): React.JSX.Element {
   const count = Math.min(MAX_FRAMES, Math.max(1, Math.floor(frames)))
-  const size = FRAME * Math.max(1, Math.round(scale))
+  const size = scale === 0.5 ? FRAME / 2 : FRAME * Math.max(1, Math.round(scale))
   const animated = count > 1 && fps > 0
   const bounces = reverse && canReverse(count)
+  // Played by the Web Animations API, not the CSS loop: forward then back.
+  const scripted = bounces
   const reducedMotion = usePrefersReducedMotion()
   const ref = useRef<HTMLDivElement>(null)
 
@@ -84,7 +87,7 @@ function Mascot({
     <div
       key={`${src}|${count}|${fps}|${bounces}`}
       ref={ref}
-      className={animated && !bounces ? 'mascot mascot--animated' : 'mascot'}
+      className={animated && !scripted ? 'mascot mascot--animated' : 'mascot'}
       role="img"
       aria-label={label}
       style={style}

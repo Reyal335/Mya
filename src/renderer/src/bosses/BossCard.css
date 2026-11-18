@@ -1,0 +1,143 @@
+/* A boss card from "21. Boss manager". */
+.boss-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--panel);
+  border: var(--border) solid var(--line);
+}
+
+/* The boss open in the editor: a --text border and a hard shadow in its accent. */
+.boss-card--editing {
+  border-color: var(--text);
+  box-shadow: 4px 4px 0 var(--boss-accent);
+}
+
+/* A boss that is out of the pool is dimmed. */
+.boss-card--out {
+  opacity: 0.75;
+}
+
+.boss-card--problem {
+  border-color: var(--error);
+}
+
+/* The thumbnail: its background, a gradient over the lower half, and the idle loop at scale 1,
+   centered and 6px above the bottom. */
+.boss-card__thumb {
+  position: relative;
+  height: 72px;
+  overflow: hidden;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--boss-accent);
+}
+
+.boss-card__thumb-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--bg) 85%, transparent)
+  );
+}
+
+.boss-card__thumb-sprite {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  display: flex;
+  justify-content: center;
+}
+
+.boss-card__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.boss-card__swatch {
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 10px;
+  background: var(--boss-accent);
+}
+
+.boss-card__name {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.boss-card__kind {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* POOL, EDIT, and DELETE share one row, wrapping if the card is too narrow. */
+.boss-card__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+}
+
+/* POOL: ON in the accent, POOL: OFF muted. */
+.boss-card__pool {
+  flex: none;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--bg);
+  color: var(--muted);
+  border: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.boss-card__pool--on {
+  background: var(--boss-accent);
+  color: var(--bg);
+  border-color: var(--boss-accent);
+}
+
+.boss-card__pool:disabled {
+  cursor: not-allowed;
+}
+
+.boss-card__button {
+  flex: none;
+  min-height: 32px;
+  height: 32px;
+}
+
+.boss-card__problem {
+  margin: 0;
+  font-size: 12px;
+  color: var(--error);
+  overflow-wrap: anywhere;
+}
+
+.boss-card__folder {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

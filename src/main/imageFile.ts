@@ -1,4 +1,4 @@
-import { pngSize } from './png'
+import { pngSize } from './png.ts'
 
 // PNG and JPEG files, recognised by their first bytes and not by the file name. Used
 // for chat themes. The size is read from the file's header, which is cheap and never

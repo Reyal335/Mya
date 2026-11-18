@@ -1,0 +1,5 @@
+{
+  "command": "python -m pytest -k \"adds or upper\"",
+  "exitCode": 0,
+  "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0\r\nrootdir: C:\\fx\\project\r\nplugins: anyio-4.12.1\r\ncollected 10 items / 8 deselected / 2 selected\r\n\r\ntests\\test_math.py .                                                     [ 50%]\r\ntests\\test_strings.py .                                                  [100%]\r\n\r\n======================= 2 passed, 8 deselected in 0.08s =======================\r\n"
+}

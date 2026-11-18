@@ -1,0 +1,5 @@
+{
+  "command": "npx vitest run -t \"adds\"",
+  "exitCode": 0,
+  "output": "\n RUN  v5.1.0 C:/fx/project\n\n\n Test Files  1 passed | 1 skipped (2)\n      Tests  1 passed | 8 skipped (9)\n   Start at  13:39:17\n   Duration  563ms (import 51%, worker 24%, transform 17%, tests 6%, environment 1%)\n\n"
+}

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { AccountData } from '../shared/account'
 import type { UnlockNotice } from '../shared/achievements'
+import type { FightEvent } from '../shared/bosses'
 import {
   IpcChannel,
   type AgentEvent,
@@ -153,6 +154,37 @@ const api: MyaApi = {
         ipcRenderer.removeListener(IpcChannel.ProgressionUnlocked, listener)
       }
     }
+  },
+  bosses: {
+    list: () => ipcRenderer.invoke(IpcChannel.BossesList),
+    pickIdle: () => ipcRenderer.invoke(IpcChannel.BossesPickIdle),
+    sliceIdle: (sourceToken, columns, rows, cells) =>
+      ipcRenderer.invoke(IpcChannel.BossesSliceIdle, sourceToken, columns, rows, cells),
+    dropSources: () => ipcRenderer.invoke(IpcChannel.BossesDropSources),
+    pickBackground: () => ipcRenderer.invoke(IpcChannel.BossesPickBackground),
+    create: (draft) => ipcRenderer.invoke(IpcChannel.BossesCreate, draft),
+    update: (id, draft) => ipcRenderer.invoke(IpcChannel.BossesUpdate, id, draft),
+    remove: (id) => ipcRenderer.invoke(IpcChannel.BossesRemove, id),
+    setInPool: (id, on) => ipcRenderer.invoke(IpcChannel.BossesSetInPool, id, on),
+    onChanged: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(IpcChannel.BossesChanged, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.BossesChanged, listener)
+      }
+    },
+    fight: () => ipcRenderer.invoke(IpcChannel.BossesFight),
+    onFight: (callback) => {
+      const listener = (_event: IpcRendererEvent, fight: FightEvent): void => callback(fight)
+      ipcRenderer.on(IpcChannel.BossesFightEvent, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.BossesFightEvent, listener)
+      }
+    },
+    fightOn: () => ipcRenderer.invoke(IpcChannel.BossesFightOn),
+    dismiss: () => ipcRenderer.invoke(IpcChannel.BossesDismiss),
+    getTestCommand: () => ipcRenderer.invoke(IpcChannel.BossesGetTestCommand),
+    setTestCommand: (command) => ipcRenderer.invoke(IpcChannel.BossesSetTestCommand, command)
   }
 }
 

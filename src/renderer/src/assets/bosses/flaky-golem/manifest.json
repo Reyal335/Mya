@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "The Flaky Golem",
+  "accent": "#B98CF0",
+  "background": "background.png",
+  "idle": {
+    "file": "idle.png",
+    "frames": 2,
+    "fps": 3
+  }
+}

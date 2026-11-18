@@ -15,6 +15,8 @@ type SidebarProps = {
   inboxCount: number
   // An unlock not yet seen: ACHIEVEMENTS shows a red dot.
   achievementsDot: boolean
+  // A boss fight is active and CHAT is not open: CHAT shows a small red dot.
+  chatDot: boolean
   // The account meter under the project name. It opens ACCOUNT.
   meter: React.ReactNode
 }
@@ -36,6 +38,7 @@ function Sidebar({
   chatCount,
   inboxCount,
   achievementsDot,
+  chatDot,
   meter
 }: SidebarProps): React.JSX.Element {
   return (
@@ -49,8 +52,12 @@ function Sidebar({
           count={
             item.screen === 'inbox' ? inboxCount : item.screen === 'chat' ? chatCount : undefined
           }
-          dot={item.screen === 'achievements' && achievementsDot}
-          dotLabel="New achievement"
+          dot={
+            (item.screen === 'achievements' && achievementsDot) ||
+            (item.screen === 'chat' && chatDot)
+          }
+          dotSize={item.screen === 'chat' ? 'small' : 'normal'}
+          dotLabel={item.screen === 'chat' ? 'A boss fight is going' : 'New achievement'}
         />
       ))}
       <div className="sidebar__footer">

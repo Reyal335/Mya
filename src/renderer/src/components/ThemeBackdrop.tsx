@@ -10,6 +10,8 @@ type ThemeBackdropProps = {
   // A tile in the picker: the whole picture is shown, at a scale that fits the small
   // frame, instead of the scale the chat uses.
   thumbnail?: boolean
+  // What the picture is, for the warning when it cannot be loaded.
+  what?: string
 }
 
 type Size = { width: number; height: number }
@@ -22,7 +24,12 @@ type Size = { width: number; height: number }
 // frame clips the rest. Pixel art (both sides 640 or less) is scaled by whole numbers
 // so its pixels stay square; a bigger picture is scaled smoothly to fill the frame.
 // The frame is measured again whenever it is resized. The picture is decoration only.
-function ThemeBackdrop({ image, fade, thumbnail = false }: ThemeBackdropProps): React.JSX.Element {
+function ThemeBackdrop({
+  image,
+  fade,
+  thumbnail = false,
+  what = 'chat theme'
+}: ThemeBackdropProps): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<Size | null>(null)
 
@@ -47,7 +54,14 @@ function ThemeBackdrop({ image, fade, thumbnail = false }: ThemeBackdropProps): 
   return (
     <div ref={ref} className="theme-backdrop" aria-hidden="true">
       {image !== null && frame !== null && frame.width > 0 && frame.height > 0 && (
-        <BackdropImage key={image} image={image} fade={fade} frame={frame} thumbnail={thumbnail} />
+        <BackdropImage
+          key={image}
+          image={image}
+          fade={fade}
+          frame={frame}
+          thumbnail={thumbnail}
+          what={what}
+        />
       )}
     </div>
   )
@@ -60,12 +74,14 @@ function BackdropImage({
   image,
   fade,
   frame,
-  thumbnail
+  thumbnail,
+  what
 }: {
   image: string
   fade: number
   frame: Size
   thumbnail: boolean
+  what: string
 }): React.JSX.Element | null {
   const [failed, setFailed] = useState(false)
   const [natural, setNatural] = useState<Size | null>(null)
@@ -92,12 +108,12 @@ function BackdropImage({
           if (naturalWidth > 0 && naturalHeight > 0) {
             setNatural({ width: naturalWidth, height: naturalHeight })
           } else {
-            console.warn('The chat theme picture could not be loaded. Showing no theme.')
+            console.warn(`The ${what} picture could not be loaded. Showing none.`)
             setFailed(true)
           }
         }}
         onError={() => {
-          console.warn('The chat theme picture could not be loaded. Showing no theme.')
+          console.warn(`The ${what} picture could not be loaded. Showing none.`)
           setFailed(true)
         }}
       />

@@ -35,13 +35,27 @@ import {
   getPartyPanel,
   getPopups,
   getProject,
+  getTestCommand,
   setOpenInEditor,
   setPartyPanel,
+  setTestCommand,
   setPopups,
   setProject
 } from './settings'
 import { setPopupsEnabled, showTestPopup } from './popupWindow'
 import { agentStats, agentsSummary } from './progression'
+import { bossIdsInFights, dismissFight, fightFor, fightOn } from './bosses'
+import {
+  createBoss,
+  dropBossPicks,
+  listBosses,
+  pickBackground,
+  pickIdle,
+  removeBoss,
+  setBossInPool,
+  sliceIdle,
+  updateBoss
+} from './bossPacks'
 import { achievementsData, equip, markAllSeen } from './progressionStore'
 import { clearFinishedTasks, getTask, listTasks, markTaskSeen, removeTask } from './tasks'
 import { createAgent, listAgents, readAgent, removeAgent, updateAgent } from './agents'
@@ -287,6 +301,50 @@ export function registerIpc(): void {
     ok: await equip(change)
   }))
   ipcMain.handle(IpcChannel.ProgressionMarkSeen, () => markAllSeen())
+
+  // Boss battles. The window never sends a path: main uses the open project and its
+  // conversation. The test command is checked and trimmed in settings.ts.
+  // The boss manager: ids, tokens, and numbers only. bossPacks.ts checks every field again and
+  // builds every path itself.
+  ipcMain.handle(IpcChannel.BossesList, async () => listBosses(await bossIdsInFights()))
+  ipcMain.handle(IpcChannel.BossesPickIdle, (event) =>
+    pickIdle(BrowserWindow.fromWebContents(event.sender))
+  )
+  ipcMain.handle(
+    IpcChannel.BossesSliceIdle,
+    (_event, sourceToken: unknown, columns: unknown, rows: unknown, cells: unknown) =>
+      sliceIdle(sourceToken, columns, rows, cells)
+  )
+  ipcMain.handle(IpcChannel.BossesDropSources, () => dropBossPicks())
+  ipcMain.handle(IpcChannel.BossesPickBackground, (event) =>
+    pickBackground(BrowserWindow.fromWebContents(event.sender))
+  )
+  ipcMain.handle(IpcChannel.BossesCreate, (_event, draft: unknown) => createBoss(draft))
+  ipcMain.handle(IpcChannel.BossesUpdate, (_event, id: unknown, draft: unknown) =>
+    updateBoss(id, draft)
+  )
+  ipcMain.handle(IpcChannel.BossesRemove, (_event, id: unknown) => removeBoss(id))
+  ipcMain.handle(IpcChannel.BossesSetInPool, (_event, id: unknown, on: unknown) =>
+    setBossInPool(id, on)
+  )
+  ipcMain.handle(IpcChannel.BossesFight, () => fightFor(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesFightOn, () => fightOn(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesDismiss, () => dismissFight(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.BossesGetTestCommand, async () => {
+    const project = getProject()
+    return project ? getTestCommand(project.path) : ''
+  })
+  ipcMain.handle(IpcChannel.BossesSetTestCommand, async (_event, command: unknown) => {
+    const project = getProject()
+    if (!project) return { ok: false, command: '' }
+    try {
+      const saved = await setTestCommand(project.path, command)
+      return saved === null ? { ok: false, command: '' } : { ok: true, command: saved }
+    } catch (err) {
+      console.error('Could not save settings:', err instanceof Error ? err.message : err)
+      return { ok: false, command: '' }
+    }
+  })
 
   // OPEN IN EDITOR on or off, kept in settings.json. Takes effect on the next OPEN/CHANGE.
   ipcMain.handle(IpcChannel.UiGetOpenInEditor, () => getOpenInEditor())

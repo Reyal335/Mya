@@ -100,12 +100,33 @@ export function getChatSession(projectPath: string): Promise<string | null> {
   return queue(async () => (await load())[projectPath]?.sessionId ?? null)
 }
 
+// Told when a project's conversation ends: NEW CHAT, a lost session, or a fresh-context
+// restart that replaced the session id. The boss fight of that conversation goes with it.
+let sessionEnded: ((projectPath: string, sessionId: string) => void) | null = null
+
+export function onSessionEnded(
+  listener: ((projectPath: string, sessionId: string) => void) | null
+): void {
+  sessionEnded = listener
+}
+
 // Saves the project's session id, or forgets it with null (NEW CHAT). The model
 // choice stays: the caller sets it for the new chat.
 export function setChatSession(projectPath: string, sessionId: string | null): Promise<void> {
-  return update(projectPath, (chat) =>
-    chat.sessionId === sessionId ? chat : { ...chat, sessionId }
-  )
+  // Set inside the update; the cast keeps TypeScript from narrowing it to null.
+  let ended = null as string | null
+  return update(projectPath, (chat) => {
+    if (chat.sessionId === sessionId) return chat
+    ended = chat.sessionId
+    return { ...chat, sessionId }
+  }).then(() => {
+    if (ended === null || !sessionEnded) return
+    try {
+      sessionEnded(projectPath, ended)
+    } catch (err) {
+      console.error('[chats] A session listener failed:', err)
+    }
+  })
 }
 
 // The chat's saved model and thinking choice, or null when it has none yet (a new
