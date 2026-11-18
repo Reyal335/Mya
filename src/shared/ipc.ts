@@ -71,6 +71,8 @@ export const IpcChannel = {
   WindowState: 'window:state',
   UiGetPartyPanel: 'ui:get-party-panel',
   UiSetPartyPanel: 'ui:set-party-panel',
+  UiGetDialogueAutoCollapse: 'ui:get-dialogue-auto-collapse',
+  UiSetDialogueAutoCollapse: 'ui:set-dialogue-auto-collapse',
   UiGetPopups: 'ui:get-popups',
   UiSetPopups: 'ui:set-popups',
   UiTestPopup: 'ui:test-popup',
@@ -773,6 +775,9 @@ export type MyaApi = {
     // null until I choose with the collapse button.
     getPartyPanel: () => Promise<PartyPanelMode | null>
     setPartyPanel: (mode: PartyPanelMode) => Promise<{ ok: boolean }>
+    // AUTO on CHAT's dialogue box, kept in settings.json. On when never set.
+    getDialogueAutoCollapse: () => Promise<boolean>
+    setDialogueAutoCollapse: (on: boolean) => Promise<{ ok: boolean }>
     // Popups on or off, kept in settings.json. On when never set.
     getPopups: () => Promise<boolean>
     setPopups: (on: boolean) => Promise<{ ok: boolean }>

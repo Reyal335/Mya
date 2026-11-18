@@ -121,6 +121,8 @@ const api: MyaApi = {
   ui: {
     getPartyPanel: () => ipcRenderer.invoke(IpcChannel.UiGetPartyPanel),
     setPartyPanel: (mode) => ipcRenderer.invoke(IpcChannel.UiSetPartyPanel, mode),
+    getDialogueAutoCollapse: () => ipcRenderer.invoke(IpcChannel.UiGetDialogueAutoCollapse),
+    setDialogueAutoCollapse: (on) => ipcRenderer.invoke(IpcChannel.UiSetDialogueAutoCollapse, on),
     getPopups: () => ipcRenderer.invoke(IpcChannel.UiGetPopups),
     setPopups: (on) => ipcRenderer.invoke(IpcChannel.UiSetPopups, on),
     testPopup: () => ipcRenderer.invoke(IpcChannel.UiTestPopup),

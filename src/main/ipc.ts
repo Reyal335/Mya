@@ -40,11 +40,13 @@ import {
 } from './agent'
 import { readPastedImages } from './pastedImages'
 import {
+  getDialogueAutoCollapse,
   getOpenInEditor,
   getPartyPanel,
   getPopups,
   getProject,
   getTestCommand,
+  setDialogueAutoCollapse,
   setOpenInEditor,
   setPartyPanel,
   setTestCommand,
@@ -276,6 +278,19 @@ export function registerIpc(): void {
     if (mode !== 'open' && mode !== 'rail') return { ok: false }
     try {
       await setPartyPanel(mode)
+      return { ok: true }
+    } catch (err) {
+      console.error('Could not save settings:', err instanceof Error ? err.message : err)
+      return { ok: false }
+    }
+  })
+
+  // AUTO on the dialogue box (collapse while I scroll back), kept in settings.json.
+  ipcMain.handle(IpcChannel.UiGetDialogueAutoCollapse, () => getDialogueAutoCollapse())
+  ipcMain.handle(IpcChannel.UiSetDialogueAutoCollapse, async (_event, on: unknown) => {
+    if (typeof on !== 'boolean') return { ok: false }
+    try {
+      await setDialogueAutoCollapse(on)
       return { ok: true }
     } catch (err) {
       console.error('Could not save settings:', err instanceof Error ? err.message : err)

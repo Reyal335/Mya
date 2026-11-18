@@ -144,6 +144,17 @@ export function setPopups(on: boolean): Promise<void> {
   return updateSettings({ popups: on })
 }
 
+// AUTO on CHAT's dialogue box: collapse while I scroll back, open for new replies. On until
+// I turn it off.
+export async function getDialogueAutoCollapse(): Promise<boolean> {
+  const { dialogueAutoCollapse } = await readSettings()
+  return dialogueAutoCollapse !== false
+}
+
+export function setDialogueAutoCollapse(on: boolean): Promise<void> {
+  return updateSettings({ dialogueAutoCollapse: on })
+}
+
 // The project's own test command for boss fights, or '' to use the usual runners. Kept
 // in settings.json as testCommands[projectPath].
 const MAX_TEST_COMMAND = 200
