@@ -69,10 +69,15 @@ const stamp = (): string => new Date().toISOString()
 
 // Reading never asks. Editing, writing, shell commands, and web access wait for the user's
 // Approve or Deny through canUseTool. `tools` limits which built-ins exist at all.
-// Agent lets Claude bring in my agents. It is not in allowedTools, and the agent
-// gate below decides which ones may run.
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob']
-const TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch', 'Agent']
+// Agent lets Claude bring in my agents; it is pre-approved alongside reading, so
+// a subagent starts the moment Claude calls it, with no Approve/Deny in the way.
+// The agent gate below still runs first and still decides which agents may run
+// at all (file problems, unsafe permission modes, background mode). Once a
+// subagent is running, its own Edit/Write/Bash/web calls still wait for the
+// user, same as the main conversation's; only the decision to start it is automatic.
+const PRE_APPROVED_TOOLS = [...READ_ONLY_TOOLS, 'Agent']
+const TOOLS = [...PRE_APPROVED_TOOLS, 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch']
 
 const NOT_FOUND_NOTICE =
   'The saved conversation was not found. This reply starts from a fresh context.'
@@ -799,7 +804,7 @@ async function execute(run: Run): Promise<void> {
       cwd: run.cwd,
       includePartialMessages: true,
       tools: TOOLS,
-      allowedTools: READ_ONLY_TOOLS,
+      allowedTools: PRE_APPROVED_TOOLS,
       permissionMode: 'default',
       canUseTool: permissionHandler(run),
       hooks: { PreToolUse: [{ matcher: 'Agent|Task', hooks: [agentGate(run)] }] },
