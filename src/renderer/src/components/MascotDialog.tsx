@@ -565,7 +565,7 @@ function MascotDialog({
           <br />
           One spritesheet per state, as a strip or a grid. PNG under 3 MB. A strip of 64x64 frames
           is used as it is. Any other sheet opens the slicer: set columns and rows, then pick the
-          frames for the loop. Frames must be square and are scaled to 64x64. Up to 16 frames per
+          frames for the loop. Frames are scaled to 64x64, even when not square. Up to 16 frames per
           loop. Idle is required; a state with no sheet plays the idle loop.
         </div>
 

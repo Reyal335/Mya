@@ -116,7 +116,7 @@ h2{font-size:9px}
 
   <div class="muted">This is the built-in mascot. Your name and loops are kept in the app's data folder and the built-in files never change. RESET on its card brings back the built-in version.</div>
 
-  <div class="format"><b>FORMAT</b><br>One spritesheet per state, as a strip or a grid. PNG under 3 MB. A strip of 64x64 frames is used as it is. Any other sheet opens the slicer: set columns and rows, then pick the frames for the loop. Frames must be square and are scaled to 64x64. Up to 16 frames per loop. Idle is required; a state with no sheet plays the idle loop.</div>
+  <div class="format"><b>FORMAT</b><br>One spritesheet per state, as a strip or a grid. PNG under 3 MB. A strip of 64x64 frames is used as it is. Any other sheet opens the slicer: set columns and rows, then pick the frames for the loop. Frames are scaled to 64x64, even when not square. Up to 16 frames per loop. Idle is required; a state with no sheet plays the idle loop.</div>
 
   <div class="line" style="justify-content:space-between">
     <span class="label">ANIMATION LOOPS</span>
@@ -186,16 +186,16 @@ h2{font-size:9px}
   }
 
   /* The slice rules, in the order they are checked. */
+  function nice(x) { return x % 64 === 0 || 64 % x === 0; }
   function check(s) {
     var W = s.source.w, H = s.source.h, cw = W / s.cols, ch = H / s.rows, n = s.picked.length;
     var size = fmt(cw) + 'x' + fmt(ch);
     if (!Number.isInteger(cw)) return { level: 'err', size: size, text: 'Sheet width ' + W + ' does not divide into ' + s.cols + ' columns.' };
     if (!Number.isInteger(ch)) return { level: 'err', size: size, text: 'Sheet height ' + H + ' does not divide into ' + s.rows + ' rows.' };
-    if (cw !== ch) return { level: 'err', size: size, text: 'Frames must be square. ' + s.cols + ' x ' + s.rows + ' gives ' + cw + 'x' + ch + '.' };
     if (n > MAX_FRAMES) return { level: 'err', size: size, text: 'A loop can have at most 16 frames. ' + n + ' are picked.' };
-    if (cw === 64) return { level: 'ok', size: size, text: '64x64 frames, used as they are.' };
-    if (cw % 64 === 0 || 64 % cw === 0) return { level: 'ok', size: size, text: cw + 'x' + cw + ' frames, scaled to 64x64.' };
-    return { level: 'warn', size: size, text: cw + 'x' + cw + ' is not a multiple of 64. Scaled frames may look uneven.' };
+    if (cw === 64 && ch === 64) return { level: 'ok', size: size, text: '64x64 frames, used as they are.' };
+    if (nice(cw) && nice(ch)) return { level: 'ok', size: size, text: cw + 'x' + ch + ' frames, scaled to 64x64.' };
+    return { level: 'warn', size: size, text: cw + 'x' + ch + ' is not a multiple of 64. Scaled frames may look uneven.' };
   }
   function allCells(cols, rows) {
     var n = cols * rows, out = [], i;

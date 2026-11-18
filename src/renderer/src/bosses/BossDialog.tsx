@@ -328,7 +328,7 @@ function BossDialog({
           One idle loop: a horizontal strip of 64x64 frames, PNG. Height 64px, width a multiple of
           64, up to 16 frames. Drawn 4x in battle. A strip of 64x64 frames is used as it is. Any
           other sheet opens the slicer: set columns and rows, then pick the frames for the loop.
-          Frames must be square and are scaled to 64x64.
+          Frames are scaled to 64x64, even when not square.
         </div>
 
         <SheetRow

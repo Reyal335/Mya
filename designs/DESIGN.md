@@ -177,18 +177,23 @@ the real values:
    whole numbers from 1 to 16."
 2. "Sheet width 384 does not divide into 5 columns."
 3. "Sheet height 384 does not divide into 5 rows."
-4. "Frames must be square. 4 x 3 gives 96x128."
-5. At least one cell is picked. No message: USE is disabled.
-6. "A loop can have at most 16 frames. 20 are picked."
-7. Every cell is inside the grid and picked once: "Each picked frame must be a
+4. At least one cell is picked. No message: USE is disabled.
+5. "A loop can have at most 16 frames. 20 are picked."
+6. Every cell is inside the grid and picked once: "Each picked frame must be a
    cell in the grid, picked only once."
+
+Frames need not be square: width and height each scale to 64 on their own, so
+a non-square frame stretches to fill the 64x64 frame.
 
 When no rule fails, one note shows. Notes never block:
 
 - "64x64 frames, used as they are."
-- "128x128 frames, scaled to 64x64." when the frame size is a multiple of 64
-  or divides 64 evenly (32, 16, 8).
+- "128x128 frames, scaled to 64x64." when each side is a multiple of 64 or
+  divides 64 evenly (32, 16, 8). A non-square frame follows the same rule per
+  side, e.g. "128x32 frames, scaled to 64x64."
 - Warning: "96x96 is not a multiple of 64. Scaled frames may look uneven."
+  The same warning covers a non-square frame, e.g. "153x102 is not a multiple
+  of 64. Scaled frames may look uneven."
 
 Other messages: "This sheet is no longer loaded. Upload it again." (the
 loaded sheet is gone) and "Pick at least one frame." (a slice request with no
@@ -219,7 +224,8 @@ cells; the slicer itself disables USE instead).
   with the note "Plays forward, then back.", so the setting can be changed without
   slicing again. Replacing a sheet keeps it, like FPS. REMOVE clears it.
 - Frames are scaled to 64x64 by nearest neighbour only: no smoothing, no
-  blending.
+  blending. Width and height scale independently, so a non-square frame
+  stretches to fill the square.
 - SAVE MASCOT is disabled while a slicer is open.
 
 ## Party and inbox
@@ -1742,7 +1748,7 @@ hard shadow, 20px padding, 16px gap. Title "ADD BOSS" or "EDIT BOSS" (pixel 11px
   loop: a horizontal strip of 64x64 frames, PNG. Height 64px, width a multiple of 64, up to 16
   frames. Drawn 4x in battle." and the slicer's grid wording: "A strip of 64x64 frames is used
   as it is. Any other sheet opens the slicer: set columns and rows, then pick the frames for
-  the loop. Frames must be square and are scaled to 64x64."
+  the loop. Frames are scaled to 64x64, even when not square."
 - IDLE LOOP row: the mascot editor's state row (one component, `SheetRow`, for both): the
   file name, its size and frame count, FPS (1 to 30, starts at 4; a replaced strip keeps its
   speed), UPLOAD or REPLACE, the slicer for grid sheets, the playing loop, and the strip with

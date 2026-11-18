@@ -163,13 +163,14 @@ export function createSheetPicker(options: { title: string; maxPicks: number }):
       return { ok: false, error: { code: 'invalid_slice', message } }
     }
     // checkSlice has proved these are whole numbers in range.
-    const grid = { columns: columns as number, cells: cells as number[] }
+    const grid = { columns: columns as number, rows: rows as number, cells: cells as number[] }
     try {
       const bitmap = nativeImage.createFromBuffer(source.bytes).toBitmap()
       if (bitmap.length !== source.width * source.height * 4)
         throw new Error('Unexpected bitmap size')
-      const cellSize = source.width / grid.columns
-      const strip = cutFrames(bitmap, source.width, grid.columns, cellSize, grid.cells)
+      const cellWidth = source.width / grid.columns
+      const cellHeight = source.height / grid.rows
+      const strip = cutFrames(bitmap, source.width, grid.columns, cellWidth, cellHeight, grid.cells)
       const png = nativeImage
         .createFromBitmap(strip, { width: FRAME_SIZE * grid.cells.length, height: FRAME_SIZE })
         .toPNG()

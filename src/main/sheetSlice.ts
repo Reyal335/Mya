@@ -11,27 +11,31 @@ export function nearestSource(i: number, size: number): number {
   return Math.floor(((2 * i + 1) * size) / (2 * FRAME_SIZE))
 }
 
-// Cuts the picked cells out of `bitmap` (`width` pixels wide, square cells of
-// `cellSize` pixels in `columns` columns) and lays them left to right, each
-// scaled to 64x64, in one bitmap 64 pixels high. The caller checks the slice first.
+// Cuts the picked cells out of `bitmap` (`width` pixels wide, cells of
+// `cellWidth` by `cellHeight` pixels in `columns` columns) and lays them left
+// to right, each scaled to 64x64, in one bitmap 64 pixels high. A cell need
+// not be square: each axis scales on its own, so a non-square cell stretches.
+// The caller checks the slice first.
 export function cutFrames(
   bitmap: Buffer,
   width: number,
   columns: number,
-  cellSize: number,
+  cellWidth: number,
+  cellHeight: number,
   cells: readonly number[]
 ): Buffer {
   const outWidth = FRAME_SIZE * cells.length
   const out = Buffer.alloc(outWidth * FRAME_SIZE * 4)
-  const offsets = Array.from({ length: FRAME_SIZE }, (_, i) => nearestSource(i, cellSize))
+  const xOffsets = Array.from({ length: FRAME_SIZE }, (_, i) => nearestSource(i, cellWidth))
+  const yOffsets = Array.from({ length: FRAME_SIZE }, (_, i) => nearestSource(i, cellHeight))
   cells.forEach((cell, k) => {
-    const left = (cell % columns) * cellSize
-    const top = Math.floor(cell / columns) * cellSize
+    const left = (cell % columns) * cellWidth
+    const top = Math.floor(cell / columns) * cellHeight
     for (let y = 0; y < FRAME_SIZE; y++) {
-      const sourceRow = (top + offsets[y]) * width
+      const sourceRow = (top + yOffsets[y]) * width
       const outRow = y * outWidth + k * FRAME_SIZE
       for (let x = 0; x < FRAME_SIZE; x++) {
-        const from = (sourceRow + left + offsets[x]) * 4
+        const from = (sourceRow + left + xOffsets[x]) * 4
         bitmap.copy(out, (outRow + x) * 4, from, from + 4)
       }
     }

@@ -27,15 +27,25 @@ function isGridSize(value: unknown): value is number {
 
 const error = (message: string): SliceStatus => ({ level: 'error', message, canUse: false })
 
-// The note for a frame size that passed the rules. It never blocks.
-function sizeNote(size: number): { level: SliceLevel; message: string } {
-  if (size === FRAME_SIZE) return { level: 'ok', message: '64x64 frames, used as they are.' }
-  if (size % FRAME_SIZE === 0 || FRAME_SIZE % size === 0) {
-    return { level: 'ok', message: `${size}x${size} frames, scaled to 64x64.` }
+// Whether a side scales to 64 cleanly: a multiple of 64, or a divisor of it.
+function niceSide(size: number): boolean {
+  return size % FRAME_SIZE === 0 || FRAME_SIZE % size === 0
+}
+
+// The note for a frame size that passed the rules. It never blocks. Frames
+// need not be square: each side scales to 64 on its own, so a non-square
+// frame stretches to fill the 64x64 frame.
+function sizeNote(frameWidth: number, frameHeight: number): { level: SliceLevel; message: string } {
+  const size = `${frameWidth}x${frameHeight}`
+  if (frameWidth === FRAME_SIZE && frameHeight === FRAME_SIZE) {
+    return { level: 'ok', message: '64x64 frames, used as they are.' }
+  }
+  if (niceSide(frameWidth) && niceSide(frameHeight)) {
+    return { level: 'ok', message: `${size} frames, scaled to 64x64.` }
   }
   return {
     level: 'warning',
-    message: `${size}x${size} is not a multiple of 64. Scaled frames may look uneven.`
+    message: `${size} is not a multiple of 64. Scaled frames may look uneven.`
   }
 }
 
@@ -58,21 +68,17 @@ export function checkSlice(
   if (height % rows !== 0) {
     return error(`Sheet height ${height} does not divide into ${rows} rows.`)
   }
-  // 4. Square frames.
   const frameWidth = width / columns
   const frameHeight = height / rows
-  if (frameWidth !== frameHeight) {
-    return error(`Frames must be square. ${columns} x ${rows} gives ${frameWidth}x${frameHeight}.`)
-  }
   if (!Array.isArray(cells)) return error(SLICE_CELLS_MESSAGE)
-  const note = sizeNote(frameWidth)
-  // 5. Something is picked. No message of its own: the note shows, and USE is off.
+  const note = sizeNote(frameWidth, frameHeight)
+  // 4. Something is picked. No message of its own: the note shows, and USE is off.
   if (cells.length === 0) return { ...note, canUse: false }
-  // 6. Loop length.
+  // 5. Loop length.
   if (cells.length > MAX_FRAMES) {
     return error(`A loop can have at most ${MAX_FRAMES} frames. ${cells.length} are picked.`)
   }
-  // 7. Every cell is in the grid, once.
+  // 6. Every cell is in the grid, once.
   const count = columns * rows
   const seen = new Set<number>()
   for (const cell of cells) {
