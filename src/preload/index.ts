@@ -5,6 +5,7 @@ import type { FightEvent } from '../shared/bosses'
 import {
   IpcChannel,
   type AgentEvent,
+  type InstallProgress,
   type MyaApi,
   type PopupOpenTarget,
   type WindowState
@@ -64,9 +65,27 @@ const api: MyaApi = {
   },
   chat: {
     history: () => ipcRenderer.invoke(IpcChannel.ChatHistory),
-    reset: () => ipcRenderer.invoke(IpcChannel.ChatReset),
     getModelChoice: () => ipcRenderer.invoke(IpcChannel.ChatGetModelChoice),
     setModelChoice: (change) => ipcRenderer.invoke(IpcChannel.ChatSetModelChoice, change)
+  },
+  chats: {
+    list: () => ipcRenderer.invoke(IpcChannel.ChatsList),
+    open: (id) => ipcRenderer.invoke(IpcChannel.ChatsOpen, id),
+    create: (provider) => ipcRenderer.invoke(IpcChannel.ChatsCreate, provider),
+    starts: () => ipcRenderer.invoke(IpcChannel.ChatsStarts),
+    rename: (id, title) => ipcRenderer.invoke(IpcChannel.ChatsRename, id, title),
+    pin: (id, pinned) => ipcRenderer.invoke(IpcChannel.ChatsPin, id, pinned),
+    remove: (id) => ipcRenderer.invoke(IpcChannel.ChatsRemove, id),
+    fork: (id) => ipcRenderer.invoke(IpcChannel.ChatsFork, id),
+    export: (id) => ipcRenderer.invoke(IpcChannel.ChatsExport, id),
+    search: (query) => ipcRenderer.invoke(IpcChannel.ChatsSearch, query),
+    onChanged: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(IpcChannel.ChatsChanged, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.ChatsChanged, listener)
+      }
+    }
   },
   models: {
     list: () => ipcRenderer.invoke(IpcChannel.ModelsList)
@@ -195,7 +214,16 @@ const api: MyaApi = {
     saveApiKey: (provider, apiKey) =>
       ipcRenderer.invoke(IpcChannel.ProvidersSaveApiKey, provider, apiKey),
     logout: (provider) => ipcRenderer.invoke(IpcChannel.ProvidersLogout, provider),
-    installCli: (provider) => ipcRenderer.invoke(IpcChannel.ProvidersInstallCli, provider)
+    installCli: (provider) => ipcRenderer.invoke(IpcChannel.ProvidersInstallCli, provider),
+    cancelInstall: (provider) => ipcRenderer.invoke(IpcChannel.ProvidersCancelInstall, provider),
+    onInstallProgress: (callback) => {
+      const listener = (_event: IpcRendererEvent, progress: InstallProgress): void =>
+        callback(progress)
+      ipcRenderer.on(IpcChannel.ProvidersInstallProgress, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.ProvidersInstallProgress, listener)
+      }
+    }
   }
 }
 

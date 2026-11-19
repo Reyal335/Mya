@@ -329,3 +329,32 @@
 .composer-action--stop:active {
   transform: translate(1px, 1px);
 }
+
+/* A picture this chat cannot take: a 2px error border and NOT SENT (designs/22f). It stays in the
+   list so nothing disappears without a word. */
+.composer-chip--blocked {
+  border-color: var(--error);
+}
+
+.composer-chip--blocked .composer-chip__label {
+  color: var(--error);
+}
+
+/* The image button in a chat that cannot take images: dashed and muted, still reachable. */
+.composer-image {
+  flex: none;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  border: var(--border-thin) dashed var(--line);
+  border-radius: 0;
+  cursor: not-allowed;
+  opacity: 0.8;
+}

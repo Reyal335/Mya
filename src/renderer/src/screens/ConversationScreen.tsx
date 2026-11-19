@@ -9,7 +9,14 @@ import {
   useState
 } from 'react'
 import type { ExtraProps } from 'react-markdown'
-import type { ProjectInfo } from '../../../shared/ipc'
+import { DEFAULT_CHAT_TITLE, type ChatSummary } from '../../../shared/chats'
+import { clockLabel, dayClockLabel, resumedLabel } from '../../../shared/chatTime'
+import type { ProviderId } from '../../../shared/models'
+import { PROVIDERS, can } from '../../../shared/providers'
+import ProviderTag from '../components/ProviderTag'
+import StartNotice from '../components/StartNotice'
+import Unavailable from '../components/Unavailable'
+import type { PartyPanelMode, ProjectInfo } from '../../../shared/ipc'
 import { splitFenced } from '../../../shared/composerMessage'
 import { toolLabel, type ToolLabel } from '../../../shared/toolLabel'
 import type {
@@ -30,7 +37,7 @@ import { replyTag, type ModelLists } from '../../../shared/models'
 import ModelPicker from '../components/ModelPicker'
 import ThemeBackdrop from '../components/ThemeBackdrop'
 import ThemePicker from '../components/ThemePicker'
-import { usePartyPanelMode } from '../hooks/usePartyPanelMode'
+import { useNow } from '../hooks/useNow'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { useActiveMascot } from '../mascots/useActiveMascot'
 import { loopFor, type MascotStateName } from '../mascots/types'
@@ -40,10 +47,10 @@ import { speakerName } from '../conversation/agentName'
 import { errorText, STOPPED_TEXT } from '../../../shared/noticeText'
 import { partyWork, taskViews, type TaskView } from '../conversation/agentWork'
 import { callTargetOf } from '../conversation/callTarget'
+import { findAnchored, type ScrollTarget } from '../conversation/scrollTarget'
 import AgentChip from '../components/AgentChip'
 import AgentTaskCard from '../components/AgentTaskCard'
 import Composer from '../components/Composer'
-import Dialog from '../components/Dialog'
 import ToolCard from '../components/ToolCard'
 import DialogueStage from '../components/DialogueStage'
 import { useDialogueCollapse } from '../hooks/useDialogueCollapse'
@@ -67,17 +74,26 @@ import './ConversationScreen.css'
 type ConversationScreenProps = {
   project: ProjectInfo
   conversation: Conversation
+  // The open chat, or null before the project has one.
+  chat: ChatSummary | null
+  // The chats have been read: the open one is known.
+  chatsLoaded: boolean
   // The agent called for my next message, held in App so AGENTS and INBOX can set it.
   call: CallTarget | null
   onCallChange: (call: CallTarget | null) => void
   // Changes when another screen wants the input focused.
   focusRequest: number
   onOpenTask: (taskId: string, section?: 'activity') => void
-  onModelChange?: (model: string) => void
   // The open conversation's boss fight, and the party panel's tab (kept by the app).
   boss: BossFightStore
   partyTab: PartyTab
   onPartyTab: (tab: PartyTab) => void
+  // The party panel or its rail, kept by the app because the sidebar reads it too.
+  party: { mode: PartyPanelMode; toggle: () => void }
+  // A search hit in the messages: scroll to it once the chat has loaded.
+  scrollTarget: ScrollTarget | null
+  // The model picker's last row: NEW CHAT opens the dialog that picks who runs a chat.
+  onNewChat: () => void
 }
 
 // Consecutive tool cards share one wrapping row, as in the mockup. Tool calls
@@ -148,9 +164,15 @@ type HistoryProps = {
   projectPath: string
   views: Map<string, TaskView>
   note: Conversation['historyNote']
+  // The RESUMED line of a chat opened from what was saved: when it was last used and how many
+  // messages it has, and whether sending starts a fresh session.
+  resumed: { text: string; fresh: boolean } | null
   onOpenTask: (taskId: string, section?: 'activity') => void
   // The models, to name the model on each reply's tag.
   lists: ModelLists | null
+  // The chat's provider: a chat that runs without asking says so at the top, and its cards say
+  // NOT ASKED.
+  provider: ProviderId
   // Battle notices and end cards, each placed after its test run's tool card or task.
   battle: BattleEntry[]
   // The reply text that is last while the dialogue box is collapsed: it is also drawn here, with
@@ -171,8 +193,10 @@ function HistoryList({
   projectPath,
   views,
   note,
+  resumed,
   onOpenTask,
   lists,
+  provider,
   battle,
   latestId
 }: HistoryProps): React.JSX.Element {
@@ -194,6 +218,23 @@ function HistoryList({
     )
   return (
     <>
+      {!can(provider, 'approvals') && <StartNotice provider={provider} />}
+      {resumed && (
+        <p className="conversation__resumed" role="note">
+          <span className="conversation__resumed-square" aria-hidden="true" />
+          <span className="conversation__resumed-word">RESUMED</span>
+          <span className="conversation__resumed-text">
+            {resumed.text}
+            {resumed.fresh ? ' · a fresh session starts when you send' : ''}
+          </span>
+        </p>
+      )}
+      {note === 'not_shown' && (
+        <Unavailable provider={provider}>
+          Earlier messages are not shown. {PROVIDERS[provider].name} doesn&apos;t let Mya reload
+          them.
+        </Unavailable>
+      )}
       {note === 'truncated' && (
         <p className="conversation__muted">Earlier messages are not shown.</p>
       )}
@@ -223,6 +264,7 @@ function HistoryList({
               input={tool.input}
               state={tool.state}
               projectPath={projectPath}
+              notAsked={!can(provider, 'approvals')}
             />
           ))}
         </div>
@@ -234,7 +276,7 @@ function HistoryList({
         // A saved conversation does not keep the pictures, only how many there were.
         const missing = item.imageCount - item.images.length
         return (
-          <div key={item.id} className="conversation__mine">
+          <div key={item.id} className="conversation__mine" data-item-id={item.id}>
             {item.call && <AgentChip agent={item.call} />}
             {item.images.length > 0 && (
               <div className="conversation__images">
@@ -261,7 +303,7 @@ function HistoryList({
         const tag = item.meta ? replyTag(item.meta, lists) : ''
         const latest = item.id === latestId
         return (
-          <div key={item.id} className="conversation__reply">
+          <div key={item.id} className="conversation__reply" data-item-id={item.id}>
             {(tag !== '' || latest) && (
               <div className="conversation__reply-head">
                 {tag !== '' && <span className="conversation__tag">{tag}</span>}
@@ -308,8 +350,11 @@ const History = memo(
   (a, b) =>
     a.projectPath === b.projectPath &&
     a.note === b.note &&
+    a.resumed?.text === b.resumed?.text &&
+    a.resumed?.fresh === b.resumed?.fresh &&
     a.views === b.views &&
     a.lists === b.lists &&
+    a.provider === b.provider &&
     a.onOpenTask === b.onOpenTask &&
     a.battle === b.battle &&
     a.latestId === b.latestId &&
@@ -344,17 +389,21 @@ const MAX_AGENTS = 3
 function ConversationScreen({
   project,
   conversation,
+  chat,
+  chatsLoaded,
   call,
   onCallChange,
   focusRequest,
   onOpenTask,
-  onModelChange,
   boss,
   partyTab,
-  onPartyTab
+  onPartyTab,
+  party,
+  scrollTarget,
+  onNewChat
 }: ConversationScreenProps): React.JSX.Element {
-  const { items, status, running, send, stop, answerPermission, loadHistory, newChat } =
-    conversation
+  const { items, status, running, send, stop, answerPermission, loadHistory } = conversation
+  const chatId = chat?.id ?? null
   const reducedMotion = usePrefersReducedMotion()
   const mascot = useActiveMascot(window.mya.mascots)
   const { agents, loaded: agentsLoaded } = useAgents(project.path)
@@ -366,23 +415,19 @@ function ConversationScreen({
   const title = equipped.title
     ? (achievementForReward('title', equipped.title)?.reward.name ?? null)
     : null
-  const { mode, toggle } = usePartyPanelMode()
-  const modelChoice = useModelChoice(project.path)
+  const { mode, toggle } = party
+  const modelChoice = useModelChoice(project.path, chat?.provider)
+  // The provider of this chat. It never changes. A project with no chat yet shows the one its first
+  // chat would start on.
+  const provider: ProviderId = chat?.provider ?? modelChoice.provider
   // The name the conversation speaks under: the mascot's, or the active provider (Codex, Gemini, Claude).
   const speaker = speakerName(mascot, modelChoice.choice.model)
 
-  useEffect(() => {
-    onModelChange?.(modelChoice.choice.model)
-  }, [modelChoice.choice.model, onModelChange])
   const chatTheme = useChatTheme(project.path)
   const [themeOpen, setThemeOpen] = useState(false)
   const [typing, setTyping] = useState(false)
-  const [confirmNew, setConfirmNew] = useState(false)
-  const [newChatError, setNewChatError] = useState<string | null>(null)
   // The input box's text, so focus can be moved there from outside it.
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  // Bumped when the input should take focus once the screen has settled.
-  const [inputFocus, setInputFocus] = useState(0)
   // Boss battles: the packs, the replay of the latest round, the battle view (open on the
   // live fight, or read-only on a finished one), and text a weak point puts in the box.
   // A fight is drawn only once main has listed the bosses: a custom boss is never shown as The
@@ -401,22 +446,35 @@ function ConversationScreen({
   const battlePack = battleFight && bossesLoaded ? packForFight(packs, battleFight) : null
   const battleOpen = battleFight !== null && battlePack !== null
 
-  // The saved conversation comes back once per project, when nothing is in memory.
+  // The saved conversation comes back once per chat, when nothing is in memory. Until the chats
+  // are read, the open one is not known.
   useEffect(() => {
-    loadHistory(project.path)
-  }, [project.path, loadHistory])
+    if (chatsLoaded) loadHistory(`${project.path}\u0000${chatId ?? ''}`, chatId)
+  }, [project.path, chatId, chatsLoaded, loadHistory])
 
   useEffect(() => {
     if (focusRequest > 0) inputRef.current?.focus()
   }, [focusRequest])
 
-  // After NEW CHAT the confirm dialog closes and hands focus back to the header button
-  // that opened it. The input takes it from there, a frame later.
+  // A search hit in the messages: once its chat is shown, scroll to the message and mark it for a
+  // moment. It is asked for once, and only the history that is on screen can be found in.
+  const scrolled = useRef(0)
   useEffect(() => {
-    if (inputFocus === 0) return
-    const frame = requestAnimationFrame(() => inputRef.current?.focus())
-    return () => cancelAnimationFrame(frame)
-  }, [inputFocus])
+    if (!scrollTarget || scrollTarget.chatId !== chatId || scrolled.current === scrollTarget.tick) {
+      return
+    }
+    const id = findAnchored(items, scrollTarget.anchor)
+    if (id === null) return
+    const element = document.querySelector<HTMLElement>(
+      `.conversation__history [data-item-id="${id}"]`
+    )
+    if (!element) return
+    scrolled.current = scrollTarget.tick
+    element.scrollIntoView({ block: 'center' })
+    element.classList.add('conversation__hit')
+    const timer = window.setTimeout(() => element.classList.remove('conversation__hit'), 2000)
+    return () => window.clearTimeout(timer)
+  }, [scrollTarget, chatId, items])
 
   const views = useMemo(() => taskViews(items, project.path), [items, project.path])
   const work = useMemo(() => partyWork(views), [views])
@@ -604,39 +662,47 @@ function ConversationScreen({
     return entries
   }, [pastFights, fight, packs, bossesLoaded, running, fightOn, setBattle])
 
-  async function startNewChat(): Promise<void> {
-    setConfirmNew(false)
-    setBattle(null)
-    const error = await newChat()
-    setNewChatError(error ? error.message : null)
-    if (!error) {
-      follow()
-      // Every chat starts with the box open.
-      box.reset()
-      // The new chat starts from the saved defaults, so the control changes with it.
-      modelChoice.reload()
-      // And with no theme of its own: it shows the default theme.
-      chatTheme.reload()
-      setInputFocus((tick) => tick + 1)
-    }
-  }
-
   const statusLabel = STATUS_LABELS[status]
   const badge = BADGES[shownState]
+  const now = useNow()
+  // "3:02 PM" for a chat started today, else "Wed 3:02 PM".
+  const startedLabel = chat
+    ? new Date(chat.createdAt).toDateString() === new Date(now).toDateString()
+      ? clockLabel(chat.createdAt)
+      : dayClockLabel(chat.createdAt, now)
+    : ''
+  const resumedText = conversation.resume
+    ? resumedLabel(conversation.resume.at, now, conversation.resume.count)
+    : null
+  const resumed =
+    resumedText !== null && conversation.resume
+      ? { text: resumedText, fresh: conversation.resume.mode === 'fresh' }
+      : null
+  // An old chat opened from HISTORY invites me to carry on.
   const placeholder = call
     ? `Message for ${call.agent.name}...`
     : running
       ? `Message ${speaker} or call an agent...`
-      : `Message ${speaker}...`
+      : resumed
+        ? 'Continue this chat...'
+        : `Message ${speaker}...`
 
   return (
     <section className="conversation" aria-labelledby="conversation-title">
       <header className="conversation__header">
         <div className="conversation__heading">
           <h1 id="conversation-title" className="conversation__title">
-            {speaker}
+            {chat?.title ?? DEFAULT_CHAT_TITLE}
           </h1>
-          <div className="conversation__subtitle">In {project.name}</div>
+          <div className="conversation__subtitle">
+            <ProviderTag provider={provider} />
+            <span className="conversation__facts">
+              {speaker}
+              {chat
+                ? ` · started ${startedLabel} · ${chat.messageCount} ${chat.messageCount === 1 ? 'message' : 'messages'}`
+                : ' · no messages yet'}
+            </span>
+          </div>
         </div>
         {statusLabel && (
           <span className={`conversation__status conversation__status--${status}`}>
@@ -658,19 +724,6 @@ function ConversationScreen({
           />
           THEME: {chatTheme.entry.name.toUpperCase()}
         </button>
-        <button
-          type="button"
-          className="button button--secondary button--small conversation__new"
-          disabled={running}
-          onClick={() => setConfirmNew(true)}
-        >
-          NEW CHAT
-        </button>
-        {newChatError && (
-          <p role="alert" className="conversation__header-error">
-            {newChatError}
-          </p>
-        )}
       </header>
 
       <div className="conversation__body">
@@ -712,8 +765,10 @@ function ConversationScreen({
                     projectPath={project.path}
                     views={views}
                     note={conversation.historyNote}
+                    resumed={resumed}
                     onOpenTask={onOpenTask}
                     lists={modelChoice.lists}
+                    provider={provider}
                     battle={battleEntries}
                     latestId={latestId}
                   />
@@ -767,23 +822,27 @@ function ConversationScreen({
           )}
 
           <Composer
-            key={project.path}
+            key={`${project.path}\u0000${chatId ?? ''}`}
+            provider={provider}
             label={call ? `Message for ${call.agent.name}` : `Message ${speaker}`}
             placeholder={placeholder}
             running={running}
             inputRef={inputRef}
             picker={
               <ModelPicker
-                lists={modelChoice.lists}
+                lists={modelChoice.pickerLists}
+                provider={provider}
+                onNewChat={onNewChat}
+                newChatBlocked={running}
                 listFailed={modelChoice.listFailed}
                 choice={modelChoice.choice}
                 asDefault={modelChoice.asDefault}
                 onAsDefaultChange={modelChoice.setAsDefault}
                 onPick={modelChoice.pick}
                 hasReplies={hasReplies}
-                onOpen={() => {
-                  if (modelChoice.listFailed) modelChoice.reload()
-                }}
+                // Read again each time it opens: a failed list is tried again, and a chat that has
+                // begun since the last read now offers only its own provider's models.
+                onOpen={modelChoice.reload}
               />
             }
             agent={
@@ -805,6 +864,7 @@ function ConversationScreen({
         </div>
 
         <PartyPanel
+          provider={provider}
           agents={agents}
           loaded={agentsLoaded}
           call={call}
@@ -863,33 +923,6 @@ function ConversationScreen({
           onRemove={chatTheme.remove}
           onClose={() => setThemeOpen(false)}
         />
-      )}
-
-      {confirmNew && (
-        <Dialog
-          title="NEW CHAT?"
-          onClose={() => setConfirmNew(false)}
-          actions={
-            <>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => setConfirmNew(false)}
-              >
-                CANCEL
-              </button>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={() => void startNewChat()}
-              >
-                NEW CHAT
-              </button>
-            </>
-          }
-        >
-          <p>Start a new conversation? The current one is cleared from Mya.</p>
-        </Dialog>
       )}
     </section>
   )

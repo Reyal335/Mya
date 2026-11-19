@@ -14,9 +14,12 @@ import BossesTab from '../bosses/BossesTab'
 import MascotsTabs from './MascotsTabs'
 import { mascotsPanelId, mascotsTabId, type MascotsTab } from './mascotsTabIds'
 import type { LeaveGuard } from './types'
+import type { ProviderId } from '../../../shared/models'
 import './MascotsScreen.css'
 
 type MascotsScreenProps = {
+  // The open chat's provider: MASCOTS says where the voice does not apply.
+  provider: ProviderId
   // MASCOTS or BOSSES. The app keeps it for the session, so the title bar can name it too.
   tab: MascotsTab
   onTab: (tab: MascotsTab) => void
@@ -31,7 +34,12 @@ type ConfirmState =
 
 // The MASCOTS screen from designs/4-mascot-manager.html: the gallery, with the
 // built-in default first, and the upload dialog to add or edit a mascot.
-function MascotsScreen({ tab, onTab, setLeaveGuard }: MascotsScreenProps): React.JSX.Element {
+function MascotsScreen({
+  provider,
+  tab,
+  onTab,
+  setLeaveGuard
+}: MascotsScreenProps): React.JSX.Element {
   const { mascots, defaultMascot, activeId, loaded, error, reload } = useMascots()
   const popups = usePopupsSetting()
   const openInEditor = useOpenInEditorSetting()
@@ -261,6 +269,7 @@ function MascotsScreen({ tab, onTab, setLeaveGuard }: MascotsScreenProps): React
 
           {editor && (
             <MascotDialog
+              provider={provider}
               key={editor.key}
               target={editor.target}
               onDirtyChange={setDirty}

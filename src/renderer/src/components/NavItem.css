@@ -1,38 +1,59 @@
+/* A screen in the sidebar (designs/21-sidebar.html): a link, 40px tall, a 16px pixel icon and the
+   label in the pixel font at 8px. Not current: a 2px transparent border and a muted icon.
+   Current: --raised, a 2px --text border, a 4px 4px 0 --accent shadow, an accent icon. */
 .nav-item {
+  position: relative;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 44px;
-  margin: 0;
+  gap: 12px;
+  height: 40px;
   padding: 0 10px;
-  background: none;
   color: var(--text);
-  border: var(--border) solid var(--line);
+  background: transparent;
+  border: var(--border-thin) solid transparent;
   border-radius: 0;
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 8px;
   line-height: 1.5;
-  text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
+.nav-item__icon {
+  color: var(--muted);
+}
+
+.nav-item--waiting .nav-item__icon {
+  color: var(--waiting);
+}
+
 .nav-item:hover {
-  border-color: var(--accent);
+  border-color: var(--line);
 }
 
 .nav-item--active,
 .nav-item--active:hover {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--raised);
   border-color: var(--text);
-  box-shadow: var(--shadow-hard);
+  box-shadow: 4px 4px 0 var(--accent);
+}
+
+.nav-item--active .nav-item__icon {
+  color: var(--accent);
+}
+
+.nav-item__label {
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-item__count {
-  padding: 4px 6px;
-  background: var(--bg);
-  color: var(--text);
+  padding: 3px 5px;
+  background: var(--waiting);
+  color: var(--bg);
+  font-size: 8px;
+  line-height: 1.2;
 }
 
 /* An 8px red dot: something new to see on this screen. */
@@ -46,4 +67,26 @@
 .nav-item__dot--small {
   width: 6px;
   height: 6px;
+}
+
+/* The rail: 44px squares, the icon alone. The count and the dot sit on the corner. */
+.nav-item--rail {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+.nav-item--rail .nav-item__count {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  padding: 2px 3px;
+  border: var(--border-thin) solid var(--bg);
+}
+
+.nav-item--rail .nav-item__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
 }

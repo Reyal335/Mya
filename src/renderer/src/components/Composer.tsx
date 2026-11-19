@@ -11,6 +11,8 @@ import {
   type RefObject
 } from 'react'
 import { buildMessage, countLines, formatSize, shouldChip } from '../../../shared/composerMessage'
+import type { ProviderId } from '../../../shared/models'
+import { PROVIDERS, can } from '../../../shared/providers'
 import {
   IMAGE_ERRORS,
   IMAGE_MAX_BYTES,
@@ -23,9 +25,14 @@ import {
   formatBytesUp
 } from '../../../shared/images'
 import type { OutgoingImage } from '../hooks/useConversation'
+import NoApprovalsTag from './NoApprovalsTag'
+import PixelIcon from './PixelIcon'
 import './Composer.css'
 
 type ComposerProps = {
+  // The chat's provider: it decides whether the NO APPROVALS tag shows and whether pictures can
+  // be sent.
+  provider: ProviderId
   // The visually hidden label of the text box.
   label: string
   placeholder: string
@@ -59,6 +66,10 @@ type ImageChip = {
   width: number
   height: number
   size: string
+  // A picture pasted into a chat whose provider cannot take images: it stays in the list with its
+  // reason, marked NOT SENT, and is never sent.
+  blocked?: boolean
+  name?: string
 }
 type Attachment = TextChip | ImageChip
 
@@ -95,10 +106,10 @@ async function canDraw(bytes: Uint8Array<ArrayBuffer>, type: ImageMediaType): Pr
 }
 
 // What a screen reader says for a chip, in place of its drawn text.
-function reading(chip: Attachment): string {
-  return chip.kind === 'text'
-    ? `Pasted text, ${plural(chip.lines, 'line')}, ${chip.size}`
-    : `Pasted image, ${chip.width}x${chip.height}, ${chip.size}`
+function reading(chip: Attachment, noImages: string): string {
+  if (chip.kind === 'text') return `Pasted text, ${plural(chip.lines, 'line')}, ${chip.size}`
+  if (chip.blocked) return `Pasted image, not sent. ${noImages}`
+  return `Pasted image, ${chip.width}x${chip.height}, ${chip.size}`
 }
 
 // The image files on the clipboard. Read before the first await: the clipboard is only
@@ -135,6 +146,7 @@ function FileGlyph(): React.JSX.Element {
 // model picker, the called agent, STOP and SEND. The box owns the typed text and what was
 // pasted into it; the screen only gets the finished message.
 function Composer({
+  provider,
   label,
   placeholder,
   running,
@@ -181,7 +193,13 @@ function Composer({
   const id = useId()
   const helpId = `${id}-help`
 
-  const canSend = text.trim() !== '' || attachments.length > 0
+  const imagesOk = can(provider, 'images')
+  const providerName = PROVIDERS[provider].name
+  // The sentence for a picture this chat cannot take: on its chip, and under the image button.
+  const noImages = `${providerName} chats can't take images yet.`
+  // A picture that is NOT SENT is not part of the message.
+  const sendable = attachments.filter((chip) => !(chip.kind === 'image' && chip.blocked))
+  const canSend = text.trim() !== '' || sendable.length > 0
   const lines = useMemo(() => countLines(text), [text])
 
   // The blob: URLs of images that were never sent are given back when the box goes away.
@@ -190,7 +208,9 @@ function Composer({
     return () => {
       mounted.current = false
       // Read when the box goes away, on purpose: it is whatever is left then.
-      for (const chip of latest.current) if (chip.kind === 'image') URL.revokeObjectURL(chip.url)
+      for (const chip of latest.current) {
+        if (chip.kind === 'image' && chip.url !== '') URL.revokeObjectURL(chip.url)
+      }
     }
   }, [])
 
@@ -217,7 +237,9 @@ function Composer({
         text,
         list.flatMap((chip) => (chip.kind === 'text' ? [chip.text] : []))
       ),
-      list.flatMap((chip) => (chip.kind === 'image' ? [{ bytes: chip.bytes, url: chip.url }] : []))
+      list.flatMap((chip) =>
+        chip.kind === 'image' && !chip.blocked ? [{ bytes: chip.bytes, url: chip.url }] : []
+      )
     )
     // The images went with the message: their URLs now belong to the history.
     setList([])
@@ -278,7 +300,30 @@ function Composer({
     const files = imageFilesOf(data)
     if (files.length === 0) return
     event.preventDefault()
+    if (!imagesOk) {
+      holdBlocked(files)
+      return
+    }
     void addImages(files)
+  }
+
+  // A chat that cannot take images still keeps what was pasted, with the reason, so nothing
+  // disappears without a word. Nothing is read or checked: it will not be sent.
+  function holdBlocked(files: File[]): void {
+    setError(null)
+    const chips: ImageChip[] = files.map((file) => ({
+      kind: 'image',
+      id: nextId.current++,
+      bytes: new Uint8Array(new ArrayBuffer(0)),
+      url: '',
+      width: 0,
+      height: 0,
+      size: '',
+      blocked: true,
+      name: file.name.trim() !== '' ? file.name : 'Pasted image'
+    }))
+    setList([...latest.current, ...chips])
+    announce(`Pasted image not sent. ${noImages}`)
   }
 
   // Reads the files and checks them, in paste order: size, type, side, that the browser can
@@ -371,7 +416,7 @@ function Composer({
   }
 
   function removeChip(chip: Attachment): void {
-    if (chip.kind === 'image') URL.revokeObjectURL(chip.url)
+    if (chip.kind === 'image' && chip.url !== '') URL.revokeObjectURL(chip.url)
     setList(latest.current.filter((other) => other.id !== chip.id))
     setError(null)
     announce(chip.kind === 'image' ? 'Pasted image removed' : 'Pasted text removed')
@@ -402,22 +447,29 @@ function Composer({
       {attachments.length > 0 && (
         <ul ref={chipsRef} className="composer-attachments" aria-label="Pasted attachments">
           {attachments.map((chip) => (
-            <li key={chip.id} className="composer-chip">
+            <li
+              key={chip.id}
+              className={`composer-chip${chip.kind === 'image' && chip.blocked ? ' composer-chip--blocked' : ''}`}
+            >
               {chip.kind === 'text' ? (
                 <FileGlyph />
+              ) : chip.blocked ? (
+                <PixelIcon name="image" size={16} className="composer-chip__icon" />
               ) : (
                 <img className="composer-chip__thumb" src={chip.url} alt="" />
               )}
               <span className="composer-chip__label" aria-hidden="true">
-                {chip.kind === 'text' ? 'PASTED' : 'IMAGE'}
+                {chip.kind === 'text' ? 'PASTED' : chip.blocked ? 'NOT SENT' : 'IMAGE'}
               </span>
               <span className="composer-chip__detail" aria-hidden="true">
                 {chip.kind === 'text'
                   ? `${plural(chip.lines, 'line')} · ${chip.size}`
-                  : `${chip.width}x${chip.height} · ${chip.size}`}
+                  : chip.blocked
+                    ? `${chip.name}: ${noImages}`
+                    : `${chip.width}x${chip.height} · ${chip.size}`}
               </span>
               <span id={`${id}-chip-${chip.id}`} className="visually-hidden">
-                {reading(chip)}
+                {reading(chip, noImages)}
               </span>
               <button
                 type="button"
@@ -461,8 +513,22 @@ function Composer({
       />
 
       <div className="composer-toolbar">
+        {/* A chat that runs without asking says so here, and it cannot be hidden. */}
+        {!can(provider, 'approvals') && <NoApprovalsTag provider={provider} />}
         {picker}
         {agent}
+        {/* Where you would look for it: dashed, with the reason. It stays reachable by keyboard. */}
+        {!imagesOk && (
+          <button
+            type="button"
+            className="composer-image"
+            aria-disabled="true"
+            aria-label={`Attach image. Images can't be sent in ${providerName} chats yet.`}
+            title={`Images can't be sent in ${providerName} chats yet.`}
+          >
+            <PixelIcon name="image" size={20} />
+          </button>
+        )}
         {/* The room left over. The line count or the key hint shows in it only when it fits
             whole, so it never squeezes the chips and is never cut in half. */}
         <span className="composer-spacer">

@@ -239,3 +239,22 @@
     display: none;
   }
 }
+
+/* The chat's provider in the breadcrumb: its glyph and name between the title and the project. */
+.title-bar__provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.title-bar__provider-name {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+}
+
+.title-bar--blurred .title-bar__provider {
+  color: var(--muted);
+}

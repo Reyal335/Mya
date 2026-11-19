@@ -1,0 +1,26 @@
+/* From designs/21c-chat-history.html, state 4: a dashed box, the idle sprite, and two lines. */
+.empty-chats {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 12px;
+  background: var(--bg);
+  border: 3px dashed var(--line);
+  text-align: center;
+}
+
+.empty-chats__title {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.empty-chats__text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}

@@ -1,9 +1,13 @@
+import PixelIcon, { type PixelIconName } from './PixelIcon'
 import './NavItem.css'
 
 type NavItemProps = {
   label: string
+  icon: PixelIconName
   active: boolean
   onClick: () => void
+  // The icon's color when it is not the current row: the trophy is --waiting.
+  tone?: 'muted' | 'waiting'
   count?: number
   // A red dot: something new to see here.
   dot?: boolean
@@ -11,29 +15,56 @@ type NavItemProps = {
   dotLabel?: string
   // 8px, or 6px (CHAT's fight dot).
   dotSize?: 'normal' | 'small'
+  // The rail: a 44px square with the icon alone. The label is its name and its tooltip.
+  rail?: boolean
+  // What a screen reader says in the rail, such as "Inbox, 2 waiting".
+  railName?: string
 }
 
+// One of the five screens in the sidebar. A link, not a button: it goes somewhere.
 function NavItem({
   label,
+  icon,
   active,
   onClick,
+  tone = 'muted',
   count,
   dot = false,
   dotLabel,
-  dotSize = 'normal'
+  dotSize = 'normal',
+  rail = false,
+  railName
 }: NavItemProps): React.JSX.Element {
   const showCount = count !== undefined && count > 0
+  const classes = [
+    'nav-item',
+    active ? 'nav-item--active' : '',
+    tone === 'waiting' ? 'nav-item--waiting' : '',
+    rail ? 'nav-item--rail' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <button
-      type="button"
-      className={active ? 'nav-item nav-item--active' : 'nav-item'}
+    <a
+      href={`#${label.toLowerCase()}`}
+      className={classes}
       aria-current={active ? 'page' : undefined}
-      onClick={onClick}
+      aria-label={rail ? (railName ?? label) : undefined}
+      title={rail ? label : undefined}
+      onClick={(event) => {
+        event.preventDefault()
+        onClick()
+      }}
     >
-      <span>{label}</span>
+      <PixelIcon name={icon} size={rail ? 20 : 16} className="nav-item__icon" />
+      {!rail && <span className="nav-item__label">{label}</span>}
       {showCount && (
-        <span className="nav-item__count" aria-label={`${count} unread`}>
+        <span
+          className="nav-item__count"
+          aria-label={rail ? undefined : `${count} unread`}
+          aria-hidden={rail ? 'true' : undefined}
+        >
           {count}
         </span>
       )}
@@ -44,7 +75,7 @@ function NavItem({
           aria-label={dotLabel ?? 'New'}
         />
       )}
-    </button>
+    </a>
   )
 }
 

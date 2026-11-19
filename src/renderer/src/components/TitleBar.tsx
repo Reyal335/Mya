@@ -2,6 +2,8 @@ import type { MouseEvent } from 'react'
 import { useWindowState } from '../hooks/useWindowState'
 import type { Crumb } from './titleBarCrumb'
 import AppIcon from './AppIcon'
+import ProviderGlyph from './ProviderGlyph'
+import { PROVIDERS } from '../../../shared/providers'
 import './TitleBar.css'
 
 // The app name in capitals, as the code names the app everywhere else.
@@ -115,7 +117,21 @@ function TitleBar({
               {crumb.screen} <span aria-hidden="true">/</span>{' '}
             </span>
             <span className="title-bar__item">{crumb.item.main}</span>
-            {crumb.item.rest && <span className="title-bar__rest"> {crumb.item.rest}</span>}
+            {crumb.item.provider && (
+              <span className="title-bar__provider">
+                {' '}
+                <span aria-hidden="true">·</span> <ProviderGlyph provider={crumb.item.provider} />
+                <span className="title-bar__provider-name">
+                  {PROVIDERS[crumb.item.provider].label}
+                </span>
+              </span>
+            )}
+            {crumb.item.rest && (
+              <span className="title-bar__rest">
+                {' '}
+                <span aria-hidden="true">·</span> {crumb.item.rest}
+              </span>
+            )}
           </>
         ) : (
           <span className="title-bar__screen-only">{crumb.screen}</span>

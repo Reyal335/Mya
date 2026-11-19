@@ -56,6 +56,14 @@ export function providerOf(model: string): ProviderId {
   return 'claude'
 }
 
+// The model a chat of a provider starts on when nothing else says: AUTO for Claude, the
+// provider's default for the others.
+export function defaultModelFor(provider: ProviderId): string {
+  if (provider === 'codex') return 'codex:gpt-5.3-codex'
+  if (provider === 'gemini') return 'gemini:gemini-2.5-pro'
+  return AUTO
+}
+
 export function stripProvider(model: string): string {
   const idx = model.indexOf(':')
   return idx >= 0 ? model.slice(idx + 1) : model

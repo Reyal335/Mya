@@ -2,7 +2,11 @@ import type { ToolInput, ToolState } from '../../../shared/ipc'
 import { toolLabel, type ToolLabel } from '../../../shared/toolLabel'
 import './ToolCard.css'
 
-type ToolCardProps = { state: ToolState } & (
+type ToolCardProps = {
+  state: ToolState
+  // A chat that runs without asking (Codex, Gemini): the card says so from the moment it appears.
+  notAsked?: boolean
+} & (
   | { name: string; input: ToolInput | null; projectPath: string | null }
   // A label already made, as a task's saved activity keeps it.
   | { label: ToolLabel }
@@ -37,6 +41,12 @@ function ToolCard(props: ToolCardProps): React.JSX.Element {
         )}
       </span>
       <span className="tool-card__state">{STATE_LABELS[state]}</span>
+      {props.notAsked && (
+        <span className="tool-card__not-asked" title="Ran without asking">
+          <span className="tool-card__not-asked-square" aria-hidden="true" />
+          NOT ASKED
+        </span>
+      )}
     </div>
   )
 }

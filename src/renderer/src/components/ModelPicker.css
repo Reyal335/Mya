@@ -344,3 +344,50 @@
   font-size: 11px;
   color: var(--muted);
 }
+
+/* A model with no thinking levels: a dashed line says so (Codex and Gemini have no AUTO level). */
+.model-picker__no-levels {
+  margin: 0;
+  padding: 8px 10px;
+  border: var(--border-thin) dashed var(--line);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* The last row: the way to another provider is a new chat. */
+.model-picker__other {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: var(--border-thin) solid var(--line);
+}
+
+.model-picker__other .model-picker__note {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-picker__new {
+  min-height: 32px;
+  padding: 0 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border-thin) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.model-picker__new:hover {
+  border-color: var(--accent);
+}
+
+.model-picker__new[aria-disabled='true'] {
+  color: var(--muted);
+  border-style: dashed;
+  cursor: not-allowed;
+}

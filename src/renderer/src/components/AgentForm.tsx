@@ -18,6 +18,7 @@ import {
   safeFileStem,
   TOOL_CHOICES
 } from '../../../shared/agentRules'
+import { PROVIDERS, agentModelGroups, pinnedNote } from '../../../shared/providers'
 import AgentIcon from './AgentIcon'
 import './AgentForm.css'
 
@@ -323,10 +324,9 @@ function AgentFields({
     }
   }
 
-  const modelOptions: string[] = [...MODEL_CHOICES]
-  if (initial.model !== '' && !modelOptions.includes(initial.model)) {
-    modelOptions.push(initial.model)
-  }
+  // The models, grouped by provider. A model this list does not know stays in its group.
+  const modelGroups = agentModelGroups(MODEL_CHOICES, initial.model)
+  const pinned = pinnedNote(values.model)
 
   return (
     <form
@@ -539,15 +539,28 @@ function AgentFields({
             id={`${id}-model`}
             className="agent-form__input"
             value={values.model}
+            aria-describedby={pinned ? `${id}-model-note` : undefined}
             onChange={(event) => update({ model: event.target.value })}
           >
-            <option value="">Default</option>
-            {modelOptions.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
+            <option value="">Follow the chat</option>
+            {initial.model === 'inherit' && (
+              <option value="inherit">Follow the chat (inherit)</option>
+            )}
+            {modelGroups.map((group) => (
+              <optgroup key={group.provider} label={PROVIDERS[group.provider].label}>
+                {group.models.map((model) => (
+                  <option key={model.value} value={model.value}>
+                    {model.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
+          {pinned && (
+            <p id={`${id}-model-note`} className="agent-form__note">
+              {pinned}
+            </p>
+          )}
         </div>
         <fieldset className="agent-form__scope">
           <legend className="agent-form__label agent-form__legend">SCOPE</legend>

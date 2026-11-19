@@ -31,11 +31,11 @@ import { labelText, toolLabel } from '../shared/toolLabel'
 import { noteRateLimit, readAccountFromRun } from './account'
 import { listAgents } from './agents'
 import {
+  ensureOpenChat,
   getChatSession,
-  setChatChoice,
+  recordMessage,
   setChatSession,
-  setChatTheme,
-  setProviderSession
+  type ChatRecord
 } from './chats'
 import { historyItems, type RecordedMessage, type SavedTask } from './history'
 import { DENY_MESSAGE, forIpc, isAgentTool } from './ipcInput'
@@ -49,9 +49,17 @@ import { choiceForRun } from './modelChoice'
 import { userContent, type SendImage } from './pastedImages'
 import { recordRunEnd, recordTaskStart } from './progressionStore'
 import { childEnv, claudeExecutable, loadSdk, type Sdk } from './sdk'
-import { getDefaultChoice, getTestCommand } from './settings'
+import { getTestCommand } from './settings'
 import { voiceAppend } from './voice'
-import { AUTO, AUTO_CHOICE, isEffortLevel, providerOf, type ModelChoice } from '../shared/models'
+import {
+  AUTO,
+  AUTO_CHOICE,
+  isEffortLevel,
+  providerOf,
+  type ModelChoice,
+  type ProviderId
+} from '../shared/models'
+import { PROVIDERS, can, canCallAgent } from '../shared/providers'
 import {
   createInputQueue,
   createMessageTracker,
@@ -100,6 +108,13 @@ const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 type Run = {
   requestId: string
   cwd: string
+  // The chat this run belongs to: the open one when it started. It cannot change during the run.
+  chatId: string
+  // The provider of the chat this run belongs to. It never changes.
+  provider: ProviderId
+  // The reply text so far, until it is kept as a message: a tool card or the end of the run
+  // closes it.
+  replyBuffer: string
   sender: WebContents
   // The messages into Claude Code. The run ends when main closes it.
   input: InputQueue<SDKUserMessage>
@@ -159,10 +174,14 @@ export type RunWatcher = {
     // The agent asking, or null when Claude itself asks.
     agent: TaskAgent | null
     cwd: string
+    // The chat the request is in.
+    chatId: string
   }) => void
   requestClosed: (permissionId: string) => void
   taskEnded: (task: {
     runId: string
+    chatId: string
+    provider: ProviderId
     taskId: string
     status: TaskEndStatus
     report: string
@@ -172,6 +191,8 @@ export type RunWatcher = {
   }) => void
   runEnded: (run: {
     runId: string
+    chatId: string
+    provider: ProviderId
     outcome: 'done' | 'stopped' | AgentError
     reply: string
   }) => void
@@ -227,9 +248,53 @@ function errorMessage(err: unknown): string {
 }
 
 function emit(run: Run, event: AgentEvent): void {
+  keepReply(run, event)
   if (!run.sender.isDestroyed()) {
     run.sender.send(IpcChannel.AgentEvent, event)
   }
+}
+
+// Mya keeps the text of each chat (see chats.ts). Reply text is gathered as it is sent to the
+// window and kept as one message when a tool card, an agent card, or the end of the run closes it,
+// the same places the window starts a new reply.
+function keepReply(run: Run, event: AgentEvent): void {
+  switch (event.type) {
+    case 'text':
+      run.replyBuffer += event.text
+      return
+    case 'tool_start':
+    case 'task_start':
+    case 'done':
+    case 'stopped':
+    case 'error': {
+      const text = run.replyBuffer
+      run.replyBuffer = ''
+      if (text.trim() === '' || run.chatId === '') return
+      recordMessage(run.cwd, run.chatId, { role: 'assistant', text, at: Date.now() }).catch(
+        (err: unknown) =>
+          console.error(`${stamp()} [agent] Could not keep a reply:`, errorMessage(err))
+      )
+      return
+    }
+  }
+}
+
+// What I sent, kept as text. Never blocks or fails the message.
+function keepMessage(
+  run: Run,
+  prompt: string,
+  images: SendImage[],
+  agent: string | undefined
+): Promise<void> {
+  return recordMessage(run.cwd, run.chatId, {
+    role: 'user',
+    text: prompt,
+    at: Date.now(),
+    ...(images.length > 0 ? { images: images.length } : {}),
+    ...(agent ? { agent } : {})
+  }).catch((err: unknown) =>
+    console.error(`${stamp()} [agent] Could not keep a message:`, errorMessage(err))
+  )
 }
 
 // How an agent named `name` looks: from my agent files, or as a built-in agent.
@@ -299,6 +364,7 @@ async function readTestRun(
     if (!result) return
     await recordTestRun({
       projectPath: run.cwd,
+      chatId: run.chatId,
       sessionId: run.sessionId,
       toolId: block.tool_use_id,
       taskId: call.taskId,
@@ -367,6 +433,18 @@ function unavailable(message: string): AgentSendResult {
   return { ok: false, error: { code: 'agent_unavailable', message } }
 }
 
+// A provider that cannot take images refuses a message that carries them, so none is dropped
+// without a word (the window already marks such a picture NOT SENT).
+function noImages(provider: ProviderId): AgentSendResult {
+  return {
+    ok: false,
+    error: {
+      code: 'invalid_image',
+      message: `${PROVIDERS[provider].name} chats can't take images yet.`
+    }
+  }
+}
+
 function readCall(raw: unknown): { scope: string; filePath: string } | null | 'invalid' {
   if (raw === undefined || raw === null) return null
   if (typeof raw !== 'object') return 'invalid'
@@ -381,13 +459,17 @@ type CallCheck = { ok: true; name: string } | { ok: false; message: string }
 // still exist, be the one that wins under its name, and be allowed to run.
 function checkCall(
   call: { scope: string; filePath: string },
-  listed: Awaited<ReturnType<typeof listAgents>>
+  listed: Awaited<ReturnType<typeof listAgents>>,
+  provider: ProviderId
 ): CallCheck {
   if (!listed.ok) return { ok: false, message: listed.error.message }
   const agent = listed.agents.find(
     (entry) => entry.filePath === call.filePath && entry.scope === call.scope
   )
   if (!agent) return { ok: false, message: 'This agent no longer exists.' }
+  // An agent pinned to another provider cannot run in this chat.
+  const pinned = canCallAgent(agent, provider)
+  if (!pinned.ok) return { ok: false, message: `${pinned.reason}. ${pinned.hint}` }
   const block = callBlock(agent, listed.agents)
   if (block) return { ok: false, message: block.message }
   return { ok: true, name: agent.name }
@@ -408,6 +490,9 @@ function newRun(cwd: string, sender: WebContents): Run {
   return {
     requestId: randomUUID(),
     cwd,
+    chatId: '',
+    provider: 'claude',
+    replyBuffer: '',
     sender,
     input: createInputQueue<SDKUserMessage>(),
     messages: createMessageTracker(),
@@ -483,12 +568,15 @@ async function joinRun(
   images: SendImage[]
 ): Promise<AgentSendResult | null> {
   let text = prompt
+  let called: string | undefined
   if (call) {
     if (run.openTasks.size >= MAX_AGENTS) return unavailable(FULL_MESSAGE)
-    const checked = checkCall(call, await listAgents())
+    const checked = checkCall(call, await listAgents(), run.provider)
     if (!checked.ok) return unavailable(checked.message)
     text = withCall(checked.name, prompt)
+    called = checked.name
   }
+  if (images.length > 0 && !can(run.provider, 'images')) return noImages(run.provider)
 
   // Nothing async from here to the push, so the run cannot close in between: the
   // message is in the run, or the run is closed and the caller starts a new one.
@@ -497,6 +585,7 @@ async function joinRun(
   if (!pushToRun(run.input, run.messages, userMessage(text, messageId, images), messageId)) {
     return null
   }
+  void keepMessage(run, prompt, images, called)
   return { ok: true, requestId: run.requestId, joined: true }
 }
 
@@ -514,22 +603,33 @@ async function startRun(
   activeRun = run
 
   let text = prompt
+  let called: string | undefined
   try {
+    // The message goes to the open chat. A project with none yet gets one now.
+    const chat = await ensureOpenChat(cwd)
+    run.chatId = chat.id
+    run.provider = chat.provider
+    if (images.length > 0 && !can(chat.provider, 'images')) {
+      abandonRun(run)
+      return noImages(chat.provider)
+    }
     const listed = await listAgents()
     run.agents = listed.ok ? listed.agents : []
     if (call) {
-      const checked = checkCall(call, listed)
+      const checked = checkCall(call, listed, chat.provider)
       if (!checked.ok) {
         abandonRun(run)
         return unavailable(checked.message)
       }
       text = withCall(checked.name, prompt)
+      called = checked.name
     }
   } catch (err) {
     abandonRun(run)
     return { ok: false, error: { code: 'sdk_error', message: errorMessage(err) } }
   }
 
+  await keepMessage(run, prompt, images, called)
   run.input.push(userMessage(text, messageId, images))
   run.settleReady(true)
   void execute(run)
@@ -604,7 +704,8 @@ function permissionHandler(run: Run): CanUseTool {
           input: shown.input,
           truncated: shown.truncated,
           agent: agentName ? lookOf(run.agents, agentName) : null,
-          cwd: run.cwd
+          cwd: run.cwd,
+          chatId: run.chatId
         })
       )
       // notify returns nothing, so log whether a watcher was there to hear the request.
@@ -725,6 +826,8 @@ async function endRunTask(
   notify((w) =>
     w.taskEnded({
       runId: run.requestId,
+      chatId: run.chatId,
+      provider: run.provider,
       taskId,
       status,
       report,
@@ -738,14 +841,14 @@ async function endRunTask(
 // The saved session to resume, or null. A saved id whose session is gone is
 // forgotten, with a notice in the conversation.
 async function sessionToResume(sdk: Sdk, run: Run): Promise<string | null> {
-  const saved = await getChatSession(run.cwd)
+  const saved = await getChatSession(run.cwd, run.chatId)
   if (!saved) return null
   const info = await sdk.getSessionInfo(saved, { dir: run.cwd }).catch(() => undefined)
   if (info) return saved
   // getSessionInfo is also undefined for a session it cannot summarize.
   const messages = await sdk.getSessionMessages(saved, { dir: run.cwd, limit: 1 }).catch(() => [])
   if (messages.length > 0) return saved
-  await setChatSession(run.cwd, null)
+  await setChatSession(run.cwd, run.chatId, null)
   emit(run, { requestId: run.requestId, type: 'notice', text: NOT_FOUND_NOTICE })
   return null
 }
@@ -797,6 +900,7 @@ async function execute(run: Run): Promise<void> {
       const cliResult = await executeCliProvider({
         requestId: run.requestId,
         cwd: run.cwd,
+        chatId: run.chatId,
         choice: run.choice,
         abortController: run.abortController,
         agents: run.agents,
@@ -810,6 +914,8 @@ async function execute(run: Run): Promise<void> {
           notify((w) =>
             w.taskEnded({
               runId: run.requestId,
+              chatId: run.chatId,
+              provider: run.provider,
               taskId,
               status,
               report,
@@ -898,7 +1004,7 @@ async function execute(run: Run): Promise<void> {
               if (resumed && message.session_id !== resumed) {
                 emit(run, { requestId: run.requestId, type: 'notice', text: NOT_FOUND_NOTICE })
               }
-              await setChatSession(run.cwd, message.session_id)
+              await setChatSession(run.cwd, run.chatId, message.session_id)
             }
           }
           break
@@ -1040,6 +1146,7 @@ async function execute(run: Run): Promise<void> {
                 id: block.id,
                 projectPath: run.cwd,
                 sessionId: run.sessionId,
+                chatId: run.chatId,
                 agent: { name, scope: agent.scope, filePath: agent.filePath },
                 description,
                 prompt: typeof input.prompt === 'string' ? input.prompt : ''
@@ -1148,7 +1255,7 @@ async function execute(run: Run): Promise<void> {
     }
     // A resumed session that Claude Code could not find: start fresh next time.
     if (resumed && outcome !== 'done' && outcome?.message.includes('No conversation found')) {
-      await setChatSession(run.cwd, null).catch(() => {})
+      await setChatSession(run.cwd, run.chatId, null).catch(() => {})
     }
     if (activeRun === run) {
       activeRun = null
@@ -1173,33 +1280,23 @@ async function execute(run: Run): Promise<void> {
     } else {
       emit(run, { requestId: run.requestId, type: 'error', ...ended })
     }
-    notify((w) => w.runEnded({ runId: run.requestId, outcome: ended, reply: run.reply }))
+    notify((w) =>
+      w.runEnded({
+        runId: run.requestId,
+        chatId: run.chatId,
+        provider: run.provider,
+        outcome: ended,
+        reply: run.reply
+      })
+    )
     void recordRunEnd(ended === 'done')
-    await runEnded(run.cwd, run.sessionId)
+    await runEnded(run.cwd, run.sessionId, run.chatId)
     // Last: a message waiting to start a new run goes ahead only after this run's events.
     run.settleDone()
   }
 }
 
 // --- The main conversation's saved history ---------------------------------
-
-// NEW CHAT: forget the project's session id. The session file stays where it is.
-export async function resetChat(
-  cwd: string
-): Promise<{ ok: true } | { ok: false; error: AgentError }> {
-  if (activeRun) {
-    return { ok: false, error: { code: 'busy', message: 'A run is already in progress.' } }
-  }
-  await setChatSession(cwd, null)
-  await setProviderSession(cwd, 'codex', null)
-  await setProviderSession(cwd, 'gemini', null)
-  // The new chat starts from the saved defaults. With "Use for new chats too" the
-  // defaults are the last pick, so it starts on the same choice.
-  await setChatChoice(cwd, await getDefaultChoice())
-  // And with no chat theme of its own: it uses the default theme.
-  await setChatTheme(cwd, null)
-  return { ok: true }
-}
 
 // A pick in the model picker while a run is going. The model goes through
 // setModel (no argument is AUTO) and the thinking level through applyFlagSettings
@@ -1230,16 +1327,36 @@ export async function applyChoiceToRun(next: ModelChoice): Promise<void> {
   }
 }
 
-// The last 200 messages of the project's saved conversation, as items. Only the
-// SDK reads the session file.
-export async function loadChatHistory(cwd: string): Promise<ChatHistory> {
-  const empty: ChatHistory = { items: [], truncated: false, unavailable: false }
-  const saved = await getChatSession(cwd)
-  if (!saved) return empty
+// The last 200 messages of a chat's saved conversation, as items. Only the SDK reads the
+// session file, so only a Claude chat has any. A Codex or Gemini chat opens empty: the provider
+// keeps the thread but gives Mya no way to read it back.
+export async function loadChatHistory(cwd: string, chat: ChatRecord | null): Promise<ChatHistory> {
+  const empty: ChatHistory = {
+    chatId: chat?.id ?? null,
+    items: [],
+    truncated: false,
+    unavailable: false,
+    notShown: false,
+    resume: null,
+    updatedAt: chat?.updatedAt ?? 0,
+    messageCount: chat?.messageCount ?? 0
+  }
+  if (!chat) return empty
+  const begun = chat.messageCount > 0 || chat.providerSessionId !== null
+  if (chat.provider !== 'claude') {
+    return {
+      ...empty,
+      notShown: begun,
+      resume: begun ? (chat.providerSessionId ? 'continues' : 'fresh') : null
+    }
+  }
+  const saved = chat.providerSessionId
+  // Messages Mya has but no session to read them from: Claude Code lost it.
+  if (!saved) return { ...empty, unavailable: chat.messageCount > 0, resume: begun ? 'fresh' : null }
   try {
     const sdk = await loadSdk()
     const messages = await sdk.getSessionMessages(saved, { dir: cwd })
-    if (messages.length === 0) return { ...empty, unavailable: true }
+    if (messages.length === 0) return { ...empty, unavailable: true, resume: 'fresh' }
     const shown = messages.slice(-HISTORY_LIMIT)
     const listed = await listAgents()
     const agents = listed.ok ? listed.agents : []
@@ -1259,9 +1376,14 @@ export async function loadChatHistory(cwd: string): Promise<ChatHistory> {
       tasks,
       agentFor: (name) => lookOf(agents, name)
     })
-    return { items, truncated: messages.length > HISTORY_LIMIT, unavailable: false }
+    return {
+      ...empty,
+      items,
+      truncated: messages.length > HISTORY_LIMIT,
+      resume: 'continues'
+    }
   } catch (err) {
     console.error(`${stamp()} [agent] Could not load the conversation history:`, errorMessage(err))
-    return { ...empty, unavailable: true }
+    return { ...empty, unavailable: true, resume: 'fresh' }
   }
 }

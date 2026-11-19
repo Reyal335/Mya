@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AUTO_CHOICE,
-  resolveChoice,
   type ModelChoice,
-  type ModelLists
+  type ModelLists,
+  type ProviderId
 } from '../../../shared/models'
+import { providerModels, resolveProviderChoice } from '../../../shared/providers'
 
 export type ModelChoiceStore = {
   // The models the account can use, or null until loaded, or when loading failed.
   lists: ModelLists | null
+  // The same list as the picker offers it: a chat runs one provider for good, so only that
+  // provider's models are offered (and AUTO, Claude Code's own default, only on Claude).
+  pickerLists: ModelLists | null
+  // The open chat's provider.
+  provider: ProviderId
   // The model list could not be loaded: the picker offers AUTO only.
   listFailed: boolean
   // The open chat's model and thinking choice, made to fit the models available now.
@@ -26,11 +32,16 @@ export type ModelChoiceStore = {
 
 // The model list and the open chat's model and thinking choice. Main keeps both:
 // the window only shows them and asks for changes.
-export function useModelChoice(projectPath: string): ModelChoiceStore {
+export function useModelChoice(
+  projectPath: string,
+  chatProvider: ProviderId = 'claude'
+): ModelChoiceStore {
   const [lists, setLists] = useState<ModelLists | null>(null)
   const [listFailed, setListFailed] = useState(false)
   const [choice, setChoice] = useState<ModelChoice>(AUTO_CHOICE)
   const [asDefault, setAsDefault] = useState(true)
+  // The chat's provider as main last said it.
+  const [provider, setProvider] = useState<ProviderId>(chatProvider)
   const latestLoad = useRef(0)
   const latestPick = useRef(0)
   // Picks sent to main and not answered yet.
@@ -54,7 +65,10 @@ export function useModelChoice(projectPath: string): ModelChoiceStore {
           setListFailed(true)
         }
         // A pick still being saved is newer than what was loaded.
-        if (saved.ok && picking.current === 0) setChoice(saved.choice)
+        if (saved.ok && picking.current === 0) {
+          setChoice(saved.choice)
+          setProvider(saved.provider)
+        }
       },
       (err: unknown) => {
         console.error('Could not load the model choice:', err)
@@ -71,7 +85,7 @@ export function useModelChoice(projectPath: string): ModelChoiceStore {
     (next: ModelChoice): void => {
       // The level is made to fit the model now, as main does, so the control never
       // shows a level the model does not take.
-      const fitted = resolveChoice(next, listsRef.current).choice
+      const fitted = resolveProviderChoice(next, listsRef.current, provider).choice
       const request = ++latestPick.current
       picking.current++
       setChoice(fitted)
@@ -80,8 +94,10 @@ export function useModelChoice(projectPath: string): ModelChoiceStore {
         .then((result) => {
           picking.current--
           if (request !== latestPick.current) return
-          if (result.ok) setChoice(result.choice)
-          else reload()
+          if (result.ok) {
+            setChoice(result.choice)
+            setProvider(result.provider)
+          } else reload()
         })
         .catch((err: unknown) => {
           picking.current--
@@ -89,8 +105,29 @@ export function useModelChoice(projectPath: string): ModelChoiceStore {
           if (request === latestPick.current) reload()
         })
     },
-    [asDefault, reload]
+    [asDefault, reload, provider]
   )
 
-  return { lists, listFailed, choice, asDefault, setAsDefault, pick, reload }
+  const pickerLists = useMemo(
+    () =>
+      lists || provider !== 'claude'
+        ? {
+            auto: lists?.auto ?? { resolvedModel: null, name: null, effortLevels: null },
+            models: providerModels(lists, provider)
+          }
+        : null,
+    [lists, provider]
+  )
+
+  return {
+    lists,
+    pickerLists,
+    provider,
+    listFailed,
+    choice,
+    asDefault,
+    setAsDefault,
+    pick,
+    reload
+  }
 }

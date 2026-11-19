@@ -3,10 +3,12 @@
 
 import type { AccountData } from './account'
 import type { BossListItem, Fight, FightEvent } from './bosses'
+import type { ChatList, ChatSearchResults, ChatStarts, ChatsResult } from './chats'
 import type { AchievementsData, Equipped, Reward, RewardKind, UnlockNotice } from './achievements'
 import type { PastedImage } from './images'
+import type { ProviderErrorCode } from './logins'
 import type { MascotStateName, MascotVoice } from './mascotRules'
-import type { ModelChoice, ModelLists } from './models'
+import type { ModelChoice, ModelLists, ProviderId } from './models'
 import type { AgentProgress, AgentStats, TaskLoot, TaskXp } from './progression'
 import type { ThemeChoice, ThemeInfo } from './themes'
 
@@ -38,7 +40,19 @@ export const IpcChannel = {
   // Main to every window: the active mascot or its sheets changed.
   MascotsChanged: 'mascots:changed',
   ChatHistory: 'chat:history',
-  ChatReset: 'chat:reset',
+  // The project's chats: the list, and what HISTORY does with them.
+  ChatsList: 'chats:list',
+  ChatsOpen: 'chats:open',
+  ChatsCreate: 'chats:create',
+  ChatsStarts: 'chats:starts',
+  ChatsRename: 'chats:rename',
+  ChatsPin: 'chats:pin',
+  ChatsRemove: 'chats:remove',
+  ChatsFork: 'chats:fork',
+  ChatsExport: 'chats:export',
+  ChatsSearch: 'chats:search',
+  // Main to every window: a chat was made, renamed, titled, counted, pinned, or deleted.
+  ChatsChanged: 'chats:changed',
   ChatGetModelChoice: 'chat:get-model-choice',
   ChatSetModelChoice: 'chat:set-model-choice',
   ModelsList: 'models:list',
@@ -122,7 +136,10 @@ export const IpcChannel = {
   ProvidersCancelLogin: 'providers:cancel-login',
   ProvidersSaveApiKey: 'providers:save-api-key',
   ProvidersLogout: 'providers:logout',
-  ProvidersInstallCli: 'providers:install-cli'
+  ProvidersInstallCli: 'providers:install-cli',
+  ProvidersCancelInstall: 'providers:cancel-install',
+  // Main to the window that asked: where the install is, as one line from npm.
+  ProvidersInstallProgress: 'providers:install-progress'
 } as const
 
 export type ProjectInfo = {
@@ -267,6 +284,10 @@ export type TaskSummary = {
   startedAt: number
   endedAt: number | null
   seen: boolean
+  // The chat that brought the agent in, or null when it is not known.
+  chatId: string | null
+  // The provider that ran it: its chat's. A task whose chat is not known was Claude's.
+  provider: ProviderId
   // Set when the task ended as done (loot) and its agent file earned XP (xp).
   loot: TaskLoot | null
   xp: TaskXp | null
@@ -313,11 +334,21 @@ export type HistoryItem =
     }
 
 export type ChatHistory = {
+  // The chat these belong to, or null when the project has none.
+  chatId: string | null
   items: HistoryItem[]
   // More than 200 messages: only the last 200 are in items.
   truncated: boolean
   // The saved conversation could not be read.
   unavailable: boolean
+  // The chat has messages its provider cannot bring back (Codex and Gemini): it opens empty.
+  notShown: boolean
+  // Whether sending continues the chat's own provider session, or starts a fresh one in the same
+  // chat. null for a chat with no messages.
+  resume: 'continues' | 'fresh' | null
+  // When the chat was last used and how many messages Mya has of it, for the RESUMED line.
+  updatedAt: number
+  messageCount: number
 }
 
 export type PartyPanelMode = 'open' | 'rail'
@@ -326,9 +357,10 @@ export type PartyPanelMode = 'open' | 'rail'
 // or why the list could not be loaded.
 export type ModelsResult = ({ ok: true } & ModelLists) | { ok: false; message: string }
 
-// The open chat's choice, made to fit what is available now, or why it failed.
+// The open chat's choice, made to fit what is available now, or why it failed. `provider` is
+// the chat's: it is fixed when the chat is made, and the chat only runs that provider's models.
 export type ModelChoiceResult =
-  { ok: true; choice: ModelChoice } | { ok: false; error: { message: string } }
+  { ok: true; choice: ModelChoice; provider: ProviderId } | { ok: false; error: { message: string } }
 
 // The main window, for the custom title bar. `platform` decides whether the bar draws
 // its own window buttons (win32, linux) or leaves room for the native ones (darwin).
@@ -386,7 +418,7 @@ export type PopupAction = 'approve' | 'deny' | 'open' | 'details' | 'dismiss' | 
 
 // Where OPEN takes the main window. `section` scrolls the task detail to ACTIVITY.
 export type PopupOpenTarget =
-  { screen: 'chat' } | { screen: 'inbox'; taskId: string; section?: 'activity' }
+  { screen: 'chat'; chatId?: string } | { screen: 'inbox'; taskId: string; section?: 'activity' }
 
 // The loot lines on an "agent reported back" popup.
 export type PopupLoot = {
@@ -421,6 +453,8 @@ export type PopupView =
       who: PopupWho
       text: string
       loot?: PopupLoot | null
+      // The provider of the chat it came from, for the tag beside the status.
+      provider?: ProviderId
     }
   | { id: string; kind: 'achievement'; name: string; reward: Reward }
 
@@ -715,15 +749,36 @@ export type MyaApi = {
     onChanged: (callback: () => void) => () => void
   }
   chat: {
-    // The open project's saved conversation, as items.
+    // The open chat's saved conversation, as items.
     history: () => Promise<ChatHistory>
-    // NEW CHAT: forgets the open project's session id. Refused while a run is going.
-    reset: () => Promise<{ ok: true } | { ok: false; error: AgentError }>
     // The open project's chat: its model and thinking choice.
     getModelChoice: () => Promise<ModelChoiceResult>
     // Saves a pick for the chat (and for new chats too with asDefault). During a run
     // it applies from the next message.
     setModelChoice: (change: ModelChoiceChange) => Promise<ModelChoiceResult>
+  }
+  // The open project's chats. Every call that changes them hands back the list as it is now.
+  // Making, opening, and forking a chat, and deleting the open one, are refused with the code
+  // busy while a run is going.
+  chats: {
+    list: () => Promise<ChatsResult<ChatList>>
+    open: (id: string) => Promise<ChatsResult<ChatList>>
+    // NEW CHAT, on the provider the dialog picked. The provider is fixed from then on. An empty
+    // chat of the same provider that is already open is kept, and `created` is false. A provider
+    // that is not signed in is refused with the code not_ready.
+    create: (provider: ProviderId) => Promise<ChatsResult<ChatList & { created: boolean }>>
+    // What a new chat of each provider starts on, for the cards in the NEW CHAT dialog.
+    starts: () => Promise<ChatsResult<{ starts: ChatStarts }>>
+    // An empty or unchanged title is no change.
+    rename: (id: string, title: string) => Promise<ChatsResult<ChatList>>
+    pin: (id: string, pinned: boolean) => Promise<ChatsResult<ChatList>>
+    remove: (id: string) => Promise<ChatsResult<ChatList>>
+    // Claude chats only.
+    fork: (id: string) => Promise<ChatsResult<ChatList>>
+    // Opens the save dialog and writes the chat's messages as Markdown.
+    export: (id: string) => Promise<ChatsResult<{ canceled: boolean }>>
+    search: (query: string) => Promise<ChatsResult<{ results: ChatSearchResults }>>
+    onChanged: (callback: () => void) => () => void
   }
   themes: {
     // The uploaded themes, oldest first.
@@ -843,7 +898,10 @@ export type MyaApi = {
     cancelLogin: (provider: CliProviderId) => Promise<{ ok: boolean }>
     saveApiKey: (provider: CliProviderId, apiKey: string) => Promise<ProviderActionResult>
     logout: (provider: CliProviderId) => Promise<ProviderActionResult>
+    // Runs npm install -g. Progress comes through onInstallProgress, and cancelInstall stops it.
     installCli: (provider: CliProviderId) => Promise<ProviderActionResult>
+    cancelInstall: (provider: CliProviderId) => Promise<{ ok: boolean }>
+    onInstallProgress: (callback: (progress: InstallProgress) => void) => () => void
   }
 }
 
@@ -876,7 +934,17 @@ export type ProviderStatus = {
   // Masked API key, account email, or credential source description. Never a raw secret.
   detail: string | null
   account: ProviderAccountInfo | null
+  // The key behind an API key or environment sign-in as the window may see it: the first 4 and
+  // last 4 characters ("sk-a...9f2c"). The full key never crosses to the window.
+  keyMask: string | null
+  // The environment variable an environment key came from.
+  envVar: string | null
+  // Whether the CLI runs, is not on this computer, or is there and will not start.
+  cli: 'ok' | 'missing' | 'broken'
 }
+
+// One line of an install as it goes, such as "npm: fetching packages".
+export type InstallProgress = { provider: CliProviderId; stage: string }
 
 export type ProvidersStatusResult = {
   codex: ProviderStatus
@@ -885,4 +953,13 @@ export type ProvidersStatusResult = {
 
 export type ProviderActionResult =
   | { ok: true; status: ProvidersStatusResult }
-  | { ok: false; error: string; status: ProvidersStatusResult }
+  | {
+      ok: false
+      error: string
+      // What kind of failure it was, for the card to show it in its own place.
+      code?: ProviderErrorCode | null
+      // An install that failed: npm's exit code, and the end of its output (COPY LOG).
+      exitCode?: number | null
+      log?: string | null
+      status: ProvidersStatusResult
+    }

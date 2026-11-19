@@ -1,4 +1,5 @@
 import type { ProjectInfo, TaskSummary } from '../../../shared/ipc'
+import type { ProviderId } from '../../../shared/models'
 import type { MascotsTab } from '../screens/mascotsTabIds'
 import type { Screen } from '../screens/types'
 
@@ -6,8 +7,9 @@ export type Crumb = {
   // The screen's name in capitals.
   screen: string
   // The item in view, or null for the screen alone. `rest` is the quieter tail, like the
-  // project after a chat title.
-  item: { main: string; rest: string | null } | null
+  // project after a chat title. `provider` is the chat's: its glyph and name sit between the title
+  // and the project.
+  item: { main: string; rest: string | null; provider?: ProviderId } | null
 }
 
 const SCREEN_NAMES: Record<Screen, string> = {
@@ -20,8 +22,7 @@ const SCREEN_NAMES: Record<Screen, string> = {
   account: 'ACCOUNT'
 }
 
-// What the title bar's breadcrumb shows. On CHAT it is the title and project the CHAT
-// header shows; on INBOX with a thread open it is that thread's title (the heading its
+// What the title bar's breadcrumb shows. On CHAT it is the open chat's title and its project; on INBOX with a thread open it is that thread's title (the heading its
 // detail shows); on MASCOTS it is "Bosses" while the BOSSES tab is selected; anywhere else the
 // screen name alone.
 export function titleBarCrumb(
@@ -29,11 +30,19 @@ export function titleBarCrumb(
   chatTitle: string,
   project: ProjectInfo | null,
   openTask: TaskSummary | null,
-  mascotsTab: MascotsTab = 'mascots'
+  mascotsTab: MascotsTab = 'mascots',
+  provider: ProviderId | null = null
 ): Crumb {
   const name = SCREEN_NAMES[screen]
   if (screen === 'chat' && project) {
-    return { screen: name, item: { main: chatTitle, rest: `in ${project.name}` } }
+    return {
+      screen: name,
+      item: {
+        main: chatTitle,
+        rest: project.name,
+        ...(provider ? { provider } : {})
+      }
+    }
   }
   if (screen === 'inbox' && openTask) {
     return { screen: name, item: { main: openTask.agent.name, rest: null } }

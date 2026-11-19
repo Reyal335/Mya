@@ -28,6 +28,9 @@ import { startingGrid } from '../../../shared/sliceRules'
 import SheetRow from './SheetRow'
 import SheetSlicer from './SheetSlicer'
 import { useSheetPicker, type PickedStrip, type SheetApi } from './useSheetPicker'
+import type { ProviderId } from '../../../shared/models'
+import { can } from '../../../shared/providers'
+import Unavailable from './Unavailable'
 import './MascotDialog.css'
 
 export type MascotDialogTarget =
@@ -38,6 +41,8 @@ export type MascotDialogTarget =
   | { kind: 'default'; name: string; uploaded: Partial<MascotLoops>; voice: MascotVoice | null }
 
 type MascotDialogProps = {
+  // The open chat's provider. A provider without mascot voice gets a line saying so under VOICE.
+  provider: ProviderId
   target: MascotDialogTarget
   onDirtyChange: (dirty: boolean) => void
   onSaved: () => void
@@ -147,6 +152,7 @@ const MASCOT_SHEETS: SheetApi = {
 // state. Picked sheets wait in the main process until SAVE; any not saved are
 // dropped when the dialog closes.
 function MascotDialog({
+  provider,
   target,
   onDirtyChange,
   onSaved,
@@ -537,6 +543,11 @@ function MascotDialog({
           <p className="mascot-form__note">
             Shapes how Claude talks in the main conversation. Left blank, Claude speaks plainly.
           </p>
+          {!can(provider, 'voice') && (
+            <Unavailable provider={provider}>
+              Mascot voice shapes replies in Claude chats only.
+            </Unavailable>
+          )}
 
           <fieldset className="mascot-form__emoji" disabled={trimmedVoice === ''}>
             <legend className="mascot-form__label">EMOJI</legend>

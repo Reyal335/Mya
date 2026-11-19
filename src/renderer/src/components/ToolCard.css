@@ -59,3 +59,27 @@
 .tool-card--failed .tool-card__state {
   color: var(--error);
 }
+
+/* NOT ASKED sits on every Codex and Gemini card: a 2px line chip with a hollow --waiting square. */
+.tool-card__not-asked {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: var(--border-thin) solid var(--line);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tool-card__not-asked-square {
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: var(--border-thin) solid var(--waiting);
+}

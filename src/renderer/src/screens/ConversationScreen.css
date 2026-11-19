@@ -35,10 +35,6 @@
   line-height: 1.5;
 }
 
-.conversation__new {
-  flex: none;
-}
-
 /* THEME: <NAME>, with a 12px swatch before it. The swatch is the accent color for a
    theme, and the plain frame color with a line border for none. */
 .conversation__theme {
@@ -64,15 +60,21 @@
   border: var(--border-thin) solid var(--line);
 }
 
-.conversation__header-error {
-  flex-basis: 100%;
-  margin: 0;
-  color: var(--error);
-}
-
 .conversation__subtitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.conversation__facts {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Status: colored square plus a text label, never color alone. */
@@ -316,6 +318,45 @@
 
 .conversation__error {
   color: var(--error);
+}
+
+/* The line at the top of a chat opened from HISTORY: a --muted square, RESUMED, and when it was
+   last used with how many messages it has (designs/21c-chat-history.html). Like the other plain
+   lines it has its own solid fill. */
+.conversation__resumed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.conversation__resumed-square {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--muted);
+}
+
+.conversation__resumed-word {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.conversation__resumed-text {
+  min-width: 0;
+}
+
+/* A message a search hit scrolled to, marked for a moment. */
+.conversation__hit {
+  outline: var(--border-thin) solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Plain lines in the history have no box of their own, so they get the frame's solid

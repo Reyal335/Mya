@@ -31,6 +31,69 @@
   overflow-y: auto;
 }
 
+.dialog--providers {
+  position: relative;
+  max-width: 860px;
+}
+
+/* The NEW CHAT dialog: the line under the title, not beside it; a rule above the footer, with the
+   confirm line at its left and the buttons at its right. */
+.dialog--providers .dialog__header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* The cards scroll inside when the window is short; the title and the footer stay put. */
+.dialog--providers {
+  overflow: hidden;
+}
+
+.dialog--providers .dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  /* Room for the selected card's 4px shadow. */
+  padding: 0 6px 6px 0;
+}
+
+.dialog--providers .dialog__actions {
+  position: static;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 0;
+  padding: 14px 0 0;
+  border-top-width: var(--border);
+}
+
+.dialog--providers .dialog__actions .nc-footer-line {
+  flex: 1 1 280px;
+  margin-right: auto;
+}
+
+/* The X: 44px, at the top right of the dialog, in the dialog's own padding. */
+.dialog__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--border) solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dialog__close:hover,
+.dialog__close:focus-visible {
+  border-color: var(--accent);
+}
+
 /* The buttons stay in view while the body scrolls. The negative margin cancels the
    bottom padding added here, so at rest the footer sits where it did. */
 .dialog--wide .dialog__actions {

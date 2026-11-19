@@ -3,9 +3,10 @@ import './SegmentBar.css'
 
 type SegmentBarProps = {
   view: BarView
-  // 20 on the ACCOUNT screen, 10 in the sidebar meter.
+  // 20 on the ACCOUNT screen, 10 in the sidebar.
   segments: number
-  size: 'screen' | 'meter'
+  // 'thin' is the sidebar's: 6px tall.
+  size: 'screen' | 'meter' | 'thin'
 }
 
 // A bar of equal segments, like an HP bar. Filled segments take the tone's color; empty

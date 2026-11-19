@@ -189,6 +189,13 @@ button.party__row[aria-disabled='true'] {
   color: var(--muted);
 }
 
+/* A row that cannot be called says why in full, on as many lines as it needs. */
+.party__row--off .party__smaller {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .party__marker {
   flex: none;
   width: 8px;
@@ -250,13 +257,85 @@ button.party__row[aria-disabled='true'] {
   overflow-wrap: anywhere;
 }
 
-.party__tag {
+/* The provider tag on a row, the hover card, and the detail area: pushed to the end of its line. */
+.party__provider {
   flex: none;
   margin-left: auto;
-  padding: 1px 6px;
+  display: inline-flex;
+}
+
+/* The icon on a panel row: the frame the provider badge sits on. */
+.party__row-icon {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+
+/* CANNOT BE CALLED in the hover card: a muted square and the words, in the pixel font. */
+.party__cannot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.party__cannot-box {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--muted);
+}
+
+/* Codex and Gemini: what they do with agents, in a 2px dashed line border. */
+.party__note--solo {
+  padding: 8px 10px;
+  border: var(--border-thin) dashed var(--line);
+}
+
+/* The small glyph badge at the rail icon's bottom-left corner: the agent is pinned to a provider. */
+.party__icon-provider {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+}
+
+/* BOSS when the provider has no boss battles: dashed and muted. It does not open. */
+.party__tab--off,
+.party__tab--off:hover {
+  background: var(--panel);
+  color: var(--muted);
+  border-style: dashed;
+  border-color: var(--line);
+  cursor: not-allowed;
+}
+
+.party__tab--off:focus-visible {
+  outline: var(--border-thin) solid var(--accent);
+  outline-offset: 2px;
+}
+
+.party__boss-why {
+  flex: none;
   font-size: 11px;
   color: var(--muted);
-  border: var(--border-thin) solid var(--line);
+}
+
+.party__boss-why:focus-visible {
+  outline: var(--border-thin) solid var(--accent);
+  outline-offset: 2px;
 }
 
 .party__detail-description,

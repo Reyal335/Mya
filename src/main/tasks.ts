@@ -26,6 +26,7 @@ import { labelText } from '../shared/toolLabel'
 import { loadIcons } from './agentIcons'
 import { loadRoles } from './agentRoles'
 import { isObject, readJsonFile, serialQueue, writeJsonFile } from './jsonFile'
+import { chatIdForSession, getChat } from './chats'
 import { lootFor, type TaskCall } from './loot'
 import { recordTaskEnd } from './progressionStore'
 
@@ -49,6 +50,9 @@ type TaskRecord = {
   id: string
   projectPath: string
   sessionId: string | null
+  // The chat that brought the agent in. A task saved before there were many chats has none; its
+  // chat is found from its Claude session.
+  chatId: string | null
   agent: StoredAgent
   description: string
   prompt: string
@@ -169,6 +173,7 @@ function readRecord(raw: unknown): TaskRecord | null {
     id,
     projectPath,
     sessionId: str(raw.sessionId),
+    chatId: str(raw.chatId),
     agent: { name, scope, filePath: str(raw.agent.filePath) },
     description: str(description) ?? '',
     prompt: str(prompt) ?? '',
@@ -293,6 +298,10 @@ async function agentLook(): Promise<Look> {
 }
 
 async function summary(task: TaskRecord, look: Look): Promise<TaskSummary> {
+  const chatId =
+    task.chatId ??
+    (task.sessionId ? await chatIdForSession(task.projectPath, task.sessionId) : null)
+  const chat = chatId ? await getChat(task.projectPath, chatId) : null
   return {
     id: task.id,
     agent: await look(task.agent),
@@ -302,6 +311,8 @@ async function summary(task: TaskRecord, look: Look): Promise<TaskSummary> {
     startedAt: task.startedAt,
     endedAt: task.endedAt,
     seen: task.seen,
+    chatId,
+    provider: chat?.provider ?? 'claude',
     loot: task.loot,
     xp: task.xp
   }
@@ -313,6 +324,7 @@ export type NewTask = {
   id: string
   projectPath: string
   sessionId: string | null
+  chatId: string | null
   agent: StoredAgent
   description: string
   prompt: string

@@ -2,6 +2,7 @@ import type { TaskSummary } from '../../../shared/ipc'
 import { TASK_STATUS_LABELS } from '../conversation/callTarget'
 import { timeLabel } from '../conversation/timeLabel'
 import AgentIcon from './AgentIcon'
+import ProviderTag from './ProviderTag'
 import './TaskRow.css'
 
 type TaskRowProps = {
@@ -47,6 +48,7 @@ function TaskRow({ task, selected, onOpen, onDelete }: TaskRowProps): React.JSX.
                 {task.agent.scope === 'project' ? 'PROJECT' : 'GLOBAL'}
               </span>
             )}
+            <ProviderTag provider={task.provider} />
             <span className={`task-row__status task-row__status--${task.status}`}>
               <span className="task-row__square" aria-hidden="true" />
               {TASK_STATUS_LABELS[task.status]}

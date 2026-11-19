@@ -1,0 +1,21 @@
+/* A feature this provider lacks (designs/22f-missing-features.html): panel fill, a 2px dashed
+   --line border, the provider tag, and one muted sentence. */
+.unavailable {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: var(--border-thin) dashed var(--line);
+  border-radius: 0;
+}
+
+.unavailable__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}

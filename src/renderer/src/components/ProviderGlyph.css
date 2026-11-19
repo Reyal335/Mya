@@ -1,0 +1,6 @@
+/* A provider's pixel glyph: one fill, crisp edges. --muted unless the place it sits in says otherwise. */
+.provider-glyph {
+  flex: none;
+  color: var(--muted);
+  shape-rendering: crispEdges;
+}

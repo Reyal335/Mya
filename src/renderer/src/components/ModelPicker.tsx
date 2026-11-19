@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { BUSY_MESSAGE, PROVIDER_NAMES } from '../../../shared/chats'
 import {
   AUTO,
   AUTO_MODEL_DESCRIPTION,
@@ -12,14 +13,19 @@ import {
   modelDescription,
   optionLabel,
   pickerLevels,
-  resolveChoice,
   type ModelChoice,
-  type ModelLists
+  type ModelLists,
+  type ModelOption,
+  type ProviderId
 } from '../../../shared/models'
+import { PROVIDERS, resolveProviderChoice } from '../../../shared/providers'
+import ProviderTag from './ProviderTag'
 import './ModelPicker.css'
 
 type ModelPickerProps = {
+  // Only the chat's own provider's models: a chat never changes provider.
   lists: ModelLists | null
+  provider: ProviderId
   listFailed: boolean
   choice: ModelChoice
   asDefault: boolean
@@ -27,8 +33,11 @@ type ModelPickerProps = {
   onPick: (next: ModelChoice) => void
   // The chat already has replies from Claude.
   hasReplies: boolean
-  // The picker opened: a failed model list is tried again.
+  // The picker opened: the list and the choice are read again.
   onOpen: () => void
+  // The way to another provider: the NEW CHAT dialog. Blocked while a run is going.
+  onNewChat: () => void
+  newChatBlocked: boolean
 }
 
 // The thinking meter: 4 blocks, filled for the level. AUTO shows alternating blocks.
@@ -70,18 +79,32 @@ function Bars({
   )
 }
 
-// The model and thinking picker from designs/10-model-picker.html: a control at the
-// left of the input box's toolbar, and a dialog above the box, placed against it (its
-// parent must be positioned). Picking applies at once.
+// "Thinking: LOW · MED · HIGH", or "Thinking: none". Codex and Gemini rows say this in place of
+// POWER and SPEED bars: there is no data for them, and made-up bars would mislead.
+function thinkingLine(option: ModelOption): string {
+  const levels = option.effortLevels
+  if (levels === null) return 'Thinking: depends on the model'
+  return levels.length === 0
+    ? 'Thinking: none'
+    : `Thinking: ${levels.map((level) => LEVEL_LABELS[level]).join(' · ')}`
+}
+
+// The model and thinking picker from designs/10-model-picker.html and 22b-model-picker.html: a
+// control at the left of the input box's toolbar, and a dialog above the box, placed against it (its
+// parent must be positioned). Picking applies at once. It offers the chat's own provider's models
+// only; the last row is the way to another provider (NEW CHAT).
 function ModelPicker({
   lists,
+  provider,
   listFailed,
   choice,
   asDefault,
   onAsDefaultChange,
   onPick,
   hasReplies,
-  onOpen
+  onOpen,
+  onNewChat,
+  newChatBlocked
 }: ModelPickerProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const controlRef = useRef<HTMLButtonElement>(null)
@@ -89,11 +112,17 @@ function ModelPicker({
   // The model when the picker opened, to tell whether this visit switched models.
   const [openedWith, setOpenedWith] = useState(choice.model)
 
+  const claude = provider === 'claude'
+  const providerName = PROVIDER_NAMES[provider]
   const label = choiceLabel(choice, lists)
   const levels = pickerLevels(choice.model, lists)
   const takesLevel = levels.length > 0
+  // Claude has AUTO beside its levels. Codex and Gemini have no AUTO level: a model with levels
+  // always has one, and a model with none shows no level at all.
   const selectedEffort = takesLevel ? choice.effort : AUTO
-  const switched = hasReplies && choice.model !== openedWith
+  const switched = claude && hasReplies && choice.model !== openedWith
+  const showsLevel = claude || takesLevel
+  const controlName = showsLevel ? `${label.model} · THINK ${label.level}` : label.model
 
   function openPicker(): void {
     setOpenedWith(choice.model)
@@ -159,8 +188,8 @@ function ModelPicker({
   }
 
   function pickModel(model: string): void {
-    // The level is made to fit the new model by the hook and by main.
-    onPick(resolveChoice({ model, effort: choice.effort }, lists).choice)
+    // The level is made to fit the new model by the hook and by main: the nearest the model has.
+    onPick(resolveProviderChoice({ model, effort: choice.effort }, lists, provider).choice)
   }
 
   return (
@@ -172,9 +201,9 @@ function ModelPicker({
         aria-expanded={open}
         aria-haspopup="dialog"
         // The name stays whole when a narrow input hides the text.
-        aria-label={`Model: ${label.model} · THINK ${label.level}`}
+        aria-label={`Model: ${controlName}`}
         // The full text, for when the label is cut short or hidden.
-        title={`${label.model} · THINK ${label.level}`}
+        title={controlName}
         onClick={() => (open ? close(false) : openPicker())}
         onKeyDown={(event) => {
           if (open && event.key === 'Escape') {
@@ -183,9 +212,10 @@ function ModelPicker({
           }
         }}
       >
-        <Meter effort={choice.effort} size="small" />
+        {showsLevel && <Meter effort={choice.effort} size="small" />}
         <span className="model-picker__label">
-          {label.model} <span className="model-picker__dot">· THINK {label.level}</span>
+          {label.model}
+          {showsLevel && <span className="model-picker__dot"> · THINK {label.level}</span>}
         </span>
         {/* The dialog opens upward, so the caret points up while it is closed. */}
         <span className="model-picker__caret" aria-hidden="true">
@@ -197,35 +227,44 @@ function ModelPicker({
         <div
           ref={dialogRef}
           role="dialog"
-          aria-label="Model and thinking"
+          aria-label={`Model and thinking, ${providerName}`}
           className="model-picker__dialog"
           onKeyDown={handleKeyDown}
         >
           <div className="model-picker__head">
-            <h2 className="model-picker__title">MODEL</h2>
-            <span className="model-picker__columns" aria-hidden="true">
-              <span>POWER</span>
-              <span>SPEED</span>
-            </span>
+            <h2 className="model-picker__title">
+              {claude ? 'MODEL' : `${PROVIDERS[provider].label} MODELS`}
+            </h2>
+            {claude ? (
+              <span className="model-picker__columns" aria-hidden="true">
+                <span>POWER</span>
+                <span>SPEED</span>
+              </span>
+            ) : (
+              <ProviderTag provider={provider} />
+            )}
           </div>
 
           <div className="model-picker__models" role="group" aria-label="Model">
-            <ModelRow
-              selected={choice.model === AUTO}
-              name="AUTO"
-              description={AUTO_MODEL_DESCRIPTION}
-              power="dotted"
-              speed="dotted"
-              onClick={() => pickModel(AUTO)}
-            />
+            {claude && (
+              <ModelRow
+                selected={choice.model === AUTO}
+                name="AUTO"
+                description={AUTO_MODEL_DESCRIPTION}
+                power="dotted"
+                speed="dotted"
+                onClick={() => pickModel(AUTO)}
+              />
+            )}
             {lists?.models.map((option) => {
-              const bars = modelBars(option)
+              const bars = claude ? modelBars(option) : null
               return (
                 <ModelRow
                   key={option.value}
                   selected={choice.model === option.value}
                   name={optionLabel(option)}
-                  description={modelDescription(option)}
+                  description={claude ? modelDescription(option) : thinkingLine(option)}
+                  bars={claude}
                   power={bars ? bars.power : null}
                   speed={bars ? bars.speed : null}
                   onClick={() => pickModel(option.value)}
@@ -237,33 +276,44 @@ function ModelPicker({
 
           <div className="model-picker__head model-picker__head--divided">
             <h2 className="model-picker__title">THINKING</h2>
-            <Meter effort={choice.effort} size="large" />
+            {showsLevel && <Meter effort={choice.effort} size="large" />}
           </div>
 
-          <div className="model-picker__levels" role="group" aria-label="Thinking power">
-            <LevelButton
-              selected={selectedEffort === AUTO}
-              label="AUTO"
-              onClick={() => onPick({ model: choice.model, effort: AUTO })}
-            />
-            {levels.map((level) => (
-              <LevelButton
-                key={level}
-                selected={selectedEffort === level}
-                label={LEVEL_LABELS[level]}
-                onClick={() => onPick({ model: choice.model, effort: level })}
-              />
-            ))}
-          </div>
-          <p className="model-picker__level-line">
-            {takesLevel
-              ? LEVEL_DESCRIPTIONS[
-                  selectedEffort === AUTO
-                    ? 'auto'
-                    : (selectedEffort as keyof typeof LEVEL_DESCRIPTIONS)
-                ]
-              : NO_LEVEL_LINE}
-          </p>
+          {claude || takesLevel ? (
+            <div className="model-picker__levels" role="group" aria-label="Thinking power">
+              {claude && (
+                <LevelButton
+                  selected={selectedEffort === AUTO}
+                  label="AUTO"
+                  onClick={() => onPick({ model: choice.model, effort: AUTO })}
+                />
+              )}
+              {levels.map((level) => (
+                <LevelButton
+                  key={level}
+                  selected={selectedEffort === level}
+                  label={LEVEL_LABELS[level]}
+                  onClick={() => onPick({ model: choice.model, effort: level })}
+                />
+              ))}
+            </div>
+          ) : (
+            // A model with no levels: a dashed line says so, so the missing buttons are explained.
+            <p className="model-picker__no-levels" aria-disabled="true">
+              {label.model} has no thinking levels.
+            </p>
+          )}
+          {(claude || takesLevel) && (
+            <p className="model-picker__level-line">
+              {takesLevel
+                ? LEVEL_DESCRIPTIONS[
+                    selectedEffort === AUTO
+                      ? 'auto'
+                      : (selectedEffort as keyof typeof LEVEL_DESCRIPTIONS)
+                  ]
+                : NO_LEVEL_LINE}
+            </p>
+          )}
 
           <div className="model-picker__footer">
             <label className="model-picker__check">
@@ -272,7 +322,7 @@ function ModelPicker({
                 checked={asDefault}
                 onChange={(event) => onAsDefaultChange(event.target.checked)}
               />
-              Use for new chats too
+              Use for new {providerName} chats too
             </label>
             <button type="button" className="model-picker__done" onClick={() => close(true)}>
               DONE
@@ -287,6 +337,23 @@ function ModelPicker({
               Switching models re-reads the whole chat, which uses more of your plan.
             </p>
           )}
+
+          <div className="model-picker__other">
+            <span className="model-picker__note">To use another provider, start a new chat.</span>
+            <button
+              type="button"
+              className="model-picker__new"
+              aria-disabled={newChatBlocked ? 'true' : undefined}
+              title={newChatBlocked ? BUSY_MESSAGE : undefined}
+              onClick={() => {
+                if (newChatBlocked) return
+                close(false)
+                onNewChat()
+              }}
+            >
+              NEW CHAT
+            </button>
+          </div>
         </div>
       )}
     </>
@@ -297,6 +364,7 @@ function ModelRow({
   selected,
   name,
   description,
+  bars = true,
   power,
   speed,
   onClick
@@ -304,6 +372,8 @@ function ModelRow({
   selected: boolean
   name: string
   description: string
+  // Claude's rows have POWER and SPEED bars; the others have none.
+  bars?: boolean
   power: number | 'dotted' | null
   speed: number | 'dotted' | null
   onClick: () => void
@@ -319,8 +389,8 @@ function ModelRow({
         <span className="model-picker__row-name">{name}</span>
         <span className="model-picker__row-description">{description}</span>
       </span>
-      <Bars kind="power" filled={power} />
-      <Bars kind="speed" filled={speed} />
+      {bars && <Bars kind="power" filled={power} />}
+      {bars && <Bars kind="speed" filled={speed} />}
     </button>
   )
 }

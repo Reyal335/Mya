@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo, TaskDetail as TaskDetailData } from '../../../shared/ipc'
 import { callBlock } from '../../../shared/agentGate'
+import { canCallAgent } from '../../../shared/providers'
 import type { CallTarget, Conversation, ToolItem } from '../hooks/useConversation'
 import { useAgents } from '../hooks/useAgents'
 import type { TasksStore } from '../hooks/useTasks'
@@ -20,7 +21,8 @@ type InboxScreenProps = {
   tasks: TasksStore
   selectedTaskId: string | null
   onSelectTask: (taskId: string | null) => void
-  onAskAgain: (call: CallTarget) => void
+  // ASK AGAIN: the agent to call, and the chat the task came from (null when it is not known).
+  onAskAgain: (call: CallTarget, chatId: string | null) => void
   // VIEW CHANGES on a QUEST CLEAR card: scroll this task's detail to ACTIVITY.
   activityRequest: { taskId: string; tick: number } | null
 }
@@ -88,6 +90,15 @@ function InboxScreen({
   const agentFile = detail?.agent.filePath
     ? agents.find((agent) => agent.filePath === detail.agent.filePath)
     : undefined
+  // ASK AGAIN goes back to the chat the task came from, so that chat's provider decides: an agent
+  // pinned to another provider cannot be asked there.
+  const pinned =
+    agentFile && selected ? canCallAgent(agentFile, selected.provider) : ({ ok: true } as const)
+  const askAgainBlocked = !agentFile
+    ? null
+    : !pinned.ok
+      ? `${pinned.reason}. ${pinned.hint}`
+      : (callBlock(agentFile, agents)?.message ?? null)
 
   async function confirmAction(action: Confirm): Promise<void> {
     setConfirm(null)
@@ -157,8 +168,10 @@ function InboxScreen({
             pending={pending}
             projectPath={project.path}
             onAnswer={conversation.answerPermission}
-            onAskAgain={agentFile ? () => onAskAgain(callTargetOf(agentFile)) : null}
-            askAgainBlocked={agentFile ? (callBlock(agentFile, agents)?.message ?? null) : null}
+            onAskAgain={
+              agentFile ? () => onAskAgain(callTargetOf(agentFile), selected.chatId) : null
+            }
+            askAgainBlocked={askAgainBlocked}
             activityRequest={activityRequest?.taskId === selected.id ? activityRequest.tick : 0}
           />
         ) : (

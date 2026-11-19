@@ -1,0 +1,69 @@
+/* The NO APPROVALS tag (designs/DESIGN-providers.md): in the composer's toolbar, at the left of the
+   model button. A 2px --waiting border, a --waiting square, the words, and a muted ?. It is as tall
+   as the other toolbar controls (36px). The popover has a 4px --waiting border. Never --error. */
+.no-approvals {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  background: var(--bg);
+  color: var(--waiting);
+  border: var(--border-thin) solid var(--waiting);
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.no-approvals:hover,
+.no-approvals[aria-expanded='true'] {
+  background: var(--panel);
+}
+
+.no-approvals__square {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--waiting);
+}
+
+.no-approvals__help {
+  color: var(--muted);
+}
+
+/* Opens upward over the composer, like the model picker. */
+.no-approvals__popover {
+  position: absolute;
+  left: calc(var(--composer-border, 0px) * -1);
+  bottom: calc(100% + var(--composer-border, 0px) + 12px);
+  z-index: 2;
+  box-sizing: border-box;
+  width: 360px;
+  max-width: calc(100% + var(--composer-border, 0px) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border) solid var(--waiting);
+  box-shadow: var(--shadow-hard);
+  cursor: default;
+}
+
+.no-approvals__line,
+.no-approvals__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.no-approvals__hint {
+  color: var(--muted);
+}

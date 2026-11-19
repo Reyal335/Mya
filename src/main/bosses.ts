@@ -22,7 +22,7 @@ import {
   startFight,
   type Attacker
 } from './bossRules'
-import { getChatSession, onSessionEnded } from './chats'
+import { getOpenChat, onSessionEnded } from './chats'
 import { isObject, readJsonFile, serialQueue, setAside, writeJsonFile } from './jsonFile'
 import { validBosses } from './bossPacks'
 import { recordBossVictory } from './progressionStore'
@@ -142,16 +142,16 @@ function send(event: FightEvent): void {
 }
 
 // popupWindow shows a victory or an escape as a popup with the app in the background.
-type EndListener = (end: { kind: 'victory' | 'escape'; text: string }) => void
+type EndListener = (end: { kind: 'victory' | 'escape'; text: string; chatId: string }) => void
 let endListener: EndListener | null = null
 
 export function onFightEnd(listener: EndListener | null): void {
   endListener = listener
 }
 
-function announceEnd(kind: 'victory' | 'escape', text: string): void {
+function announceEnd(kind: 'victory' | 'escape', text: string, chatId: string): void {
   try {
-    endListener?.({ kind, text })
+    endListener?.({ kind, text, chatId })
   } catch (err) {
     console.error('[bosses] Could not show the end of a fight:', err)
   }
@@ -173,6 +173,8 @@ async function bossNameFor(fight: Fight): Promise<string> {
 
 export type TestRunReport = {
   projectPath: string
+  // The chat the run is in: where a popup about the fight opens.
+  chatId: string
   sessionId: string
   toolId: string
   taskId: string | null
@@ -260,7 +262,7 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
     let { fight } = result
     if (fight.status === 'defeated' && existing?.status !== 'defeated') {
       fight = await victory(fight)
-      announceEnd('victory', fight.log[fight.log.length - 1] ?? '')
+      announceEnd('victory', fight.log[fight.log.length - 1] ?? '', report.chatId)
     }
     current.fights[key] = fight
     await save()
@@ -271,7 +273,11 @@ export async function recordTestRun(report: TestRunReport): Promise<void> {
 }
 
 // The run ended (done, error, or STOP) with the fight still going: the boss gets away.
-export async function runEnded(projectPath: string, sessionId: string | null): Promise<void> {
+export async function runEnded(
+  projectPath: string,
+  sessionId: string | null,
+  chatId: string
+): Promise<void> {
   if (!sessionId) return
   try {
     const current = await load()
@@ -283,13 +289,14 @@ export async function runEnded(projectPath: string, sessionId: string | null): P
     current.fights[key] = escaped
     await save()
     send({ key, fight: escaped, round: null })
-    announceEnd('escape', escaped.log[escaped.log.length - 1] ?? '')
+    announceEnd('escape', escaped.log[escaped.log.length - 1] ?? '', chatId)
   } catch (err) {
     console.error('[bosses] Could not end a fight:', err)
   }
 }
 
-// NEW CHAT, a lost session, or a fresh-context restart: the fight ends without a result.
+// Deleting a chat, a lost session, or a fresh-context restart: the fight ends without a result.
+// NEW CHAT does not: the old chat keeps its fight, and it is there when the chat is opened again.
 async function conversationEnded(projectPath: string, sessionId: string): Promise<void> {
   const current = await load()
   const key = fightKey(projectPath, sessionId)
@@ -310,9 +317,11 @@ export function watchConversations(): void {
 
 // --- For the window ---------------------------------------------------------------------
 
+// The open chat's fight, by its Claude session. Only a Claude chat has one.
 async function openKey(projectPath: string | null): Promise<string | null> {
   if (!projectPath) return null
-  const session = await getChatSession(projectPath)
+  const chat = await getOpenChat(projectPath)
+  const session = chat?.provider === 'claude' ? chat.providerSessionId : null
   return session ? fightKey(projectPath, session) : null
 }
 

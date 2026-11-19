@@ -19,6 +19,9 @@ export type { ToolState }
 
 export type ConversationStatus = 'idle' | 'running' | 'waiting' | 'done' | 'error'
 
+// What the RESUMED line at the top of an old chat says.
+export type Resume = { mode: 'continues' | 'fresh'; at: number; count: number }
+
 // An image I pasted, on its way out: the bytes main gets, and the blob: URL the composer
 // made to show it. The composer makes and revokes the URL; this hook only passes it on.
 export type OutgoingImage = { bytes: Uint8Array; url: string }
@@ -94,10 +97,15 @@ type State = {
   items: ConversationItem[]
   status: Exclude<ConversationStatus, 'waiting'>
   nextId: number
-  // The project whose saved history was loaded (or found empty), so it loads once.
+  // The chat whose saved history was loaded (or found empty), so it loads once.
   historyFor: string | null
-  // A line at the top of the history: more than 200 messages, or none readable.
-  historyNote: 'truncated' | 'unavailable' | null
+  // A line at the top of the history: more than 200 messages, none readable, or a provider that
+  // keeps the thread but gives Mya no way to read it back.
+  historyNote: 'truncated' | 'unavailable' | 'not_shown' | null
+  // A chat opened from what was saved: whether sending carries on the provider's own session or
+  // starts a fresh one, when it was last used, and how many messages it has. null for a chat
+  // begun in this window.
+  resume: Resume | null
   // The model and level of the reply now starting, and the time spent thinking since
   // the last reply text. The next reply text takes them for its tag.
   reply: ReplyMeta | null
@@ -121,7 +129,7 @@ type Action =
   // Nothing was sent, but the run that was going goes on.
   | { type: 'refused'; messageId: string; error: AgentError }
   | { type: 'answering'; permissionId: string; answering: boolean }
-  | { type: 'loaded'; projectPath: string; history: ChatHistory }
+  | { type: 'loaded'; key: string; history: ChatHistory }
   | { type: 'clear' }
 
 const initialState: State = {
@@ -130,6 +138,7 @@ const initialState: State = {
   nextId: 1,
   historyFor: null,
   historyNote: null,
+  resume: null,
   reply: null
 }
 
@@ -437,16 +446,25 @@ function reducer(state: State, action: Action): State {
     case 'loaded': {
       // Only into an empty conversation: anything said meanwhile wins.
       if (state.items.length > 0 || state.status === 'running') {
-        return { ...state, historyFor: action.projectPath }
+        return { ...state, historyFor: action.key }
       }
       let next: State = {
         ...state,
-        historyFor: action.projectPath,
+        historyFor: action.key,
         historyNote: action.history.unavailable
           ? 'unavailable'
-          : action.history.truncated
-            ? 'truncated'
-            : null
+          : action.history.notShown
+            ? 'not_shown'
+            : action.history.truncated
+              ? 'truncated'
+              : null,
+        resume: action.history.resume
+          ? {
+              mode: action.history.resume,
+              at: action.history.updatedAt,
+              count: action.history.messageCount
+            }
+          : null
       }
       for (const item of action.history.items) next = append(next, fromHistory(item))
       return next
@@ -467,16 +485,17 @@ export type Conversation = {
   status: ConversationStatus
   // True while a run is in progress, waiting for approval or not.
   running: boolean
-  historyNote: 'truncated' | 'unavailable' | null
+  historyNote: 'truncated' | 'unavailable' | 'not_shown' | null
+  // Set for a chat opened from what was saved: the RESUMED line at the top of its history.
+  resume: Resume | null
   send: (prompt: string, call?: CallTarget | null, images?: OutgoingImage[]) => void
   stop: () => void
   answerPermission: (permissionId: string, decision: PermissionDecision) => void
-  // Loads the project's saved conversation once, if nothing is in memory.
-  loadHistory: (projectPath: string) => void
-  // Clears what is shown, for a project switch. The saved session stays.
+  // Loads the open chat's saved conversation once, if nothing is in memory. `key` names the chat
+  // (project and chat id); `chatId` is the chat the answer must belong to.
+  loadHistory: (key: string, chatId: string | null) => void
+  // Clears what is shown, for a project switch or another chat. Nothing saved is touched.
   clear: () => void
-  // NEW CHAT: forgets the project's saved session too.
-  newChat: () => Promise<AgentError | null>
 }
 
 // The main conversation, as an ordered list of items. Held in App, above the
@@ -629,18 +648,35 @@ export function useConversation(): Conversation {
     []
   )
 
-  const loadHistory = useCallback((projectPath: string): void => {
-    if (historyRequested.current === projectPath) return
-    historyRequested.current = projectPath
+  const loadHistory = useCallback((key: string, chatId: string | null): void => {
+    if (historyRequested.current === key) return
+    historyRequested.current = key
     window.mya.chat
       .history()
-      .then((history) => dispatch({ type: 'loaded', projectPath, history }))
+      .then((history) => {
+        // Another chat was opened while this one was on its way.
+        if (historyRequested.current !== key) return
+        // The history is of the chat that is open in main. If that is not the one asked for, the
+        // answer is not for this key.
+        if (history.chatId !== chatId) return
+        dispatch({ type: 'loaded', key, history })
+      })
       .catch((err: unknown) => {
         console.error('Could not load the conversation:', err)
+        if (historyRequested.current !== key) return
         dispatch({
           type: 'loaded',
-          projectPath,
-          history: { items: [], truncated: false, unavailable: true }
+          key,
+          history: {
+            chatId,
+            items: [],
+            truncated: false,
+            unavailable: true,
+            notShown: false,
+            resume: null,
+            updatedAt: 0,
+            messageCount: 0
+          }
         })
       })
   }, [])
@@ -649,17 +685,6 @@ export function useConversation(): Conversation {
     if (liveRun.current !== null || sendsOut.current > 0) return
     historyRequested.current = null
     dispatch({ type: 'clear' })
-  }, [])
-
-  const newChat = useCallback(async (): Promise<AgentError | null> => {
-    if (liveRun.current !== null || sendsOut.current > 0) {
-      return { code: 'busy', message: 'A run is already in progress.' }
-    }
-    const result = await window.mya.chat.reset()
-    if (!result.ok) return result.error
-    // Nothing to load for this project now: the conversation starts empty.
-    dispatch({ type: 'clear' })
-    return null
   }, [])
 
   const waiting =
@@ -672,11 +697,11 @@ export function useConversation(): Conversation {
     status,
     running: state.status === 'running',
     historyNote: state.historyNote,
+    resume: state.resume,
     send,
     stop,
     answerPermission,
     loadHistory,
-    clear,
-    newChat
+    clear
   }
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentScope, AgentSummary, ProjectInfo } from '../../../shared/ipc'
 import { callBlock } from '../../../shared/agentGate'
+import type { ProviderId } from '../../../shared/models'
+import { canCallAgent } from '../../../shared/providers'
 import type { CallTarget } from '../hooks/useConversation'
 import { callTargetOf } from '../conversation/callTarget'
 import { useAgents } from '../hooks/useAgents'
@@ -14,10 +16,24 @@ import './AgentsScreen.css'
 
 type AgentsScreenProps = {
   project: ProjectInfo | null
+  // The open chat's provider: CALL is off for an agent pinned to another provider.
+  provider: ProviderId
   // Lets the app ask before leaving while the form has unsaved changes.
   setLeaveGuard: (guard: LeaveGuard | null) => void
   // CALL on a card: opens CHAT with that agent called.
   onCall: (call: CallTarget) => void
+}
+
+// Why CALL is off for an agent, or null: pinned to another provider ("Set to run on Claude. Start a
+// Claude chat to call it."), or its file will not let it run.
+function callBlockedReason(
+  agent: AgentSummary,
+  agents: AgentSummary[],
+  provider: ProviderId
+): string | null {
+  const pinned = canCallAgent(agent, provider)
+  if (!pinned.ok) return `${pinned.reason}. ${pinned.hint}`
+  return callBlock(agent, agents)?.message ?? null
 }
 
 type Selection = { target: FormTarget; key: string }
@@ -32,7 +48,12 @@ function targetKey(target: FormTarget, nonce: number): string {
 
 // The AGENTS screen from designs/3-agent-manager.html: project and global agents,
 // and the form to create or edit one.
-function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): React.JSX.Element {
+function AgentsScreen({
+  project,
+  provider,
+  setLeaveGuard,
+  onCall
+}: AgentsScreenProps): React.JSX.Element {
   const projectPath = project?.path ?? null
   const { agents, folders, loaded, error, reload } = useAgents(projectPath)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -158,7 +179,7 @@ function AgentsScreen({ project, setLeaveGuard, onCall }: AgentsScreenProps): Re
               setDialog({ kind: 'delete', filePath: agent.filePath, name: agent.name, busy: false })
             }
             onCall={() => onCall(callTargetOf(agent))}
-            callBlocked={callBlock(agent, agents)?.message ?? null}
+            callBlocked={callBlockedReason(agent, agents, provider)}
             progress={progress[agent.filePath]}
             onStatus={() => setStatusOf(agent.filePath)}
           />

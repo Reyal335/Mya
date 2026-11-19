@@ -5,6 +5,7 @@ import type { MascotStateName } from '../../../shared/mascotRules'
 import AgentIcon from '../components/AgentIcon'
 import Mascot from '../components/Mascot'
 import { PermissionDetails } from '../components/PermissionRow'
+import ProviderTag from '../components/ProviderTag'
 import { AGENT_NAME } from '../conversation/agentName'
 import { loopFor, type Mascot as MascotData } from '../mascots/types'
 import type { Accessory } from '../progression/accessories'
@@ -183,9 +184,12 @@ function PopupCard({ view, mascot, api, accessory }: PopupCardProps): React.JSX.
             <span className="popup-card__text">
               {loot ? lootLine(nameOf(view.who), loot, view.text) : view.text}
             </span>
-            <span className={`popup-card__status popup-card__status--${view.kind}`}>
-              <span className="popup-card__square" aria-hidden="true" />
-              {error ? 'ERROR' : 'DONE'}
+            <span className="popup-card__status-line">
+              <span className={`popup-card__status popup-card__status--${view.kind}`}>
+                <span className="popup-card__square" aria-hidden="true" />
+                {error ? 'ERROR' : 'DONE'}
+              </span>
+              {view.provider && <ProviderTag provider={view.provider} />}
             </span>
           </span>
         </button>

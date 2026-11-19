@@ -13,6 +13,16 @@
   height: 10px;
 }
 
+/* The sidebar's ACCOUNT link: thin bars, 6px tall. A 1px border keeps the empty cells legible. */
+.segment-bar--thin {
+  height: 6px;
+}
+
+.segment-bar--thin .segment-bar__cell--empty,
+.segment-bar--thin .segment-bar__cell--dashed {
+  border-width: 1px;
+}
+
 .segment-bar__cell {
   flex: 1;
   min-width: 0;

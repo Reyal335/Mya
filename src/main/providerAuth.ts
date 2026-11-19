@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { randomBytes } from 'crypto'
 import { app, shell } from 'electron'
+import { statSync } from 'fs'
 import { mkdir, readdir, readFile, stat, unlink } from 'fs/promises'
 import { createServer, type Server } from 'http'
 import { homedir } from 'os'
@@ -12,10 +13,31 @@ import type {
   ProviderStatus,
   ProvidersStatusResult
 } from '../shared/ipc'
-import { getChatChoice, setChatChoice } from './chats'
+import {
+  BROWSER_CANCELLED_MESSAGE,
+  SIGN_IN_TIMEOUT_MS,
+  TIMEOUT_MESSAGE,
+  binaryFor,
+  cancelledInBrowser,
+  classifyCliFailure,
+  envKeySignOutMessage,
+  envVarsFor,
+  installFailedMessage,
+  installStage,
+  keyRejectedMessage,
+  packageFor,
+  type ProviderErrorCode
+} from '../shared/logins'
+import { PROVIDERS, maskKey } from '../shared/providers'
+import { withoutDeadCaFiles } from './caEnv'
 import { isObject, readJsonFile, serialQueue, writeJsonFile } from './jsonFile'
-import { AUTO } from '../shared/models'
-import { getDefaultChoice, getProject, setDefaultChoice } from './settings'
+import {
+  fixtureOf,
+  fixtureSignInWaitMs,
+  fixtureStatus,
+  setFixture,
+  type FixtureState
+} from './loginsFixtures'
 
 type StoredAuth = {
   codexApiKey: string | null
@@ -111,11 +133,8 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
 }
 
-function maskSecret(secret: string): string {
-  const trimmed = secret.trim()
-  if (trimmed.length <= 8) return '••••••••'
-  return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
-}
+// The key as the window may see it. Nothing else of a key is ever sent or logged.
+const maskSecret = maskKey
 
 function decodeJwtPayload(token: unknown): Record<string, unknown> | null {
   if (typeof token !== 'string') return null
@@ -170,7 +189,28 @@ export function augmentedEnv(extra?: Record<string, string | undefined>): NodeJS
   const merged = [...additions, currentPath].filter(Boolean).join(delimiter)
   env.PATH = merged
   if ('Path' in env) env.Path = merged
-  return env
+  // A CA bundle variable that names a file that is not there (conda's SSL_CERT_FILE, after an
+  // install moved) makes the Codex sign-in fail. It is left out of the CLI's environment only.
+  const { env: clean, dropped } = withoutDeadCaFiles(env, isFile)
+  for (const name of dropped) {
+    if (!warnedCaVars.has(name)) {
+      warnedCaVars.add(name)
+      console.warn(
+        `[providerAuth] ${name} names a file that is not there, so the CLIs run without it.`
+      )
+    }
+  }
+  return clean
+}
+
+const warnedCaVars = new Set<string>()
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
 }
 
 export async function resolveAgyBinary(): Promise<string | null> {
@@ -231,9 +271,7 @@ async function loadStoredAuth(): Promise<StoredAuth> {
   return cachedAuth
 }
 
-async function updateStoredAuth(
-  change: (current: StoredAuth) => StoredAuth
-): Promise<StoredAuth> {
+async function updateStoredAuth(change: (current: StoredAuth) => StoredAuth): Promise<StoredAuth> {
   return authQueue(async () => {
     const before = await loadStoredAuth()
     const after = change(before)
@@ -288,17 +326,17 @@ function runQuickCommand(
   args: string[],
   timeoutMs = 8_000,
   stdinText?: string
-): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+): Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve) => {
     let stdout = ''
     let stderr = ''
     let settled = false
 
-    const finish = (ok: boolean): void => {
+    const finish = (ok: boolean, exitCode: number | null = null): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      resolve({ ok, stdout: stdout.trim(), stderr: stderr.trim() })
+      resolve({ ok, stdout: stdout.trim(), stderr: stderr.trim(), exitCode })
     }
 
     const child = spawn(binary, args, {
@@ -328,15 +366,27 @@ function runQuickCommand(
       stderr += chunk.toString('utf8')
     })
     child.on('error', () => finish(false))
-    child.on('close', (code) => finish(code === 0))
+    child.on('close', (code) => finish(code === 0, code))
   })
+}
+
+// What the last look at each CLI found: it runs, it is not on this computer, or it is there and
+// will not start. Read when a status is made.
+const cliStates: Record<CliProviderId, 'ok' | 'missing' | 'broken'> = {
+  codex: 'missing',
+  gemini: 'missing'
 }
 
 async function detectCliVersion(
   binary: string
 ): Promise<{ installed: boolean; version: string | null }> {
   const res = await runQuickCommand(binary, ['--version'], 6_000)
-  if (!res.ok) return { installed: false, version: null }
+  const provider: CliProviderId = binary === 'codex' ? 'codex' : 'gemini'
+  if (!res.ok) {
+    cliStates[provider] = classifyCliFailure(`${res.stderr}\n${res.stdout}`)
+    return { installed: false, version: null }
+  }
+  cliStates[provider] = 'ok'
   const firstLine = (res.stdout || res.stderr).split(/\r?\n/)[0]?.trim() ?? ''
   return { installed: true, version: firstLine || null }
 }
@@ -392,8 +442,7 @@ async function hasCodexOauthFile(): Promise<{
             ? accessClaims['https://api.openai.com/auth']
             : null
 
-        const name =
-          nonEmptyString(idClaims?.name) ?? nonEmptyString(profileClaims?.name) ?? null
+        const name = nonEmptyString(idClaims?.name) ?? nonEmptyString(profileClaims?.name) ?? null
         const email =
           nonEmptyString(idClaims?.email) ?? nonEmptyString(profileClaims?.email) ?? null
         const rawPlan =
@@ -456,9 +505,7 @@ async function hasGeminiOauthFile(): Promise<{
     const domain = nonEmptyString(idClaims?.hd) ?? null
     const expiryMs = typeof raw.expiry_date === 'number' ? raw.expiry_date : null
     const activeUntil =
-      expiryMs && Number.isFinite(expiryMs)
-        ? new Date(expiryMs).toISOString().slice(0, 10)
-        : null
+      expiryMs && Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString().slice(0, 10) : null
 
     return {
       ok: true,
@@ -476,7 +523,9 @@ async function hasGeminiOauthFile(): Promise<{
   }
 }
 
-async function getCodexStatus(stored: StoredAuth): Promise<ProviderStatus> {
+type BareStatus = Omit<ProviderStatus, 'keyMask' | 'envVar' | 'cli'>
+
+async function getCodexStatus(stored: StoredAuth): Promise<BareStatus> {
   const cli = await detectCliVersion('codex')
   if (stored.codexApiKey) {
     return {
@@ -536,7 +585,7 @@ async function getCodexStatus(stored: StoredAuth): Promise<ProviderStatus> {
   }
 }
 
-async function getGeminiStatus(stored: StoredAuth): Promise<ProviderStatus> {
+async function getGeminiStatus(stored: StoredAuth): Promise<BareStatus> {
   const [cli, agyBin] = await Promise.all([detectCliVersion('gemini'), resolveAgyBinary()])
   const installed = agyBin !== null || cli.installed
   const version = agyBin
@@ -619,6 +668,28 @@ async function getGeminiStatus(stored: StoredAuth): Promise<ProviderStatus> {
   }
 }
 
+// Adds what the LOGINS cards show beyond the sign-in itself: the key as a mask (never the key),
+// the environment variable a key came from, and whether the CLI runs.
+function decorate(status: BareStatus, stored: StoredAuth): ProviderStatus {
+  const provider = status.provider
+  const saved = provider === 'codex' ? stored.codexApiKey : stored.geminiApiKey
+  let keyMask: string | null = null
+  let envVar: string | null = null
+  if (status.method === 'api_key' && saved) keyMask = maskKey(saved)
+  if (status.method === 'env') {
+    envVar = envVarsFor(provider).find((name) => nonEmptyString(process.env[name])) ?? null
+    const value = envVar ? nonEmptyString(process.env[envVar]) : null
+    if (value) keyMask = maskKey(value)
+  }
+  return { ...status, keyMask, envVar, cli: status.installed ? 'ok' : cliStates[provider] }
+}
+
+// A made-up state (MYA_LOGINS_FIXTURE, see loginsFixtures.ts) stands in for the real status.
+function shownStatus(status: ProviderStatus): ProviderStatus {
+  const fixture = fixtureOf(status.provider)
+  return fixture ? fixtureStatus(status.provider, fixture) : status
+}
+
 export async function getProvidersStatus(force = false): Promise<ProvidersStatusResult> {
   if (!force && sessionStatusCache !== null) {
     return sessionStatusCache
@@ -629,7 +700,10 @@ export async function getProvidersStatus(force = false): Promise<ProvidersStatus
   const run = (async (): Promise<ProvidersStatusResult> => {
     const stored = await loadStoredAuth()
     const [codex, gemini] = await Promise.all([getCodexStatus(stored), getGeminiStatus(stored)])
-    const result: ProvidersStatusResult = { codex, gemini }
+    const result: ProvidersStatusResult = {
+      codex: shownStatus(decorate(codex, stored)),
+      gemini: shownStatus(decorate(gemini, stored))
+    }
     sessionStatusCache = result
     return result
   })()
@@ -640,25 +714,6 @@ export async function getProvidersStatus(force = false): Promise<ProvidersStatus
     if (pendingStatusPromise === run) {
       pendingStatusPromise = null
     }
-  }
-}
-
-async function activateProviderModelIfAuto(provider: CliProviderId): Promise<void> {
-  const targetModel = provider === 'codex' ? 'codex:gpt-5.3-codex' : 'gemini:gemini-2.5-pro'
-  try {
-    const def = await getDefaultChoice()
-    if (def.model === AUTO) {
-      await setDefaultChoice({ model: targetModel, effort: AUTO })
-    }
-    const project = getProject()
-    if (project) {
-      const chat = await getChatChoice(project.path)
-      if (!chat || chat.model === AUTO) {
-        await setChatChoice(project.path, { model: targetModel, effort: AUTO })
-      }
-    }
-  } catch (err) {
-    console.error('[providerAuth] Could not auto-select provider model:', err)
   }
 }
 
@@ -694,6 +749,9 @@ export function cancelProviderLogin(provider: CliProviderId): { ok: boolean } {
   return { ok: true }
 }
 
+// How a browser sign-in ended: it worked, or the failure with its kind.
+type Outcome = { ok: boolean; error?: string; code?: ProviderErrorCode }
+
 async function loginCodexOAuth(): Promise<ProviderActionResult> {
   const cli = await detectCliVersion('codex')
   if (!cli.installed) {
@@ -717,13 +775,13 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
   delete env.OPENAI_API_KEY
   delete env.CODEX_API_KEY
 
-  const loginOutcome = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+  const loginOutcome = await new Promise<Outcome>((resolve) => {
     let settled = false
     let openedUrl = false
     let cancelled = false
     let outputText = ''
 
-    const finish = (result: { ok: boolean; error?: string }): void => {
+    const finish = (result: Outcome): void => {
       if (settled) return
       settled = true
       clearInterval(poller)
@@ -741,7 +799,7 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
     activeCancelFns.set('codex', () => {
       cancelled = true
       killProcessTree(child)
-      finish({ ok: false, error: 'Sign-in was cancelled.' })
+      finish({ ok: false, error: 'Sign-in was cancelled.', code: 'cancelled' })
     })
 
     const inspectChunk = (chunk: Buffer): void => {
@@ -783,8 +841,8 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
 
     const timeout = setTimeout(() => {
       killProcessTree(child)
-      finish({ ok: false, error: 'Browser sign-in timed out after 3 minutes.' })
-    }, 180_000)
+      finish({ ok: false, error: TIMEOUT_MESSAGE, code: 'timeout' })
+    }, SIGN_IN_TIMEOUT_MS)
 
     child.on('error', (err) => {
       finish({ ok: false, error: err.message })
@@ -793,7 +851,7 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
     child.on('close', (code) => {
       void (async () => {
         if (cancelled) {
-          finish({ ok: false, error: 'Sign-in was cancelled.' })
+          finish({ ok: false, error: 'Sign-in was cancelled.', code: 'cancelled' })
           return
         }
         const nowMtime = await fileMtimeMs(codexAuthPath())
@@ -804,9 +862,15 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
           finish({ ok: true })
         } else {
           const cleanErr = outputText.trim().split(/\r?\n/).slice(-3).join(' ')
+          // The person said no in the browser, or the sign-in broke.
+          if (cancelledInBrowser(outputText)) {
+            finish({ ok: false, error: BROWSER_CANCELLED_MESSAGE, code: 'browser_cancelled' })
+            return
+          }
           finish({
             ok: false,
-            error: cleanErr || `Browser sign-in did not complete (exit code ${code ?? 'unknown'}).`
+            error: cleanErr || `Browser sign-in did not complete (exit code ${code ?? 'unknown'}).`,
+            code: 'sign_in_failed'
           })
         }
       })()
@@ -815,12 +879,12 @@ async function loginCodexOAuth(): Promise<ProviderActionResult> {
 
   const status = await getProvidersStatus(true)
   if (loginOutcome.ok && status.codex.loggedIn) {
-    await activateProviderModelIfAuto('codex')
     return { ok: true, status }
   }
   return {
     ok: false,
     error: loginOutcome.error ?? 'Sign-in was not completed.',
+    code: loginOutcome.code ?? null,
     status
   }
 }
@@ -837,11 +901,11 @@ async function loginGeminiOAuth(): Promise<ProviderActionResult> {
   }
   const state = randomBytes(32).toString('hex')
 
-  const loginOutcome = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+  const loginOutcome = await new Promise<Outcome>((resolve) => {
     let settled = false
     let server: Server | null = null
 
-    const finish = (result: { ok: boolean; error?: string }): void => {
+    const finish = (result: Outcome): void => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
@@ -855,11 +919,11 @@ async function loginGeminiOAuth(): Promise<ProviderActionResult> {
     }
 
     const timeout = setTimeout(() => {
-      finish({ ok: false, error: 'Browser sign-in timed out after 3 minutes.' })
-    }, 180_000)
+      finish({ ok: false, error: TIMEOUT_MESSAGE, code: 'timeout' })
+    }, SIGN_IN_TIMEOUT_MS)
 
     activeCancelFns.set('gemini', () => {
-      finish({ ok: false, error: 'Sign-in was cancelled.' })
+      finish({ ok: false, error: 'Sign-in was cancelled.', code: 'cancelled' })
     })
 
     server = createServer((req, res) => {
@@ -876,7 +940,11 @@ async function loginGeminiOAuth(): Promise<ProviderActionResult> {
           if (errorParam) {
             res.writeHead(301, { Location: GEMINI_SIGN_IN_FAILURE_URL })
             res.end()
-            finish({ ok: false, error: `Google OAuth error: ${errorParam}` })
+            finish(
+              cancelledInBrowser(errorParam)
+                ? { ok: false, error: BROWSER_CANCELLED_MESSAGE, code: 'browser_cancelled' }
+                : { ok: false, error: `Google OAuth error: ${errorParam}`, code: 'sign_in_failed' }
+            )
             return
           }
           if (parsedUrl.searchParams.get('state') !== state) {
@@ -995,24 +1063,131 @@ async function loginGeminiOAuth(): Promise<ProviderActionResult> {
 
   const status = await getProvidersStatus(true)
   if (loginOutcome.ok && status.gemini.loggedIn) {
-    await activateProviderModelIfAuto('gemini')
     return { ok: true, status }
   }
   return {
     ok: false,
     error: loginOutcome.error ?? 'Sign-in was not completed.',
+    code: loginOutcome.code ?? null,
     status
   }
 }
 
+// --- The LOGINS actions ---------------------------------------------------------------------------
+
+const MADE_UP_STEP_MS = 900
+
+function sleepFor(ms: number, isCancelled: () => boolean): Promise<void> {
+  return new Promise((resolve) => {
+    const started = Date.now()
+    const timer = setInterval(() => {
+      if (isCancelled() || Date.now() - started >= ms) {
+        clearInterval(timer)
+        resolve()
+      }
+    }, 100)
+  })
+}
+
+// --- Made-up actions (MYA_LOGINS_FIXTURE) ----------------------------------------------------------
+
+async function fixtureInstall(
+  provider: CliProviderId,
+  state: FixtureState,
+  onProgress: (stage: string) => void
+): Promise<ProviderActionResult> {
+  let cancelled = false
+  installJobs.set(provider, { cancel: () => (cancelled = true) })
+  try {
+    for (const stage of ['npm: fetching packages', 'npm: unpacking packages', 'npm: finishing']) {
+      onProgress(stage)
+      await sleepFor(MADE_UP_STEP_MS, () => cancelled)
+      if (cancelled) {
+        return {
+          ok: false,
+          error: 'Install cancelled.',
+          code: 'cancelled',
+          status: await getProvidersStatus()
+        }
+      }
+    }
+  } finally {
+    installJobs.delete(provider)
+  }
+  if (state === 'install-fails') {
+    return {
+      ok: false,
+      error: installFailedMessage(1),
+      code: 'install_failed',
+      exitCode: 1,
+      log: 'npm ERR! code E404\nnpm ERR! 404 Not Found - GET https://registry.npmjs.org/made-up\nnpm ERR! A complete log of this run can be found in: made-up-log.txt',
+      status: await getProvidersStatus()
+    }
+  }
+  setFixture(provider, 'signed-out')
+  return { ok: true, status: await getProvidersStatus(true) }
+}
+
+async function fixtureSignIn(
+  provider: CliProviderId,
+  state: FixtureState
+): Promise<ProviderActionResult> {
+  let cancelled = false
+  activeCancelFns.set(provider, () => (cancelled = true))
+  try {
+    const wait =
+      state === 'sign-in-times-out'
+        ? fixtureSignInWaitMs(SIGN_IN_TIMEOUT_MS)
+        : state === 'browser-cancelled'
+          ? 2_500
+          : 2_000
+    await sleepFor(wait, () => cancelled)
+  } finally {
+    activeCancelFns.delete(provider)
+  }
+  if (cancelled) {
+    return {
+      ok: false,
+      error: 'Sign-in was cancelled.',
+      code: 'cancelled',
+      status: await getProvidersStatus()
+    }
+  }
+  if (state === 'sign-in-times-out') {
+    return {
+      ok: false,
+      error: TIMEOUT_MESSAGE,
+      code: 'timeout',
+      status: await getProvidersStatus()
+    }
+  }
+  if (state === 'browser-cancelled') {
+    return {
+      ok: false,
+      error: BROWSER_CANCELLED_MESSAGE,
+      code: 'browser_cancelled',
+      status: await getProvidersStatus()
+    }
+  }
+  setFixture(provider, 'signed-in-browser')
+  return { ok: true, status: await getProvidersStatus(true) }
+}
+
+// --- Sign-in ------------------------------------------------------------------------------------
+
 export async function loginProviderOAuth(provider: CliProviderId): Promise<ProviderActionResult> {
   cancelProviderLogin(provider)
+  const fixture = fixtureOf(provider)
+  if (fixture) return fixtureSignIn(provider, fixture)
   if (provider === 'codex') {
     return loginCodexOAuth()
   }
   return loginGeminiOAuth()
 }
 
+// SAVE KEY. Codex hands the key to its own CLI, which says whether it takes it; Gemini has no such
+// check, so its key is kept as it is. Mya keeps its own copy (provider-auth.json) because a run
+// starts the CLI with the key in its environment; the window only ever gets the masked form.
 export async function saveProviderApiKey(
   provider: CliProviderId,
   rawKey: string
@@ -1033,17 +1208,48 @@ export async function saveProviderApiKey(
     }
   }
 
-  if (provider === 'codex') {
-    await updateStoredAuth((cur) => ({ ...cur, codexApiKey: trimmed }))
-    const cli = await detectCliVersion('codex')
-    if (cli.installed) {
-      await runQuickCommand('codex', ['login', '--with-api-key'], 10_000, `${trimmed}\n`)
+  const fixture = fixtureOf(provider)
+  if (fixture) {
+    if (fixture === 'key-rejected') {
+      return {
+        ok: false,
+        error: keyRejectedMessage(PROVIDERS[provider].name),
+        code: 'key_rejected',
+        status: await getProvidersStatus()
+      }
     }
-    await activateProviderModelIfAuto('codex')
+    setFixture(provider, 'signed-in-key')
+    return { ok: true, status: await getProvidersStatus(true) }
+  }
+
+  if (provider === 'codex') {
+    const cli = await detectCliVersion('codex')
+    if (!cli.installed) {
+      return {
+        ok: false,
+        error: 'Install the CLI first.',
+        code: 'not_installed',
+        status: await getProvidersStatus()
+      }
+    }
+    const taken = await runQuickCommand(
+      'codex',
+      ['login', '--with-api-key'],
+      10_000,
+      `${trimmed}\n`
+    )
+    if (!taken.ok) {
+      return {
+        ok: false,
+        error: keyRejectedMessage(PROVIDERS.codex.name),
+        code: 'key_rejected',
+        status: await getProvidersStatus(true)
+      }
+    }
+    await updateStoredAuth((cur) => ({ ...cur, codexApiKey: trimmed }))
   } else {
     await updateStoredAuth((cur) => ({ ...cur, geminiApiKey: trimmed }))
     await setGeminiAuthType('gemini-api-key')
-    await activateProviderModelIfAuto('gemini')
   }
 
   return { ok: true, status: await getProvidersStatus(true) }
@@ -1051,6 +1257,32 @@ export async function saveProviderApiKey(
 
 export async function logoutProvider(provider: CliProviderId): Promise<ProviderActionResult> {
   cancelProviderLogin(provider)
+  const fixture = fixtureOf(provider)
+  if (fixture) {
+    if (fixture === 'signed-in-env') {
+      return {
+        ok: false,
+        error: envKeySignOutMessage(
+          fixtureStatus(provider, fixture).envVar ?? envVarsFor(provider)[0]
+        ),
+        code: 'env_key',
+        status: await getProvidersStatus()
+      }
+    }
+    setFixture(provider, 'signed-out')
+    return { ok: true, status: await getProvidersStatus(true) }
+  }
+  // A key that comes from the environment is not Mya's to remove.
+  const before = await getProvidersStatus(true)
+  const current = provider === 'codex' ? before.codex : before.gemini
+  if (current.method === 'env') {
+    return {
+      ok: false,
+      error: envKeySignOutMessage(current.envVar ?? envVarsFor(provider)[0]),
+      code: 'env_key',
+      status: before
+    }
+  }
   if (provider === 'codex') {
     await updateStoredAuth((cur) => ({ ...cur, codexApiKey: null }))
     await runQuickCommand('codex', ['logout'], 6_000).catch(() => {})
@@ -1063,18 +1295,96 @@ export async function logoutProvider(provider: CliProviderId): Promise<ProviderA
   return { ok: true, status: await getProvidersStatus(true) }
 }
 
-export async function installProviderCli(provider: CliProviderId): Promise<ProviderActionResult> {
-  const pkg = provider === 'codex' ? '@openai/codex' : '@google/gemini-cli'
-  const res = await runQuickCommand('npm', ['install', '-g', pkg], 180_000)
-  const status = await getProvidersStatus(true)
-  const installed = provider === 'codex' ? status.codex.installed : status.gemini.installed
-  if (!res.ok || !installed) {
-    const detail = (res.stderr || res.stdout).split(/\r?\n/).slice(-3).join(' ')
-    return {
-      ok: false,
-      error: detail || `Could not install ${pkg} via npm.`,
-      status
-    }
+// --- INSTALL CLI -----------------------------------------------------------------------------------
+
+const installJobs = new Map<CliProviderId, { cancel: () => void }>()
+const INSTALL_TIMEOUT_MS = 180_000
+const LOG_LINES = 40
+
+export function cancelProviderInstall(provider: CliProviderId): { ok: boolean } {
+  const job = installJobs.get(provider)
+  if (!job) return { ok: false }
+  job.cancel()
+  return { ok: true }
+}
+
+// Runs npm install -g for the CLI. `onProgress` hears each stage as npm goes. CANCEL stops it, and a
+// failure keeps npm's exit code and the end of its output (COPY LOG).
+export async function installProviderCli(
+  provider: CliProviderId,
+  onProgress: (stage: string) => void = () => {}
+): Promise<ProviderActionResult> {
+  const fixture = fixtureOf(provider)
+  if (fixture) return fixtureInstall(provider, fixture, onProgress)
+  if (installJobs.has(provider)) {
+    return { ok: false, error: 'An install is already going.', status: await getProvidersStatus() }
   }
-  return { ok: true, status }
+  const pkg = packageFor(provider)
+  const outcome = await new Promise<{
+    exitCode: number | null
+    cancelled: boolean
+    timedOut: boolean
+    log: string[]
+  }>((resolve) => {
+    const log: string[] = []
+    let cancelled = false
+    let timedOut = false
+    const child = spawn('npm', ['install', '-g', pkg], {
+      env: augmentedEnv(),
+      shell: process.platform === 'win32',
+      windowsHide: true
+    })
+    const hear = (chunk: Buffer): void => {
+      for (const line of chunk.toString('utf8').split(/\r?\n/)) {
+        if (line.trim() === '') continue
+        log.push(line)
+        if (log.length > LOG_LINES) log.shift()
+        const stage = installStage(line)
+        if (stage) onProgress(stage)
+      }
+    }
+    child.stdout?.on('data', hear)
+    child.stderr?.on('data', hear)
+    const timer = setTimeout(() => {
+      timedOut = true
+      killProcessTree(child)
+    }, INSTALL_TIMEOUT_MS)
+    installJobs.set(provider, {
+      cancel: () => {
+        cancelled = true
+        killProcessTree(child)
+      }
+    })
+    const done = (exitCode: number | null): void => {
+      clearTimeout(timer)
+      installJobs.delete(provider)
+      resolve({ exitCode, cancelled, timedOut, log })
+    }
+    child.on('error', (err) => {
+      log.push(err.message)
+      done(null)
+    })
+    child.on('close', (code) => done(code))
+  })
+
+  const status = await getProvidersStatus(true)
+  if (outcome.cancelled) {
+    return { ok: false, error: 'Install cancelled.', code: 'cancelled', status }
+  }
+  const installed = provider === 'codex' ? status.codex.installed : status.gemini.installed
+  if (outcome.exitCode === 0 && installed) return { ok: true, status }
+  return {
+    ok: false,
+    error: installFailedMessage(outcome.exitCode),
+    code: 'install_failed',
+    exitCode: outcome.exitCode,
+    log: outcome.log.join('\n'),
+    status
+  }
+}
+
+// Whether the CLI could not start even though it is there: for the "Couldn't run ... --version"
+// card. Kept next to the status so one place knows the binary names.
+export function cliBinary(provider: CliProviderId): string {
+  return binaryFor(provider)
 }

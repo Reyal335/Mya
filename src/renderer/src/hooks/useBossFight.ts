@@ -22,7 +22,7 @@ export type BossFightStore = {
 
 // The open project's fight, as main has it. Main sends an event after every change; a
 // round in the event is replayed by the BOSS tab and the battle view.
-export function useBossFight(projectPath: string | null): BossFightStore {
+export function useBossFight(projectPath: string | null, chatId: string | null): BossFightStore {
   const [data, setData] = useState<{ key: string | null; current: Fight | null; past: Fight[] }>({
     key: null,
     current: null,
@@ -52,14 +52,15 @@ export function useBossFight(projectPath: string | null): BossFightStore {
     }, ms)
   }, [])
 
-  // A different project: its own conversation and fight. Nothing from the last one replays.
+  // A different project or another chat: its own conversation and fight. Nothing from the last one
+  // replays.
   useEffect(() => {
     reload()
     return () => {
       latest.current += 1
       setReplay(null)
     }
-  }, [projectPath, reload])
+  }, [projectPath, chatId, reload])
 
   useEffect(
     () =>

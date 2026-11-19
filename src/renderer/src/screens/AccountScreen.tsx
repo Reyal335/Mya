@@ -13,6 +13,9 @@ import {
   type AccountState,
   type UsageRow
 } from '../../../shared/account'
+import type { ProviderId } from '../../../shared/models'
+import { can } from '../../../shared/providers'
+import ProviderAccount from '../components/ProviderAccount'
 import SegmentBar from '../components/SegmentBar'
 import type { AccountStore } from '../hooks/useAccount'
 import './AccountScreen.css'
@@ -21,6 +24,9 @@ const APP_NAME = 'Mya'
 
 type AccountScreenProps = {
   store: AccountStore
+  // The open chat's provider. A provider that reports no usage shows its own account instead.
+  provider: ProviderId
+  onOpenLogins: () => void
 }
 
 function UsageRowView({ row, now }: { row: UsageRow; now: number }): React.JSX.Element {
@@ -97,7 +103,16 @@ function Fields({ account }: { account: AccountState }): React.JSX.Element | nul
 // The ACCOUNT screen from designs/13-account.html and 13b-account-states.html: who the
 // agents run as, and how much of the session and weekly limits is used. Reached from the
 // meter at the bottom of the sidebar.
-function AccountScreen({ store }: AccountScreenProps): React.JSX.Element {
+function AccountScreen({ store, provider, onOpenLogins }: AccountScreenProps): React.JSX.Element {
+  // Codex and Gemini report no usage: the screen is that provider's account (from LOGINS), then a
+  // line saying so. Claude's is below, unchanged.
+  if (!can(provider, 'usage')) {
+    return <ProviderAccount provider={provider} onOpenLogins={onOpenLogins} />
+  }
+  return <ClaudeAccount store={store} />
+}
+
+function ClaudeAccount({ store }: { store: AccountStore }): React.JSX.Element {
   const { data, now, checking, check } = store
   const { account } = data
   const titleRef = useRef<HTMLHeadingElement>(null)

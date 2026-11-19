@@ -159,3 +159,8 @@
   color: var(--error);
   overflow-wrap: anywhere;
 }
+
+/* The line for a provider with no mascot voice, set off from the note above and the EMOJI group below. */
+.mascot-form__field .unavailable {
+  margin: 6px 0 12px;
+}

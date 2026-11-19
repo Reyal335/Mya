@@ -1,0 +1,18 @@
+/* The provider tag from designs/DESIGN-providers.md: glyph plus name in the pixel font at 8px,
+   muted, a 2px line border, 20px tall, 6px side padding. */
+.provider-tag {
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--muted);
+  border: var(--border-thin) solid var(--line);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+}

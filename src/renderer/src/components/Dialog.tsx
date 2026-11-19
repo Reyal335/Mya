@@ -7,12 +7,15 @@ type DialogProps = {
   subtitle?: string
   tone?: 'default' | 'danger'
   // Wide dialogs hold a whole form and scroll inside when the window is short.
-  size?: 'default' | 'wide'
+  // 'providers' is the NEW CHAT dialog's: 860px, and it scrolls inside when the window is short.
+  size?: 'default' | 'wide' | 'providers'
   children: ReactNode
   // The buttons. The first one gets focus when the dialog opens.
   actions: ReactNode
   // Called on Escape.
   onClose: () => void
+  // Shows an X at the top right that does what Escape does. It is last in the tab order.
+  closeButton?: boolean
   // Called when the dimmed backdrop outside the dialog is clicked. Leave it out for
   // a dialog that only Escape or its buttons may close.
   onBackdropClick?: () => void
@@ -48,6 +51,7 @@ function Dialog({
   children,
   actions,
   onClose,
+  closeButton = false,
   onBackdropClick
 }: DialogProps): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
@@ -99,7 +103,7 @@ function Dialog({
     >
       <div
         ref={ref}
-        className={`dialog dialog--${tone}${size === 'wide' ? ' dialog--wide' : ''}`}
+        className={`dialog dialog--${tone}${size === 'wide' ? ' dialog--wide' : ''}${size === 'providers' ? ' dialog--wide dialog--providers' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -123,6 +127,11 @@ function Dialog({
         )}
         <div className="dialog__body">{children}</div>
         <div className="dialog__actions">{actions}</div>
+        {closeButton && (
+          <button type="button" className="dialog__close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        )}
       </div>
     </div>
   )

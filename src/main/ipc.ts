@@ -9,8 +9,22 @@ import {
   type ProjectInfo
 } from '../shared/ipc'
 import { accountData, checkAccount, openUsagePage } from './account'
+import {
+  chatsCreate,
+  chatsStarts,
+  chatsExport,
+  chatsFork,
+  chatsHistory,
+  chatsList,
+  chatsOpen,
+  chatsPin,
+  chatsRemove,
+  chatsRename,
+  chatsSearch
+} from './chatActions'
 import { openInEditor } from './editor'
 import {
+  cancelProviderInstall,
   cancelProviderLogin,
   getProvidersStatus,
   installProviderCli,
@@ -29,15 +43,7 @@ import {
   setThemeChoice,
   themeChoices
 } from './themes'
-import {
-  answerPermission,
-  applyChoiceToRun,
-  isRunning,
-  loadChatHistory,
-  resetChat,
-  sendMessage,
-  stopRun
-} from './agent'
+import { answerPermission, applyChoiceToRun, isRunning, sendMessage, stopRun } from './agent'
 import { readPastedImages } from './pastedImages'
 import {
   getDialogueAutoCollapse,
@@ -198,20 +204,39 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.MascotsResetDefault, () => resetDefaultMascot())
   ipcMain.handle(IpcChannel.MascotsSetActive, (_event, id: unknown) => setActiveMascot(id))
 
-  // The open project's main conversation.
-  ipcMain.handle(IpcChannel.ChatHistory, async (): Promise<ChatHistory> => {
-    const project = getProject()
-    return project
-      ? loadChatHistory(project.path)
-      : { items: [], truncated: false, unavailable: false }
-  })
-  ipcMain.handle(IpcChannel.ChatReset, async () => {
-    const project = getProject()
-    if (!project) {
-      return { ok: false, error: { code: 'no_project', message: 'No project is open.' } }
-    }
-    return resetChat(project.path)
-  })
+  // The open project's open chat: its saved conversation.
+  ipcMain.handle(
+    IpcChannel.ChatHistory,
+    async (): Promise<ChatHistory> => chatsHistory(getProject()?.path ?? null)
+  )
+
+  // The open project's chats. The window names a chat by id only; chatActions.ts checks it.
+  ipcMain.handle(IpcChannel.ChatsList, () => chatsList(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.ChatsOpen, (_event, id: unknown) =>
+    chatsOpen(getProject()?.path ?? null, id)
+  )
+  ipcMain.handle(IpcChannel.ChatsCreate, (_event, provider: unknown) =>
+    chatsCreate(getProject()?.path ?? null, provider)
+  )
+  ipcMain.handle(IpcChannel.ChatsStarts, () => chatsStarts(getProject()?.path ?? null))
+  ipcMain.handle(IpcChannel.ChatsRename, (_event, id: unknown, title: unknown) =>
+    chatsRename(getProject()?.path ?? null, id, title)
+  )
+  ipcMain.handle(IpcChannel.ChatsPin, (_event, id: unknown, pinned: unknown) =>
+    chatsPin(getProject()?.path ?? null, id, pinned)
+  )
+  ipcMain.handle(IpcChannel.ChatsRemove, (_event, id: unknown) =>
+    chatsRemove(getProject()?.path ?? null, id)
+  )
+  ipcMain.handle(IpcChannel.ChatsFork, (_event, id: unknown) =>
+    chatsFork(getProject()?.path ?? null, id)
+  )
+  ipcMain.handle(IpcChannel.ChatsExport, (event, id: unknown) =>
+    chatsExport(getProject()?.path ?? null, id, BrowserWindow.fromWebContents(event.sender))
+  )
+  ipcMain.handle(IpcChannel.ChatsSearch, (_event, query: unknown) =>
+    chatsSearch(getProject()?.path ?? null, query)
+  )
 
   // The chat's model and thinking choice, and the models the account can use. The
   // window names no folder: main uses the open project.
@@ -417,10 +442,18 @@ export function registerIpc(): void {
     }
     return logoutProvider(provider)
   })
-  ipcMain.handle(IpcChannel.ProvidersInstallCli, async (_event, provider: unknown) => {
+  ipcMain.handle(IpcChannel.ProvidersInstallCli, async (event, provider: unknown) => {
     if (!isCliProvider(provider)) {
       return { ok: false, error: 'Unknown provider.', status: await getProvidersStatus() }
     }
-    return installProviderCli(provider)
+    return installProviderCli(provider, (stage) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IpcChannel.ProvidersInstallProgress, { provider, stage })
+      }
+    })
+  })
+  ipcMain.handle(IpcChannel.ProvidersCancelInstall, (_event, provider: unknown) => {
+    if (!isCliProvider(provider)) return { ok: false }
+    return cancelProviderInstall(provider)
   })
 }

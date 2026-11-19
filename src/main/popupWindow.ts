@@ -21,6 +21,7 @@ import {
   type TaskAgent
 } from '../shared/ipc'
 import type { UnlockNotice } from '../shared/achievements'
+import type { ProviderId } from '../shared/models'
 import type { TaskLoot, TaskXp } from '../shared/progression'
 import { errorText } from '../shared/noticeText'
 import { fitsPopup, popupDetailsHeight } from '../shared/popupFit'
@@ -174,21 +175,29 @@ function popupLoot(loot: TaskLoot | null, xp: TaskXp | null): PopupLoot | null {
   }
 }
 
-function runNotice(outcome: 'done' | AgentError, reply: string): popups.PopupNotice {
+function runNotice(
+  outcome: 'done' | AgentError,
+  reply: string,
+  chatId: string,
+  provider: ProviderId
+): popups.PopupNotice {
+  // OPEN goes to the chat the run was in, which may no longer be the open one.
   return outcome === 'done'
     ? {
         id: randomUUID(),
         kind: 'finished',
         who: { kind: 'speaker' },
         text: firstLine(reply),
-        open: { screen: 'chat' }
+        open: { screen: 'chat', chatId },
+        provider
       }
     : {
         id: randomUUID(),
         kind: 'error',
         who: { kind: 'speaker' },
         text: errorText(outcome),
-        open: { screen: 'chat' }
+        open: { screen: 'chat', chatId },
+        provider
       }
 }
 
@@ -211,6 +220,7 @@ function watch(): void {
           input: request.input,
           truncated: request.truncated,
           projectPath: request.cwd,
+          chatId: request.chatId,
           fits: fitsPopup(request.name, request.input, request.truncated, request.cwd)
         }
       })
@@ -227,8 +237,11 @@ function watch(): void {
           kind: done ? 'finished' : 'error',
           who: whoOf(task.agent),
           text: done ? firstLine(task.report) : task.report.trim() || TASK_ERROR_TEXT,
-          open: done ? { screen: 'inbox', taskId: task.taskId } : { screen: 'chat' },
-          loot: done ? popupLoot(task.loot, task.xp) : null
+          open: done
+            ? { screen: 'inbox', taskId: task.taskId }
+            : { screen: 'chat', chatId: task.chatId },
+          loot: done ? popupLoot(task.loot, task.xp) : null,
+          provider: task.provider
         }
       })
     },
@@ -236,7 +249,10 @@ function watch(): void {
       dispatch({
         type: 'run_ended',
         runId: run.runId,
-        notice: run.outcome === 'stopped' ? null : runNotice(run.outcome, run.reply)
+        notice:
+          run.outcome === 'stopped'
+            ? null
+            : runNotice(run.outcome, run.reply, run.chatId, run.provider)
       })
   })
 }
@@ -434,7 +450,7 @@ export function setupPopups(main: BrowserWindow): void {
         kind: end.kind === 'victory' ? 'finished' : 'error',
         who: { kind: 'speaker' },
         text: end.text,
-        open: { screen: 'chat' }
+        open: end.chatId ? { screen: 'chat', chatId: end.chatId } : { screen: 'chat' }
       }
     })
   )

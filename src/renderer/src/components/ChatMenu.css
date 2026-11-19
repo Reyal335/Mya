@@ -1,0 +1,60 @@
+/* The chat item menu from designs/21c-chat-history.html: 200px, 3px --text border, hard shadow,
+   pixel 7px items 30px tall. Square corners, no blur. */
+.chat-menu {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg);
+  border: 3px solid var(--text);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.chat-menu__item {
+  min-height: 30px;
+  margin: 0;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-menu__item:hover,
+.chat-menu__item:focus-visible {
+  background: var(--line);
+}
+
+.chat-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.chat-menu__item--danger {
+  color: var(--error);
+}
+
+.chat-menu__item[aria-disabled='true'] {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.chat-menu__item--danger[aria-disabled='true'] {
+  color: var(--muted);
+}
+
+.chat-menu__rule {
+  height: 2px;
+  margin: 2px 0;
+  background: var(--line);
+}

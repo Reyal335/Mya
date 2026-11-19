@@ -11,6 +11,8 @@ import { getProvidersStatus } from './providerAuth'
 import { getProject, loadProject } from './settings'
 import { loadProgression, useProjectFrom } from './progressionStore'
 import { loadBosses, watchConversations } from './bosses'
+import { setFirstChatStart } from './chats'
+import { firstChatStart } from './startChoice'
 import { loadTasks } from './tasks'
 import { loadUsage } from './usage'
 import { watchWindow } from './windowControls'
@@ -123,6 +125,8 @@ app.whenReady().then(async () => {
   // Boss fights, and the user's boss packs (a broken pack is skipped and logged).
   await loadBosses()
   watchConversations()
+  // A project with no chat yet makes its first chat on the first provider that is signed in.
+  setFirstChatStart(firstChatStart)
   // The saved usage numbers come back first; the account is read on its own after that.
   await loadUsage()
   registerIpc()

@@ -1,7 +1,9 @@
 import type { AgentSummary } from '../../../shared/ipc'
+import { agentPin } from '../../../shared/providers'
 import { CLASS_NAMES, classFor, type AgentProgress } from '../../../shared/progression'
 import AgentIcon from './AgentIcon'
 import ClassBadge from './ClassBadge'
+import ProviderTag from './ProviderTag'
 import XpBar from './XpBar'
 import './AgentCard.css'
 
@@ -58,6 +60,8 @@ function AgentCard({
   // The class comes from the tools line as it is now; the level from main.
   const agentClass = classFor(agent.tools)
   const level = progress?.level ?? 1
+  // An agent pinned to a model shows its provider. One with none follows the chat: no tag.
+  const pin = agentPin(agent.model)
 
   // The select button keeps the whole card; CALL and STATUS sit beside it at the right
   // edge, so no click ever does another's job.
@@ -75,7 +79,10 @@ function AgentCard({
           {agent.role && <span className="agent-card__role">{agent.role}</span>}
           <span className="agent-card__top">
             <span className="agent-card__name">{agent.name}</span>
-            <span className="agent-card__model">{agent.model ?? 'default'}</span>
+            <span className="agent-card__model">
+              {pin && <ProviderTag provider={pin} />}
+              {agent.model ?? 'default'}
+            </span>
           </span>
           <span className="agent-card__progress">
             <ClassBadge classId={agentClass.id} reason={agentClass.reason} />

@@ -107,6 +107,14 @@
   overflow-wrap: anywhere;
 }
 
+/* The status and, beside it, the provider of the chat it came from. */
+.popup-card__status-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 .popup-card__status {
   display: inline-flex;
   align-items: center;

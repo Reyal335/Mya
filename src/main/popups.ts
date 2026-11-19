@@ -3,6 +3,7 @@
 // fake time. popupWindow.ts feeds it and draws its view.
 
 import type { Reward } from '../shared/achievements'
+import type { ProviderId } from '../shared/models'
 import type {
   PopupAction,
   PopupLoot,
@@ -28,6 +29,8 @@ export type PopupRequest = {
   truncated: boolean
   projectPath: string
   fits: boolean
+  // The chat the request is in, so OPEN goes to it.
+  chatId?: string
 }
 
 // A finished or error popup, or an achievement unlocked. All three queue the same way.
@@ -40,6 +43,8 @@ export type PopupNotice =
       open: PopupOpenTarget
       // An agent's finished task: what it changed and the XP it earned.
       loot?: PopupLoot | null
+      // The provider of the chat it came from.
+      provider?: ProviderId
     }
   | { id: string; kind: 'achievement'; name: string; reward: Reward; open: PopupOpenTarget }
 
@@ -283,8 +288,15 @@ export function viewOf(state: PopupState): PopupView | null {
     if (notice.kind === 'achievement') {
       return { id: notice.id, kind: 'achievement', name: notice.name, reward: notice.reward }
     }
-    const { id, kind, who, text, loot } = notice
-    return loot ? { id, kind, who, text, loot } : { id, kind, who, text }
+    const { id, kind, who, text, loot, provider } = notice
+    return {
+      id,
+      kind,
+      who,
+      text,
+      ...(loot ? { loot } : {}),
+      ...(provider ? { provider } : {})
+    }
   }
   const index = state.requests.findIndex((r) => r.permissionId === shown.permissionId)
   if (index < 0) return null
@@ -326,7 +338,14 @@ export function actAllowed(state: PopupState, id: unknown, action: unknown): boo
 
 // Where OPEN goes for the popup on screen.
 export function openTargetOf(state: PopupState): PopupOpenTarget {
-  return state.shown?.kind === 'notice' ? state.shown.notice.open : { screen: 'chat' }
+  const { shown } = state
+  if (shown?.kind === 'notice') return shown.notice.open
+  if (shown?.kind === 'approval') {
+    const chatId = state.requests.find((request) => request.permissionId === shown.permissionId)
+      ?.chatId
+    return chatId ? { screen: 'chat', chatId } : { screen: 'chat' }
+  }
+  return { screen: 'chat' }
 }
 
 // When the next timer event is due, or null when nothing is counting down.

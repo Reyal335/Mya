@@ -3,7 +3,8 @@ import { readFile, stat } from 'fs/promises'
 import { basename, join } from 'path'
 import type { PartyPanelMode, ProjectInfo } from '../shared/ipc'
 import { DEFAULT_MASCOT_ID } from '../shared/mascotRules'
-import { AUTO, type ModelChoice } from '../shared/models'
+import { AUTO, providerOf, type ModelChoice, type ProviderId } from '../shared/models'
+import { savedDefault } from '../shared/providers'
 import { DEFAULT_THEME, isValidFade, type ThemeChoice } from '../shared/themes'
 import { writeFileSafely } from './safeWrite'
 
@@ -111,6 +112,29 @@ export async function getDefaultChoice(): Promise<ModelChoice> {
 
 export function setDefaultChoice(choice: ModelChoice): Promise<void> {
   return updateSettings({ defaultModel: choice.model, defaultEffort: choice.effort })
+}
+
+// The model and level a new chat of each provider starts on, kept in settings.json as
+// providerDefaults: { claude?, codex?, gemini? }. "Use for new <Provider> chats too" saves a pick
+// here. Before there was one default per provider, settings.json held a single defaultModel and
+// defaultEffort: it counts as the default of the provider its model belongs to. null means nothing
+// was saved for the provider, and the caller works out its start from the models it offers.
+export async function getProviderDefault(provider: ProviderId): Promise<ModelChoice | null> {
+  return savedDefault(await readSettings(), provider)
+}
+
+export async function setProviderDefault(
+  provider: ProviderId,
+  choice: ModelChoice
+): Promise<void> {
+  if (providerOf(choice.model) !== provider) return
+  const { providerDefaults } = await readSettings()
+  const all =
+    providerDefaults !== null && typeof providerDefaults === 'object'
+      ? { ...(providerDefaults as Record<string, unknown>) }
+      : {}
+  all[provider] = { model: choice.model, effort: choice.effort }
+  await updateSettings({ providerDefaults: all })
 }
 
 // The chat theme new chats and chats with no theme of their own use. Tokyo Night at

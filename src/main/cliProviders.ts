@@ -15,7 +15,7 @@ import { parseCall } from '../shared/callAgent'
 import { isEffortLevel, providerOf, stripProvider, type ModelChoice } from '../shared/models'
 import { toolLabel } from '../shared/toolLabel'
 import { readAgent } from './agents'
-import { getProviderSession, setProviderSession, type CliProvider } from './chats'
+import { getChatSession, setChatSession, type CliProvider } from './chats'
 import { forIpc } from './ipcInput'
 import { providerChildEnv, shouldUseAgyForGemini } from './providerAuth'
 import type { MessageTracker } from './runInput'
@@ -24,6 +24,8 @@ import { endTask, startTask, taskActivity } from './tasks'
 export type CliRunContext = {
   requestId: string
   cwd: string
+  // The chat this run is in. It holds the provider's own thread or session id.
+  chatId: string
   choice: ModelChoice
   abortController: AbortController
   agents: AgentSummary[]
@@ -159,8 +161,9 @@ export async function executeCliProvider(
   const baseModelId = stripProvider(ctx.choice.model)
   const effort = isEffortLevel(ctx.choice.effort) ? ctx.choice.effort : 'auto'
 
-  let codexThreadId = await getProviderSession(ctx.cwd, 'codex')
-  let geminiSessionId = await getProviderSession(ctx.cwd, 'gemini')
+  // The chat is on one provider for good, so it holds one thread or session id: Codex's or
+  // Gemini's. A called agent never uses it.
+  let chatSession = await getChatSession(ctx.cwd, ctx.chatId)
 
   for await (const userMsg of ctx.input.iterable) {
     if (ctx.abortController.signal.aborted) break
@@ -203,6 +206,7 @@ export async function executeCliProvider(
         id: taskId,
         projectPath: ctx.cwd,
         sessionId: null,
+        chatId: ctx.chatId,
         agent: { name: calledAgent.name, scope: calledAgent.scope, filePath: calledAgent.filePath },
         description,
         prompt: finalPrompt
@@ -224,12 +228,12 @@ export async function executeCliProvider(
             effort,
             prompt: finalPrompt,
             taskId,
-            // Only resume the project's conversation when talking in the main chat.
-            threadId: calledAgent ? null : codexThreadId,
+            // Only resume the chat's own thread when talking in the main chat.
+            threadId: calledAgent ? null : chatSession,
             onThreadId: (id) => {
               if (!calledAgent) {
-                codexThreadId = id
-                void setProviderSession(ctx.cwd, 'codex', id)
+                chatSession = id
+                void setChatSession(ctx.cwd, ctx.chatId, id)
               }
             }
           })
@@ -239,11 +243,11 @@ export async function executeCliProvider(
             effort,
             prompt: finalPrompt,
             taskId,
-            sessionId: calledAgent ? null : geminiSessionId,
+            sessionId: calledAgent ? null : chatSession,
             onSessionId: (id) => {
               if (!calledAgent) {
-                geminiSessionId = id
-                void setProviderSession(ctx.cwd, 'gemini', id)
+                chatSession = id
+                void setChatSession(ctx.cwd, ctx.chatId, id)
               }
             }
           })
@@ -255,9 +259,8 @@ export async function executeCliProvider(
           msg
         )
       ) {
-        if (turnProvider === 'codex') codexThreadId = null
-        else geminiSessionId = null
-        await setProviderSession(ctx.cwd, turnProvider, null)
+        chatSession = null
+        await setChatSession(ctx.cwd, ctx.chatId, null)
       }
     }
 

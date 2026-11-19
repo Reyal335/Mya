@@ -1,0 +1,35 @@
+/* The start notice (designs/22a-chat-codex.html): a 2px --line border on the frame's solid fill, so it
+   stays readable over a theme picture. */
+.start-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--line);
+  font-size: 12px;
+}
+
+.start-notice__tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--waiting);
+  white-space: nowrap;
+}
+
+.start-notice__square {
+  width: 8px;
+  height: 8px;
+  background: var(--waiting);
+}
+
+.start-notice__text {
+  min-width: 0;
+}

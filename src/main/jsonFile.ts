@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises'
-import { renameWithRetry, writeFileSafely } from './safeWrite'
+import { renameWithRetry, writeFileSafely } from './safeWrite.ts'
 
 // Small JSON files in userData (chats.json, tasks.json). A missing file is empty.
 // A file that cannot be parsed is kept aside as <name>.bad, never deleted, and
