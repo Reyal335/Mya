@@ -1,13 +1,14 @@
 ; The mya command: <install>\resources\bin on the USER Path. The Path itself only ever
 ; passes through mya-path.ps1, never an NSIS string. A failure is reported and the
-; install still succeeds.
+; install still succeeds. After 60 s the call stops waiting for a stalled PowerShell and
+; the result is "timeout".
 !include "LogicLib.nsh"
 
 !macro myaCliPath ACTION
   Push $0
   Push $1
   DetailPrint "Setting up the mya command (${ACTION})..."
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\bin\mya-path.ps1" -Action ${ACTION} -Dir "$INSTDIR\resources\bin"'
+  nsExec::ExecToStack /TIMEOUT=60000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\bin\mya-path.ps1" -Action ${ACTION} -Dir "$INSTDIR\resources\bin"'
   Pop $0
   Pop $1
   DetailPrint "$1"

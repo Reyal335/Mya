@@ -42,6 +42,17 @@ test('shim args: --version and --help', () => {
   assert.deepEqual(parse('--version', 'a'), { kind: 'version' })
 })
 
+test('shim args: /? is --help, and only that exact text', () => {
+  assert.deepEqual(parse('/?'), { kind: 'help' })
+  assert.deepEqual(parse('/?', '--version'), { kind: 'help' })
+  assert.deepEqual(parse('/?', 'a', 'b'), {
+    kind: 'error',
+    message: 'mya: give one folder at most'
+  })
+  assert.deepEqual(parse('/c'), { kind: 'open', folder: '/c' })
+  assert.deepEqual(parse('/??'), { kind: 'open', folder: '/??' })
+})
+
 test('shim args: two folders are one too many, even with a bad option after them', () => {
   assert.deepEqual(parse('a', 'b'), { kind: 'error', message: 'mya: give one folder at most' })
   assert.deepEqual(parse('a', 'b', '--bogus'), {

@@ -170,6 +170,31 @@ try {
   Check-Value '13 exact preservation: after add' $mid "$original;$D"
   Check-Value '13 exact preservation: after remove' (Get-Path) $original
 
+  # 14 and 15: a Dir that would split into two entries, or be read as a variable, is refused
+  # before anything is read or written.
+  foreach ($bad in @(@('14 ; in Dir', 'C:\A;C:\B'), @('15 % in Dir', 'C:\%USERPROFILE%\bin'))) {
+    Reset-Keys
+    Set-Path 'a' 'ExpandString'
+    $r = Invoke-Mya 'add' $bad[1]
+    Check-Value "$($bad[0]): exit" $r.Code 1
+    Check-Value "$($bad[0]): Path unchanged" (Get-Path) 'a'
+    Check-Value "$($bad[0]): no record" (Get-Record) $null
+    Check "$($bad[0]): no state key made" (-not (Test-StateKey)) 'the state key was made'
+    $r = Invoke-Mya 'remove' $bad[1]
+    Check-Value "$($bad[0]), remove: exit" $r.Code 1
+    Check-Value "$($bad[0]), remove: Path unchanged" (Get-Path) 'a'
+  }
+
+  # 16: a write that is refused must not have said it was done.
+  Reset-Keys
+  $long = 'x' * 32760
+  Set-Path $long 'ExpandString'
+  $r = Invoke-Mya 'add' $D
+  Check-Value '16 Path too long: exit' $r.Code 3
+  Check-Value '16 Path too long: Path unchanged' (Get-Path) $long
+  Check '16 Path too long: no "Added" message' ($r.Out -notlike '*Added*') "got [$($r.Out)]"
+  Check-Value '16 Path too long: no record' (Get-Record) $null
+
   Check-Value 'real user Path was not touched' ([string]$hkcu.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)) $realBefore
 }
 finally {

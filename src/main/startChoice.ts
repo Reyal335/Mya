@@ -24,12 +24,15 @@ export async function signedIn(): Promise<Record<ProviderId, boolean>> {
 
 // The first provider that is signed in, Claude first. With none signed in, Claude: its chat then
 // says it is not signed in, as before.
-export async function firstSignedInProvider(): Promise<ProviderId> {
-  const ready = await signedIn()
+export function firstReadyProvider(ready: Record<ProviderId, boolean>): ProviderId {
   if (ready.claude) return 'claude'
   if (ready.codex) return 'codex'
   if (ready.gemini) return 'gemini'
   return 'claude'
+}
+
+export async function firstSignedInProvider(): Promise<ProviderId> {
+  return firstReadyProvider(await signedIn())
 }
 
 // The model and level a new chat of `provider` starts on: the saved default ("Use for new

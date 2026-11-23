@@ -357,10 +357,10 @@ export type ChatHistory = {
 
 export type PartyPanelMode = 'open' | 'rail'
 
-// What a start of the `mya` command left for the window. The path is for display only: the window
-// names a folder request by id.
+// What a start of the `mya` command left for the window. The window names a folder request by id:
+// the folder itself stays in main.
 export type LaunchEvent =
-  { id: string; kind: 'open-folder'; path: string } | { id: string; kind: 'notice'; text: string }
+  { id: string; kind: 'open-folder' } | { id: string; kind: 'notice'; text: string }
 
 // projectChanged can be true on a failure: the project switched but the chat was refused.
 export type LaunchOpenResult =

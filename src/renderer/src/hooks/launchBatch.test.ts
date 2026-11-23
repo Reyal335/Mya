@@ -7,7 +7,7 @@ test('launch batch: nothing queued asks nothing', () => {
 })
 
 test('launch batch: one of each kind', () => {
-  assert.deepEqual(launchBatch([{ id: 'a', kind: 'open-folder', path: 'C:\\a' }]), {
+  assert.deepEqual(launchBatch([{ id: 'a', kind: 'open-folder' }]), {
     notice: null,
     openId: 'a'
   })
@@ -20,8 +20,8 @@ test('launch batch: one of each kind', () => {
 test('launch batch: the last of each kind wins', () => {
   assert.deepEqual(
     launchBatch([
-      { id: 'a', kind: 'open-folder', path: 'C:\\a' },
-      { id: 'b', kind: 'open-folder', path: 'C:\\b' },
+      { id: 'a', kind: 'open-folder' },
+      { id: 'b', kind: 'open-folder' },
       { id: 'n1', kind: 'notice', text: 'first' },
       { id: 'n2', kind: 'notice', text: 'second' }
     ]),
@@ -33,9 +33,9 @@ test('launch batch: mixed order keeps the last of each kind', () => {
   assert.deepEqual(
     launchBatch([
       { id: 'n1', kind: 'notice', text: 'first' },
-      { id: 'a', kind: 'open-folder', path: 'C:\\a' },
+      { id: 'a', kind: 'open-folder' },
       { id: 'n2', kind: 'notice', text: 'second' },
-      { id: 'b', kind: 'open-folder', path: 'C:\\b' },
+      { id: 'b', kind: 'open-folder' },
       { id: 'n3', kind: 'notice', text: 'third' }
     ]),
     { notice: 'third', openId: 'b' }

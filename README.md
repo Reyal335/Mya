@@ -270,7 +270,7 @@ mya                 Start Mya, or bring it to the front
 mya .               Also start a new chat in the folder you are in
 mya <folder>        Also start a new chat in <folder>
 mya --version       Print "Mya <version>" and exit
-mya --help          Print the usage and exit
+mya --help          Print the usage and exit (mya /? does the same)
 ```
 
 For example, from `C:\work\my-app` in cmd:
@@ -307,6 +307,8 @@ When you pass a folder, Mya does one of these things:
   reads `Wait for the reply, or press STOP.`
 - **It is not a folder.** Nothing changes. A notice reads
   `Could not open <path>. It is not a folder.`, with the full path.
+- **It does not answer.** A dead network drive, for example. After 5 seconds nothing
+  changes, and a notice reads `Could not open <path>. It did not answer in time.`
 
 Notices show in a strip under the title bar.
 
@@ -324,12 +326,16 @@ the front, and quits.
   ```
 
 - A trailing backslash inside quotes is fine. `mya "C:\work\"` opens `C:\work`.
-- In Windows PowerShell 5.1, a name with `&` needs the `--%` token, so the rest of
-  the line reaches `mya` unchanged:
+- In Windows PowerShell, a folder name with `&` or `^` in it reaches cmd's own
+  parser, because `mya` is a `.cmd` file. Text after `&` can run as a command, and
+  `^` is dropped. Put `--%` before the folder, so the rest of the line reaches `mya`
+  unchanged:
 
   ```powershell
   mya --% "a&b"
   ```
+
+  `mya .` is always safe, because the folder name never goes on the command line.
 
 - A folder whose name starts with `-` needs a path in front of it, such as `mya .\-name`.
 
@@ -344,8 +350,14 @@ In WSL:
   start, and the command prints
   `Mya cannot open folders inside WSL. Use a folder under /mnt/c instead.` It exits
   with code 1.
+- If Windows interop is turned off in WSL, Mya cannot be started from it. The command
+  prints `mya: Windows interop is off in this WSL, so Mya cannot be started from it.`
+  and exits with code 1.
 
 In Git Bash, paths such as `/c/Users/you/work` are converted for you.
+
+To test the command without starting Mya, set `MYA_SHIM_DRY_RUN=1`. `mya` then prints
+what it would start and exits.
 
 ### Developer command: `mya-dev`
 

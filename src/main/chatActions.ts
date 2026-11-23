@@ -77,7 +77,9 @@ export async function chatsHistory(projectPath: string | null): Promise<ChatHist
 
 export async function chatsCreate(
   projectPath: string | null,
-  rawProvider: unknown
+  rawProvider: unknown,
+  // Who is signed in, when the caller has just asked (the `mya` command). Asking again is slow.
+  ready?: Record<ProviderId, boolean>
 ): Promise<ChatsResult<ChatList & { created: boolean }>> {
   if (!projectPath) return noProject()
   if (
@@ -90,7 +92,7 @@ export async function chatsCreate(
   if (isRunning()) return busy()
   try {
     // A chat can only start on a provider that is signed in.
-    if (!(await signedIn())[provider]) {
+    if (!(ready ?? (await signedIn()))[provider]) {
       return failure(
         'not_ready',
         `${PROVIDER_NAMES[provider]} isn't signed in, so a chat can't start on it yet. Sign in on LOGINS.`

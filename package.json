@@ -6,6 +6,9 @@
   "bin": {
     "mya-dev": "scripts/mya-dev.mjs"
   },
+  "engines": {
+    "node": ">=22.18"
+  },
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {

@@ -41,7 +41,8 @@ export function cleanFolderArg(raw: string): string {
 
 // The shims' reading, strict. Same rules as mya.cmd and the sh script, in the same order:
 // an empty argument is ignored; an unknown option fails at once; then more than one folder
-// fails; then --help; then --version; else open. Options are case-sensitive.
+// fails; then --help; then --version; else open. Options are case-sensitive. /? is --help, as
+// cmd users expect.
 export function parseShimArgs(args: readonly string[], name: string): ShimCommand {
   let help = false
   let version = false
@@ -49,7 +50,7 @@ export function parseShimArgs(args: readonly string[], name: string): ShimComman
   let first: string | null = null
   for (const arg of args) {
     if (arg === '') continue
-    if (arg === '--help') help = true
+    if (arg === '--help' || arg === '/?') help = true
     else if (arg === '--version') version = true
     else if (arg.startsWith('-')) return { kind: 'error', message: unknownOptionText(name, arg) }
     else {

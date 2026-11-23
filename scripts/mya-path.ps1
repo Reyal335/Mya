@@ -6,8 +6,10 @@ kept, %VARIABLES% stay unexpanded, and every other entry stays as it is and wher
 empty entries included (they are not ours to tidy). The entry added is recorded in
 HKCU\<StateKey> (CliPathEntry): a later install takes a moved entry off first, and the
 uninstaller takes off exactly the recorded entry.
-Exit: 0 done or nothing to do, 1 bad arguments, 2 could not read, 3 could not write,
-4 the Path value is not a string.
+The messages are printed only once the Path has been written (or there was nothing to write).
+Exit: 0 done or nothing to do, 1 bad arguments (Dir is not an absolute path, or has ; or %
+in it), 2 could not read, 3 could not write, 4 the Path value is not a string, 5 the Path
+changed while this ran (nothing was written).
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('add', 'remove')][string]$Action,
@@ -45,8 +47,25 @@ function Remove-Matching($List, [string]$Target) {
   return ,$kept
 }
 
+# The Path in the registry as it is now: the name as stored (any case), its type, and its
+# raw text (%VARIABLES% unexpanded). A missing value reads as an empty REG_EXPAND_SZ.
+function Read-PathValue($Reg) {
+  $name = $null
+  foreach ($n in $Reg.GetValueNames()) { if ($n -ieq 'Path') { $name = $n } }
+  if ($null -eq $name) {
+    return [pscustomobject]@{ Name = 'Path'; Kind = [Microsoft.Win32.RegistryValueKind]::ExpandString; Text = '' }
+  }
+  return [pscustomobject]@{
+    Name = $name
+    Kind = $Reg.GetValueKind($name)
+    Text = [string]$Reg.GetValue($name, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+  }
+}
+
 $Dir = $Dir.Trim()
 if ($Dir -eq '' -or -not [System.IO.Path]::IsPathRooted($Dir)) { Fail 1 'Dir must be an absolute folder path.' }
+# ; would split it into two entries, and % would be read as a variable.
+if ($Dir.Contains(';') -or $Dir.Contains('%')) { Fail 1 'Dir cannot have a ; or a % in it.' }
 
 # Read everything first. Nothing is written unless every read worked.
 # (PowerShell names are case-insensitive: the key objects cannot be called $envKey or
@@ -56,14 +75,8 @@ try {
   if ($null -eq $envReg) { $envReg = $Hkcu.CreateSubKey($EnvKey) }
   $stateReg = $Hkcu.OpenSubKey($StateKey, $true)
   if ($null -eq $stateReg -and $Action -eq 'add') { $stateReg = $Hkcu.CreateSubKey($StateKey) }
-  $pathName = $null
-  foreach ($n in $envReg.GetValueNames()) { if ($n -ieq 'Path') { $pathName = $n } }
-  if ($null -ne $pathName) {
-    $kind = $envReg.GetValueKind($pathName)
-    $old = [string]$envReg.GetValue($pathName, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-  } else {
-    $pathName = 'Path'; $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString; $old = ''
-  }
+  $first = Read-PathValue $envReg
+  $pathName = $first.Name; $kind = $first.Kind; $old = $first.Text
   $recorded = $null
   if ($null -ne $stateReg) { $recorded = $stateReg.GetValue($StateName, $null) }
   if ($recorded -isnot [string] -or $recorded.Trim() -eq '') { $recorded = $null }
@@ -72,38 +85,48 @@ if ($kind -ne [Microsoft.Win32.RegistryValueKind]::ExpandString -and $kind -ne [
   Fail 4 "The user Path is a $kind value, not a string. It was not changed."
 }
 
+# What to tell the person. Printed only after the write, so a failure never says it was done.
+$messages = New-Object 'System.Collections.Generic.List[string]'
 $entries = New-Object 'System.Collections.Generic.List[string]'
 if ($old -ne '') { foreach ($e in $old.Split(';')) { $entries.Add($e) } }
 if ($Action -eq 'add') {
   if ($null -ne $recorded -and -not (Test-Same $recorded $Dir)) {
     $entries = Remove-Matching $entries $recorded
-    Write-Output "Took the old entry $recorded off the user Path."
+    $messages.Add("Took the old entry $recorded off the user Path.")
   }
   $present = $false
   foreach ($e in $entries) { if (Test-Same $e $Dir) { $present = $true } }
-  if ($present) { Write-Output "$Dir is already on the user Path." }
+  if ($present) { $messages.Add("$Dir is already on the user Path.") }
   else {
     # "a;b;" ends in an empty entry: fill it, so the value reads "a;b;<dir>".
     if ($entries.Count -gt 0 -and $entries[$entries.Count - 1] -eq '') { $entries[$entries.Count - 1] = $Dir }
     else { $entries.Add($Dir) }
-    Write-Output "Added $Dir to the user Path."
+    $messages.Add("Added $Dir to the user Path.")
   }
 } else {
   $target = if ($null -ne $recorded) { $recorded } else { $Dir }
   $before = $entries.Count
   $entries = Remove-Matching $entries $target
-  if ($entries.Count -lt $before) { Write-Output "Took $target off the user Path." }
-  else { Write-Output "$target was not on the user Path." }
+  if ($entries.Count -lt $before) { $messages.Add("Took $target off the user Path.") }
+  else { $messages.Add("$target was not on the user Path.") }
 }
 $new = [string]::Join(';', $entries)
 $changed = -not [string]::Equals($new, $old, [StringComparison]::Ordinal)
 if ($new.Length -gt $MaxLength) { Fail 3 "The user Path would be longer than $MaxLength characters. It was not changed." }
 
 if ($changed) {
+  # Something else (another installer, the person) may have changed the Path since it was read:
+  # writing now would undo that. Read it again and stop if it differs. (A change in the few
+  # milliseconds between this read and the write cannot be caught.)
+  try { $now = Read-PathValue $envReg } catch { Fail 2 "Could not read the user Path: $($_.Exception.Message)" }
+  if ($now.Kind -ne $kind -or $now.Text -cne $old) { Fail 5 'The user Path changed while this ran. It was not changed. Run the setup again.' }
   try {
     if ($new -eq '') { $envReg.DeleteValue($pathName, $false) }
     else { $envReg.SetValue($pathName, $new, $kind) }
   } catch { Fail 3 "Could not write the user Path: $($_.Exception.Message)" }
+}
+foreach ($m in $messages) { Write-Output $m }
+if ($changed) {
   if (-not $NoBroadcast) {
     try {
       Add-Type -Namespace MyaCli -Name Native -MemberDefinition @'

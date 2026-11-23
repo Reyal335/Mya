@@ -4,12 +4,13 @@ import type { BrowserWindow, WebContents } from 'electron'
 import { BUSY_MESSAGE } from '../shared/chats'
 import { notFolderText } from '../shared/cliArgs'
 import { IpcChannel, type LaunchEvent, type LaunchOpenResult } from '../shared/ipc'
+import type { ProviderId } from '../shared/models'
 import { isRunning } from './agent'
 import { chatsCreate } from './chatActions'
 import { launchFolder, samePath, type LaunchRequest } from './launchRules'
 import { openProjectFolder } from './projectSwitch'
 import { getProject } from './settings'
-import { firstSignedInProvider } from './startChoice'
+import { firstReadyProvider, signedIn } from './startChoice'
 
 // The `mya` command's folder, from a start of Mya to the main window. Main works out what the
 // command line asked and queues it; the window is poked and takes the queue (poke, then pull), so
@@ -19,6 +20,12 @@ import { firstSignedInProvider } from './startChoice'
 
 const MAX_ANNOUNCED = 16
 const MAX_ID = 64
+// The chain handles one start at a time, so an await that never returns would stall every later
+// one. A folder that does not answer (a dead network drive) and the sign-in check are bounded.
+const FOLDER_TIMEOUT_MS = 5_000
+const PROVIDER_TIMEOUT_MS = 30_000
+const TIMED_OUT = Symbol('timed out')
+const NOT_MADE = 'The chat could not be made.'
 
 let mainWindow: BrowserWindow | null = null
 // A raise that came before there was a window to raise.
@@ -37,11 +44,37 @@ function liveWindow(): BrowserWindow | null {
   return mainWindow !== null && !mainWindow.isDestroyed() ? mainWindow : null
 }
 
+const noAnswerText = (path: string): string => `Could not open ${path}. It did not answer in time.`
+
+// The work's result, or TIMED_OUT when it takes longer than `ms`. The work itself is not stopped.
+async function within<T>(work: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms)
+  })
+  try {
+    return await Promise.race([work, late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function isDirectory(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory()
   } catch {
     return false
+  }
+}
+
+// Which providers are signed in, or null when that could not be found out in time.
+async function providersReady(): Promise<Record<ProviderId, boolean> | null> {
+  try {
+    const ready = await within(signedIn(), PROVIDER_TIMEOUT_MS)
+    return ready === TIMED_OUT ? null : ready
+  } catch (err) {
+    log(err)
+    return null
   }
 }
 
@@ -80,7 +113,12 @@ async function announce(request: LaunchRequest, wantRaise: boolean): Promise<voi
   const target = launchFolder(request)
   if (target === null) return
   const id = randomUUID()
-  if (!(await isDirectory(target))) {
+  const isFolder = await within(isDirectory(target), FOLDER_TIMEOUT_MS)
+  if (isFolder === TIMED_OUT) {
+    push({ id, kind: 'notice', text: noAnswerText(target) })
+    return
+  }
+  if (!isFolder) {
     push({ id, kind: 'notice', text: notFolderText(target) })
     return
   }
@@ -88,13 +126,15 @@ async function announce(request: LaunchRequest, wantRaise: boolean): Promise<voi
     push({ id, kind: 'notice', text: BUSY_MESSAGE })
     return
   }
-  const path = await canonicalFolder(target)
+  // A folder that is slow to resolve is kept as it was typed, as one that cannot be resolved is.
+  const resolved = await within(canonicalFolder(target), FOLDER_TIMEOUT_MS)
+  const path = resolved === TIMED_OUT ? target : resolved
   announced.set(id, path)
   if (announced.size > MAX_ANNOUNCED) {
     const oldest = announced.keys().next()
     if (!oldest.done) announced.delete(oldest.value)
   }
-  push({ id, kind: 'open-folder', path })
+  push({ id, kind: 'open-folder' })
 }
 
 function fail(message: string): LaunchOpenResult {
@@ -108,15 +148,24 @@ async function openFolder(rawId: unknown): Promise<LaunchOpenResult> {
   const path = announced.get(rawId)
   announced.delete(rawId)
   if (path === undefined) return fail('That folder request has expired.')
-  if (!(await isDirectory(path))) return fail(notFolderText(path))
+  const isFolder = await within(isDirectory(path), FOLDER_TIMEOUT_MS)
+  if (isFolder === TIMED_OUT) return fail(noAnswerText(path))
+  if (!isFolder) return fail(notFolderText(path))
   // The run belongs to the open project; it cannot change under it.
+  if (isRunning()) return fail(BUSY_MESSAGE)
+
+  // Who is signed in comes first. It can take seconds, and until main switches the project the
+  // window and main must keep showing the same one.
+  const ready = await providersReady()
+  if (ready === null) return fail(NOT_MADE)
+  // A run may have started while that was asked: it still belongs to the open project.
   if (isRunning()) return fail(BUSY_MESSAGE)
 
   const current = getProject()
   const changed = current === null || !samePath(current.path, path)
   try {
     const project = changed ? await openProjectFolder(path) : current
-    const made = await chatsCreate(project.path, await firstSignedInProvider())
+    const made = await chatsCreate(project.path, firstReadyProvider(ready), ready)
     if (!made.ok) {
       return { ok: false, project, projectChanged: changed, error: { message: made.error.message } }
     }
@@ -128,7 +177,7 @@ async function openFolder(rawId: unknown): Promise<LaunchOpenResult> {
       ok: false,
       project: getProject(),
       projectChanged: getProject() !== current,
-      error: { message: 'The chat could not be made.' }
+      error: { message: NOT_MADE }
     }
   }
 }
