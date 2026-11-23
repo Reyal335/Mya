@@ -14,6 +14,10 @@ asarUnpack:
   - resources/**
 win:
   executableName: mya
+  # The mya command: mya.cmd, mya (sh) and mya-path.ps1, made by scripts/make-shims.mjs.
+  extraResources:
+    - from: build/generated/bin
+      to: bin
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
