@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
+  "bin": {
+    "mya-dev": "scripts/mya-dev.mjs"
+  },
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
