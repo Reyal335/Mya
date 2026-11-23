@@ -22,7 +22,10 @@ components in React and match these visually.
 | `11-chat-themes.html` | The chat theme picker: the tiles, the preview, the fade slider, and APPLY TO |
 | `12-title-bar.html` | The custom title bar: where I am, RUNNING and WAITING pills, window buttons, and its states |
 | `13-account.html` | ACCOUNT: who the agents run as, the session and weekly usage bars, and the sidebar meter that opens it |
-| `13b-account-states.html` | Every state of the sidebar meter, the usage panel, and the account panel |
+| `13b-account-states.html` | Every state of the sidebar meter, the usage panel, and the account panel (the meter is now the ACCOUNT link in the sidebar footer: see Sidebar and chat history) |
+| `21-sidebar.html` | The sidebar: NEW CHAT, the five screens, HISTORY, the ACCOUNT link and the gear. In `mya-design-files-sidebar-and-provider/designs/`, like the next two |
+| `21b-sidebar-rail.html` | The 68px rail at 960x600 with the party panel open (a Codex chat, which is not built yet) |
+| `21c-chat-history.html` | The chat item menu, search, an old chat opened, and the empty list |
 | `mascot.png` | Default mascot image used in the mockups |
 
 ## Colors
@@ -235,8 +238,8 @@ See `8-chat-party.html`, `8b-party-states.html`, `8c-party-rail.html`, and
 Progression), and the app opens on CHAT. The party panel's header is the PARTY | BOSS
 tab bar (see Boss battles). CHAT shows a count of 1 while a request from the main
 conversation itself is pending; INBOX shows the number of waiting tasks. Both
-are hidden at zero. Under the project name sits the account meter, which opens
-ACCOUNT (see Account and usage).
+are hidden at zero. *Replaced by Sidebar and chat history:* the project name and the account
+meter are no longer a block under the nav; HISTORY and the ACCOUNT link take their place.
 
 ### Party panel
 
@@ -307,8 +310,9 @@ inbox are not changed.
   three agents already working is refused with "Three agents are already
   working." and nothing is sent. With more than one agent working, the dialogue
   box reads "<n> agents are working".
-- NEW CHAT asks "Start a new conversation? The current one is cleared from
-  Mya."
+- NEW CHAT starts a fresh chat and the old one moves to HISTORY. *Replaced:* it no longer asks
+  "Start a new conversation? The current one is cleared from Mya." (see Sidebar and chat
+  history).
 - Saved history: "Earlier messages are not shown." (more than 200 messages) and
   "Earlier messages are not available." (the saved conversation cannot be
   read). A lost session: "The saved conversation was not found. This reply
@@ -1027,8 +1031,8 @@ popup notification window is not changed.
 - App name: MYA, Press Start 2P, 10px, `--accent`.
 - Breadcrumb: 12px, `--muted`, one line, an ellipsis when it does not fit. The screen name
   in capitals, then " / " and the item in view in `--text`. On CHAT: "<chat title> in
-  <project>", with only the title in `--text`: the same title (the speaker name) and project
-  the CHAT header shows. On INBOX with a thread open: that thread's title, the heading its
+  <project>", with only the title in `--text`: the open chat's title (see Sidebar and chat
+  history) and its project. On INBOX with a thread open: that thread's title, the heading its
   detail shows. Anywhere else the screen name alone.
 - Below 1100px of window width: the breadcrumb shows only the item in view (or the screen
   name), and the pills show only their counts.
@@ -1090,7 +1094,8 @@ borders `--line`, as in the mockup). A filled WAITING pill dims with the rest.
 
 See `13-account.html` and `13b-account-states.html`. ACCOUNT shows who the agents run as
 and how much of the plan's session (5 hour) and weekly (7 day) limits is used. It has no
-nav button: the meter at the bottom of the sidebar opens it, and the title bar shows
+nav button: the ACCOUNT link at the bottom of the sidebar opens it (the meter described
+below was replaced by that link: see Sidebar and chat history), and the title bar shows
 ACCOUNT as the screen name. The mockups and the app both say "Mya".
 
 ### Where the numbers come from
@@ -1167,6 +1172,9 @@ itself is `aria-hidden`.
   `https://claude.ai/settings/usage` in the default browser; main opens that one address.
 
 ### The sidebar meter
+
+*Replaced by the ACCOUNT link in Sidebar and chat history, which keeps these states and notes but is
+152px wide with thin 6px bars. The text below is the step 13 spec, kept for the states.*
 
 - At the bottom of the sidebar, under the project name, on every screen. One button:
   `--bg` fill, 4px `--line` border; with ACCOUNT open, a `--text` border and the hard
@@ -1973,3 +1981,630 @@ cells)`, `dropSources()`, `pickBackground()`, `create(draft)`, `update(id, draft
   An extra field in a draft is ignored.
 - After any change main sends `bosses:changed`. The BOSS tab, the battle view, and saved
   fights redraw with the new name, accent, loop, and background at once.
+
+## Sidebar and chat history
+
+See `21-sidebar.html`, `21b-sidebar-rail.html`, and `21c-chat-history.html` (in
+`mya-design-files-sidebar-and-provider/designs/`). Where a mockup's numbers differ from this
+section, this section wins: the mockup sidebar is 252px wide with a collapse button, 30px rows,
+and the project in its footer, and the mockups say "session" where the app says "chat".
+
+**This replaces the sidebar's older spec**: the 200px sidebar, the Project block with CHANGE, the
+account meter box, LOGINS in the nav, and the NEW CHAT confirm "Start a new conversation? The
+current one is cleared from Mya." (see Party and inbox, Account and usage, and Title bar, which
+point here).
+
+### Chats
+
+- A project keeps every chat it has had. NEW CHAT starts a fresh one and the old one moves to
+  HISTORY, where it can be reopened, renamed, pinned, searched, exported, and deleted.
+- Each project has a chat index in `userData/chats/<project-id>.json`, where the project id is
+  the first 16 hex digits of the SHA-1 of the project path (lower-cased on Windows). It is
+  `{ version: 1, openId, chats: [...] }`. Each chat is `{ id, provider, title, createdAt,
+  updatedAt, messageCount, pinned, providerSessionId, model, effort, themeId, fade }`. The last
+  four are the chat's own model choice and chat theme, which used to live in `chats.json`; they
+  are `null` when the chat has none. A bare array of chats is read too. A missing or corrupt file
+  is an empty list, never a crash: a file that cannot be read is kept aside as `<name>.bad` and is
+  never migrated over. It is written through a temporary file and a rename.
+- The text of each chat that Mya keeps is `userData/chats/<project-id>/<chat id>.jsonl`, one
+  line per message: what I typed and what the replies said, as plain text. It holds no tool
+  cards, no tool output, and no images (a message only counts how many it had). It feeds search,
+  EXPORT .MD, and the message count, and it is written for every provider. It is the only place
+  a Codex or Gemini conversation is written down by Mya, in plain text, like the keys on LOGINS.
+- Today's single chat per project (`chats.json`) moves into the index the first time the project
+  is read. A Claude session is read once, for the title, the times, and the text. `chats.json` is
+  never written or deleted. The chat's provider is the saved model's when that provider has a
+  session, else the first provider that has one, else the saved model's (AUTO is Claude).
+- Title: the first line of the first message with text, trimmed to 40 characters at a word
+  boundary. Until then: "New chat". A name typed in RENAME is kept when messages arrive.
+- `provider` is set when the chat is created, in the NEW CHAT dialog (see Providers), and it never
+  changes: main refuses a model of another provider ("This chat runs on <Provider>, so it cannot
+  use <Other> models."), and the model picker lists only that provider's models, and AUTO only on
+  Claude.
+- A project with no chats shows the empty state. The first message, or the first pick in the model
+  picker, makes the chat, on the first provider that is signed in (Claude, then Codex, then
+  Gemini; Claude when none is). NEW CHAT on a chat that is still empty and on the same provider
+  keeps it: it makes no second empty chat. An empty chat of another provider is replaced.
+- Opening an old chat restores what each provider supports:
+  - Claude: its messages come back from Claude Code's saved session (the last 200, with tool and
+    task cards), and sending continues the same session. When the session is gone the chat opens
+    with "Earlier messages are not available." and the RESUMED line says a fresh session starts.
+  - Codex and Gemini: sending continues the same thread or session, but nothing brings the
+    earlier messages back, so the chat opens empty with "Earlier messages are not shown." Mya's own
+    text is used for search and EXPORT .MD only.
+- DELETE removes the chat from Mya's index and Mya's own text only. The provider's own files stay.
+  The boss fight of its Claude session goes with it. Tasks in INBOX stay.
+- FORK AS NEW CHAT is Claude only: the SDK's `forkSession` copies the session into a new one, and
+  Mya copies its text. The fork is titled "<title> (fork)" and opens. It is not offered for Codex
+  or Gemini, which have no way to fork.
+- EXPORT .MD writes the messages Mya has as Markdown, to a path picked with the native save
+  dialog. A message read back from a Claude session before Mya kept text has no time.
+- Main refuses to create, open, or fork a chat while a run is going (error code `busy`), and to
+  delete the open chat. Rename, pin, export, search, and deleting another chat work during a run.
+  Only one run goes at a time, so there are no background runs in other chats.
+
+### The sidebar
+
+Square corners, and `--line` is only ever a border color. Nothing in the sidebar scrolls but the
+chat list.
+
+- 232px wide, `--panel` fill, a 4px `--line` right border.
+- Top block, padding 12px 12px 8px:
+  - NEW CHAT: full width, 44px, `--accent` fill, `--bg` text, a 4px `--text` border, a 4px 4px 0
+    #000 shadow, pixel font 9px, a pixel plus icon. During a run: `--bg` fill, `--muted` text, a
+    4px dashed `--line` border, and under it at 11px muted: "Wait for the reply, or press STOP."
+    (linked with `aria-describedby`). It uses `aria-disabled` and ignores clicks, so the keyboard
+    can still reach it and the reason is read.
+  - Five nav rows: CHAT, INBOX, AGENTS, MASCOTS, ACHIEVEMENTS. Each is a link, 40px tall, padding
+    0 10px, a 12px gap, a 16px pixel icon, and the label in the pixel font at 8px.
+    - Not current: a 2px transparent border and a muted icon. The trophy icon is `--waiting`.
+    - Current: `--raised` fill, a 2px `--text` border, a 4px 4px 0 `--accent` shadow, an accent
+      icon, `aria-current="page"`.
+    - INBOX keeps its count badge: `--waiting` fill, `--bg` text, pixel 8px, padding 3px 5px. CHAT
+      keeps its count of 1, and its red dot and ACHIEVEMENTS' red dot stay.
+- A 4px `--line` rule, 12px in from each side.
+- HISTORY block, padding 8px 12px 4px: the label HISTORY (pixel 8px, accent), then a row: the
+  project button (flex 1, 44px, `--bg` fill, a 2px `--line` border, the project name in capitals at
+  pixel 8px, an accent ▾) that does what CHANGE did, and a 44x44 search button. The project button
+  is disabled during a run, with the same reason as its title.
+- The chat list, padding 2px 8px:
+  - Rows are 32px tall, padding 0 8px, an 8px gap. Each row has the provider glyph, then the title
+    at 12px with an ellipsis, then the time at 11px muted.
+  - Times: "2:41p" today, a weekday name within 7 days, else "Nov 12".
+  - The current chat: `--raised` fill, a 2px `--text` border, `aria-current="true"`. While it
+    runs, a 6px `--running` square (role img, "Running") sits before the title.
+  - Pinned chats come first, with a 2px `--line` rule under the last pinned one.
+  - Each row's accessible name: "<title>, <Provider> chat".
+  - During a run, the other rows are `aria-disabled` with the title "Wait for the reply, or press
+    STOP."
+  - The list is `<ul>`; each row is a link and a ⋯ button beside it.
+- Footer, a 4px `--line` top border, padding 10px 12px 12px, an 8px gap:
+  - The ACCOUNT link: flex 1, min 44px, padding 6px 8px, a 2px `--line` border. "ACCOUNT" in pixel
+    8px plus the current chat's provider glyph, then today's 5H and 7D usage as thin bars (6px
+    tall, % at 11px). The states are step 13's (see Account and usage): a percent, near the limit,
+    no percent yet, "Not signed in", "API key", and the notes under the bars, which are set at 10px
+    so "Updates after a reply" stays on one line. Current style when ACCOUNT is open.
+  - The gear: a 44x44 link, a 2px `--line` border, `aria-label="Settings"`. There is no SETTINGS
+    screen yet, so it opens LOGINS directly. Current style when LOGINS is open. LOGINS is not in
+    the nav.
+- The sidebar has no Project/CHANGE block and no ACCOUNT box of its own any more.
+- At 960x600 with the party panel collapsed the list keeps at least 3 rows. During a run the line
+  under NEW CHAT takes two rows' worth of height there.
+
+### The rail
+
+When the window is under 1100px wide and the party panel is open, on any screen, the sidebar
+becomes a 68px rail (padding 12px 0, a 10px gap):
+
+- NEW CHAT as a 44x44 plus button (dashed and muted during a run, with the reason in its name).
+- The five nav icons as 44x44 links with aria-labels and tooltips (INBOX reads "Inbox, 2 waiting").
+- A 32px rule, then a history button that opens the chat list as a 260px flyout over the chat, to
+  the right of the rail, under the title bar. Esc or a click outside closes it, and focus goes
+  back to the history button. A menu or dialog opened from the flyout does not close it.
+- The ACCOUNT link as the provider glyph, then the gear, both 44x44.
+
+With the party collapsed, the full sidebar stays. The party panel is open at 1200px and wider
+until its collapse button is pressed, so the rail shows at 960px only after the panel is opened.
+
+### Glyphs
+
+Pixel glyphs, one fill (`--muted` here), crisp edges, drawn at 2x, in one `ProviderGlyph`
+component. Never a provider's logo.
+
+| Provider | Glyph | Grid | Path |
+| --- | --- | --- | --- |
+| Claude | A diamond | 7x7 | `M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM1 4h5v1H1zM2 5h3v1H2zM3 6h1v1H3z` |
+| Codex | A prompt | 8x7 | `M0 0h1v1H0zM1 1h1v1H1zM2 2h1v1H2zM3 3h1v1H3zM2 4h1v1H2zM1 5h1v1H1zM0 6h1v1H0zM4 6h4v1H4z` |
+| Gemini | Twin pillars | 7x7 | `M0 0h7v1H0zM1 1h2v5H1zM4 1h2v5H4zM0 6h7v1H0z` |
+
+### History actions
+
+- A ⋯ button (28px, `aria-label="Chat options"`) shows on row hover or focus. Its menu: RENAME,
+  PIN TO TOP (or UNPIN), FORK AS NEW CHAT (only where supported), EXPORT .MD, a rule, DELETE in
+  the error color. It is a real menu: arrow keys, Home and End, Esc, and focus returns to ⋯. It is
+  200px wide with a 3px `--text` border and a hard shadow, items 30px tall in pixel 7px. During a
+  run FORK AS NEW CHAT, and DELETE on the open chat, are `aria-disabled` with the reason.
+- RENAME edits the title in place. Enter saves, Esc cancels, leaving the field saves, and an empty
+  or unchanged name means no change. Titles are cut to 120 characters.
+- Search: the search button or Ctrl+K opens a search field over the list (in the rail, over the
+  flyout). It matches titles first (TITLES · n, a title that starts with the query ranks first, then
+  one with a word that starts with it, then the rest, each newest first), then the text of messages
+  Mya has stored (IN MESSAGES · n, one row per chat that is not already listed above, with a
+  one-line snippet), with the match marked with a `--waiting` fill and `--bg` text. Opening a
+  message match scrolls the chat to that message and outlines it for 2 seconds (a Codex or Gemini
+  chat has no messages on screen to scroll to). Results during a run are disabled like the other
+  rows. Esc closes search and focus goes back to the button it came from.
+- Opening an old chat:
+  - A line at the top of its history: a `--muted` square, RESUMED, and "<weekday> <time> · <n>
+    messages" ("Wed 9:30 PM · 44 messages"). When sending starts a fresh session it adds " · a
+    fresh session starts when you send".
+  - The composer placeholder: "Continue this chat..."
+  - Sending continues the same provider session where it can, else it starts a fresh session in
+    the same chat and says so in the RESUMED line.
+- Delete asks first: "Delete this chat from Mya? <Provider>'s own files stay on your computer."
+  with the buttons CANCEL and DELETE (error color).
+- Empty project: Mya's idle sprite at 64px, "NO CHATS YET" in pixel 8px, and "Your chats in this
+  project land here." in muted text.
+- A refused action (such as "Wait for the reply, or press STOP.") shows under the project row in
+  the error color and is read out as an alert.
+
+### NEW CHAT
+
+NEW CHAT opens the provider dialog (see Providers): pick who runs the chat, then START <PROVIDER>
+CHAT makes an empty chat on that provider, on the model and thinking level that provider starts on,
+and opens it. The old one stays in HISTORY. The CHAT header has no NEW CHAT button of its own. The
+title bar's breadcrumb on CHAT is "<chat title> · <glyph> <PROVIDER> · <project>".
+
+### What is keyed by the chat now
+
+- The model and thinking choice and the chat theme are the chat's own (see Model and thinking and
+  Chat themes): the first chat of a project starts from the saved default of its provider, and NEW CHAT starts on the
+  saved default of the provider picked in the dialog (else the model last used with that provider
+  in the project, else the first model its list offers) and with no theme of its own. "Use for new
+  <Provider> chats too" saves that provider's default.
+- A boss fight belongs to its chat's Claude session (see Boss battles). NEW CHAT does not end it:
+  the old chat keeps its fight and it is there when the chat is opened again. Deleting the chat
+  ends it.
+- A task remembers the chat that brought the agent in (a task saved before this finds its chat by
+  its Claude session). ASK AGAIN in INBOX opens that chat first, unless a run is going.
+- A popup for a run, a request, a failed task, or a boss fight opens the chat it came from (OPEN),
+  even when another chat is open now. An agent's finished popup opens the task in INBOX as before.
+- The composer and the rest of the CHAT screen start fresh when another chat or project takes over.
+
+## Providers
+
+Mya runs three providers: Claude (through Claude Code), Codex, and Gemini.
+Mockups are in `mya-design-files-sidebar-and-provider/designs/`: `22-new-chat.html` (the dialog),
+`22a-chat-codex.html` (a Codex chat), `22b-model-picker.html`, `22c-small-party-open.html` and
+`22d-small-party-rail.html` (960x600), `22e-provider-cards.html` (every card state),
+`22f-missing-features.html`, `22g-party-agents-tags.html`, `22h-account-codex.html`,
+`22i-logins.html`, and `22j-logins-states.html`. Where a mockup's numbers differ from this section,
+this section wins, and "As built" at the end lists where the app differs from both.
+
+### Rules
+
+1. A chat belongs to one provider for its whole life. You pick it in NEW CHAT.
+2. Switching provider means a new chat. The old chat moves to HISTORY. It is
+   not deleted, and the new provider never sees it.
+3. A provider is a bundle: models, thinking levels, approvals, account, and
+   features. Switching swaps the whole bundle. Nothing from one provider
+   shows in another provider's chat.
+4. The provider can't change during a run. NEW CHAT is disabled until the run
+   ends or you press STOP.
+5. Every chat shows its provider. No per-provider colors: a provider is a
+   text label plus its glyph.
+
+### Where things live (sidebar 23b)
+
+- Sidebar, top to bottom: NEW CHAT, the five nav rows (CHAT, INBOX, AGENTS,
+  MASCOTS, ACHIEVEMENTS), HISTORY (project button, search, chat list), and a
+  footer row.
+- Footer row: the ACCOUNT button (usage meter) opens ACCOUNT. The gear opens
+  SETTINGS. LOGINS is the last tab in SETTINGS.
+- HISTORY rows show the provider glyph before the title.
+- Below 1100px wide with the party panel open, the sidebar folds to a 68px
+  icon rail (board 14c). With the party collapsed, the full sidebar stays
+  (board 14d).
+
+### Glyphs
+
+Each glyph is drawn on a small pixel grid, filled with one token color, and
+shown at 2x (3x in cards).
+
+| Provider | Glyph | Grid |
+| --- | --- | --- |
+| Claude | Diamond | 7x7 |
+| Codex | Prompt (`>_`) | 8x7 |
+| Gemini | Twin pillars (the Gemini zodiac sign) | 7x7 |
+
+- Always next to the provider name, except in HISTORY rows and the party rail
+  badge. In those two places the accessible name carries the provider.
+- Never use OpenAI, Google, Anthropic, or Claude Code logos or mascots.
+
+### Components
+
+**Provider tag.** Glyph plus name in Press Start 2P 8px, muted. 2px line
+border, 20px tall, 6px side padding. Not a button.
+
+**NO APPROVALS tag.** On Codex and Gemini chats only.
+- A button in the composer toolbar, left of the model button. 44px tall, 2px
+  waiting border, a waiting square, the words NO APPROVALS, and a muted `?`.
+- Clicking it opens a popover with a 4px waiting border:
+  "Codex edits files and runs commands without asking. STOP ends it." and,
+  muted, "To approve each step, start a Claude chat."
+- It can't be turned off or hidden. It never uses the error color.
+- Over the popover, Esc closes it and focus goes back to the tag.
+
+**Start notice.** First line in a Codex or Gemini chat's history: a waiting
+square, NO APPROVALS, then "Codex edits files and runs commands without
+asking. STOP ends it." 2px line border. It stays in the history.
+
+**NOT ASKED mark.** On every Codex and Gemini tool card, from the moment it
+appears. A 2px line-bordered chip: a hollow waiting square plus NOT ASKED in
+8px. Tooltip "Ran without asking".
+
+**Unavailable piece.** For a feature this provider lacks, in a place you'd
+look for it. Panel fill, 2px dashed line border, provider tag, one muted
+sentence. Never red. It keeps `aria-disabled="true"` and can still take focus.
+
+### Missing features
+
+Hide it if you'd never look for it in this chat. Show the unavailable piece if
+you would.
+
+Hidden on Codex and Gemini: APPROVE and DENY, the WAITING and DENIED tool
+states, and any copy about the main agent bringing in party members.
+
+| Where | What shows | Exact copy |
+| --- | --- | --- |
+| Party panel | Help line, 2px dashed line border | Codex runs only the agents you call, one at a time. |
+| Party panel, one agent working | Help line | Silverwolf is working. Call another when it's done. |
+| BOSS tab | Tab dashed and muted, `aria-disabled`, reason line below the tabs | BOSS: not on Codex. Tooltip: Boss battles aren't on Codex yet. |
+| Sidebar meter | ACCOUNT, glyph, muted line | No usage from Codex |
+| ACCOUNT | Account table, then the unavailable piece | Usage isn't reported by Codex. |
+| Image button | Dashed, `aria-disabled` | Images can't be sent in Codex chats yet. |
+| Pasted image | Chip with a 2px error border, NOT SENT | screenshot.png: Codex chats can't take images yet. |
+| After a restart | Unavailable piece at the top of the chat | Earlier messages are not shown. Codex doesn't let Mya reload them. |
+| MASCOTS voice | Unavailable piece under the voice switch | Mascot voice shapes replies in Claude chats only. |
+
+For Gemini, swap the name. Once a provider supports images, the button and
+chip look like Claude's.
+
+### NEW CHAT dialog (board 14)
+
+- Opens from NEW CHAT in the sidebar and from the model picker. Dialog: 860px
+  max, panel fill, 4px text border, 6px 6px 0 #000 shadow.
+- Title NEW CHAT. Line: "Pick who runs this chat. It stays with them until you
+  start another."
+- Three provider cards in a radio group (`fieldset`, each card a `label` with
+  a real radio). The current provider is selected when it opens.
+- Each card: glyph and name, sign-in status, "Starts on <MODEL> · <LEVEL>", a
+  two-line summary, and NOT HERE YET with the missing features.
+  - Claude: "Asks before edits and commands. Can bring in up to 3 agents by
+    itself." Missing: "Everything in Mya works here."
+  - Codex and Gemini: "Edits files and runs commands without asking. Runs
+    only the agents you call." Missing: "Usage, images, mascot voice, old
+    messages after a restart."
+- Card states (board 14e):
+  - SELECTED: raised fill, 4px text border, 4px 4px 0 accent shadow.
+  - AVAILABLE: bg fill, 4px line border.
+  - CHECKING: a muted CHECKING... status, "Looking for the Gemini CLI.", radio
+    disabled.
+  - SIGNED OUT: dashed border, waiting status, radio disabled, the line
+    "Can't start a chat yet.", and the link "Sign in on LOGINS".
+  - NOT INSTALLED: the same as SIGNED OUT, with a muted status.
+- Confirm line, above the buttons:
+  - Same provider: "Start a new conversation? The current one moves to
+    HISTORY."
+  - Switching: the line above, plus, muted, "Codex won't see your Claude
+    chat."
+  - Empty chat: no line.
+- Buttons: CANCEL, START <PROVIDER> CHAT.
+- During a run the sidebar NEW CHAT is dashed and disabled with "Wait for the
+  reply, or press STOP." under it.
+
+### Provider identity in CHAT (board 14a)
+
+- Title bar: CHAT / <chat title> · <glyph> <PROVIDER> · <project>.
+- CHAT header: the chat title, then the provider tag and "Firefly · started
+  3:02 PM · 9 messages".
+- The speaker stays the mascot's name.
+- The reply tag stays `<MODEL> · <LEVEL>`. The model name already says the
+  provider, and the header and composer show it too.
+
+### Model picker (board 14b)
+
+- Section label "<PROVIDER> MODELS" with the provider tag. Only that
+  provider's models.
+- Codex and Gemini rows have no POWER or SPEED bars. We have no data for them,
+  and made-up bars would mislead. The second line lists the thinking levels
+  the model accepts, for example "Thinking: LOW · MED · HIGH · XHIGH".
+- THINKING shows only the model's levels. If the model has none, it shows a
+  dashed line: "<MODEL> has no thinking levels." If the current level isn't
+  offered, it drops to the nearest one.
+- The checkbox reads "Use for new <Provider> chats too".
+- Last row: "To use another provider, start a new chat." with a NEW CHAT
+  button that opens the NEW CHAT dialog.
+
+### Party and AGENTS (board 14g)
+
+- An agent with no model, or "inherit", follows the chat. It has no tag.
+- An agent pinned to a model shows the provider tag: on the panel row, as a
+  small glyph badge on the rail icon, in the hover card, and on AGENTS.
+- An agent pinned to another provider is CANNOT BE CALLED (dashed, dimmed)
+  with "Set to run on Claude" (or Codex, or Gemini). In the hover card add
+  "Start a Claude chat to call it."
+- AGENTS model dropdown: "Follow the chat" first, then a group per provider
+  headed by its tag. Under the field: "Pinned to Codex. It can only be called
+  in Codex chats."
+
+### Tool cards
+
+- Claude: RUNNING, WAITING, DONE, FAILED, DENIED, STOPPED.
+- Codex and Gemini: RUNNING, DONE, FAILED, STOPPED, each with NOT ASKED.
+  Codex file reads show the shell command it ran (for example `cat` or
+  `sed -n`). Don't relabel them.
+
+### INBOX and popups
+
+Every task row and popup shows the provider tag next to its status. Nothing
+else changes.
+
+### LOGINS (boards 15 and 15b)
+
+SETTINGS > LOGINS. Header LOGINS, the line "One sign-in per provider. A new
+chat can only use a provider that's signed in.", and REFRESH STATUS. One card
+per provider, 820px max.
+
+Card anatomy: glyph and name, status, a one-line summary, then a table (CLI,
+Signed in as, Email, Plan, How, Key), then the actions.
+
+Claude card (read-only). Status SIGNED IN or SIGNED OUT. The table has one
+row, "Signed in with: Claude Code login". Then "Uses your Claude Code login.
+To sign in, run `claude` and then `/login` in a terminal." and, muted, "Read
+only. Mya never stores this login."
+
+Codex and Gemini states:
+
+| State | Status | Shows |
+| --- | --- | --- |
+| Not installed | NOT INSTALLED (muted) | "The Codex CLI isn't on this computer." INSTALL CLI, "Runs npm install -g @openai/codex". Sign-in actions dashed: "Install the CLI first." |
+| Installing | INSTALLING (running) | "Installing @openai/codex...", a stepped progress bar, the npm stage in muted text, CANCEL |
+| Signed out | SIGNED OUT (waiting) | SIGN IN IN BROWSER, then OR PASTE API KEY |
+| Signing in | SIGNING IN (running) | "Finish signing in in your browser.", a m:ss countdown from 3:00, CANCEL, "Stops waiting after 3 minutes." Key field disabled |
+| By browser | SIGNED IN (running) | Name, email, plan, How: Browser. SIGN OUT, SWITCH ACCOUNT |
+| By API key | SIGNED IN | How: "API key, saved by Mya", Key: `sk-a...9f2c`, "Saved on this computer in plain text." SIGN OUT, REPLACE KEY |
+| By environment key | SIGNED IN | How: "Environment key (OPENAI_API_KEY)", masked key. SIGN OUT dashed: "Set outside Mya. To sign out, remove OPENAI_API_KEY and restart Mya." |
+
+API key field:
+- A password input, 44px tall, with the placeholder `sk-...` (Gemini
+  `AIza...`).
+- A SHOW/HIDE toggle (`aria-pressed`, `aria-controls`). SAVE KEY stays
+  disabled while the field is empty.
+- Always under the field, in the waiting color: "Saved on this computer in
+  plain text."
+- Masked keys show the first 4 and last 4 characters: `sk-a...9f2c`.
+
+Errors (2px error border, ERROR status, `role="alert"`):
+
+| Error | Exact copy | Action |
+| --- | --- | --- |
+| Install failed | Install failed. npm exited with code <n>. | RETRY, COPY LOG |
+| Browser timeout | Sign-in timed out after 3 minutes. Try again. | SIGN IN IN BROWSER |
+| Cancelled in browser | Sign-in was cancelled in the browser. | SIGN IN IN BROWSER |
+| Key rejected | Codex didn't accept this key. Check it and paste it again. | Field gets an error border and `aria-invalid` |
+| CLI won't start | Couldn't run codex --version. Reinstall the CLI. | INSTALL CLI |
+
+Gemini uses `@google/gemini-cli` and `GEMINI_API_KEY`.
+
+### Sizes
+
+| Thing | Size |
+| --- | --- |
+| Buttons and inputs | 44px tall minimum |
+| Sidebar | 232px, or a 68px rail below 1100px with the party open |
+| Sidebar nav rows | 40px tall |
+| HISTORY rows | 32px tall |
+| Party panel | 264px (236px at 960) |
+| NEW CHAT dialog | 860px max |
+| Model picker | 460px |
+| LOGINS cards | 820px max |
+| Provider tag, NOT ASKED chip | 20px tall, 2px border |
+| Glyphs | 2x (14 to 16px); 3x in cards and on LOGINS |
+| Pixel text | 8px minimum; reading text in IBM Plex Mono 12 to 15px |
+
+Everything works at 960x600, with the party panel open or collapsed.
+
+### Keyboard and screen readers
+
+- NEW CHAT dialog:
+  - `role="dialog"`, `aria-modal`, labelled by its title. Focus starts on
+    the selected radio.
+  - Arrow keys move between enabled providers and skip disabled ones. Tab
+    goes to the LOGINS link, CANCEL, then START. Esc cancels.
+  - Focus returns to NEW CHAT when the dialog closes.
+- Provider in history: each HISTORY row's accessible name is "<title>,
+  <Provider> chat".
+- NO APPROVALS tag:
+  - Its accessible name includes the full sentence.
+  - The popover is `aria-controls`'d by the tag. Enter or Space opens it, Esc
+    closes it.
+- Start notice: `role="note"`, read once in order with the history.
+- Unavailable items:
+  - Use `aria-disabled="true"`, not `disabled`, so they stay focusable and the
+    reason gets read.
+  - Point `aria-describedby` at the reason line.
+  - BOSS: Enter on the tab moves focus to "BOSS: not on Codex."
+- CANNOT BE CALLED agents: the accessible name is "Argenti, cannot be called.
+  Set to run on Claude."
+- Status changes on LOGINS (installing, signing in, signed in) go to a polite
+  live region. Errors use `role="alert"`. Read the countdown at most every 30
+  seconds. Don't announce every tick.
+- Key field: the label is "API key". The plain-text note is linked with
+  `aria-describedby`. When rejected, add `aria-invalid="true"` and link the
+  error too.
+- Reduced motion: the install bar and countdown keep working with no
+  animation.
+
+### Choices made
+
+- History wins over "one chat per project", so the confirm copy now ends
+  "moves to HISTORY" in place of "is cleared from Mya".
+- NO APPROVALS lives in the composer, beside STOP, because STOP is the answer
+  to it.
+- The reply tag doesn't repeat the provider. The header, breadcrumb, and
+  composer already say it.
+- Picker rows on Codex and Gemini list thinking levels in place of
+  POWER/SPEED bars.
+- LOGINS lives in SETTINGS, and ACCOUNT behind the sidebar footer, so the nav
+  stays at five rows.
+- Gemini CLI version and plan names in the mocks are placeholders.
+
+
+### As built
+
+Where the app is not the mockup, and why.
+
+- **NO APPROVALS** is 36px tall, the height of the model button beside it, not 44px. It is still a
+  real button with the full sentence as its name.
+- **Party panel rows** show the pinned provider as the glyph badge on the agent's icon (the rail's
+  form), not the full tag at the end of the row: a 252px panel has no room for a tag beside a name
+  and its level. The hover card and the detail area under the list show the full tag. The Claude
+  chat's help line is unchanged ("Click a member to call them for your next message.").
+- **AGENTS model field** is a native select: "Follow the chat", then CLAUDE, CODEX, and GEMINI
+  groups with the provider's name as the group label (a native group label cannot hold a glyph). A
+  `model: inherit` file shows an extra "Follow the chat (inherit)" until it is changed.
+- **LOGINS** is its own screen, opened by the gear, titled LOGINS: there is no SETTINGS screen with
+  tabs yet. The Claude card is read only and shows the way Claude Code is signed in and nothing from
+  it. A Gemini key cannot be checked without a paid call, so SAVE KEY on Gemini saves it as typed
+  (Codex checks it with `codex login --with-api-key` and says "Codex didn't accept this key..." when
+  it is refused).
+- **Sign-in clock**: three minutes from the click (`SIGN_IN_TIMEOUT_MS` in `src/shared/logins.ts`).
+  The countdown is a `role="timer"`; a separate polite region says the time left every 30 seconds.
+  The install bar is stepped by the stage npm last reported (fetching, unpacking, finishing), so it
+  needs no animation and reads the same with reduced motion.
+- **What each card is doing** (installing, signing in, the last error) is kept outside the screen, so
+  it is still there when LOGINS is opened again.
+- **To see every LOGINS state without installing or signing in anywhere**: start an app that is not
+  packaged with `MYA_LOGINS_FIXTURE` set to one state, or `codex=<state>,gemini=<state>`. The
+  states are `not-installed`, `install-fails`, `wont-start`, `signed-out`, `sign-in-times-out`
+  (add `MYA_LOGINS_FAST=1` for a 6 second wait), `browser-cancelled`, `key-rejected`,
+  `signed-in-browser`, `signed-in-key`, and `signed-in-env`. While one is set the real status, the
+  real CLIs, and the real keys are not read or changed. `MYA_ACCOUNT_FIXTURE` does the same for the
+  Claude card and ACCOUNT.
+- **The agent gate on AGENTS and INBOX**: CALL on AGENTS is off for an agent pinned to another
+  provider than the open chat's, and ASK AGAIN on INBOX is off when the task's own chat is on another
+  provider, each with "Set to run on <Provider>. Start a <Provider> chat to call it." Main refuses
+  such a call too.
+- **Images**: a Codex or Gemini chat refuses images in main as well ("<Provider> chats can't take
+  images yet.").
+
+## Command line
+
+The `mya` command starts Mya from a terminal. It is the same app. The command only
+passes a folder to it. Its rules are in `src/shared/cliArgs.ts`.
+
+### Usage
+
+Printed by `mya --help`, and after an error:
+
+```
+Usage: mya [FOLDER]
+
+Starts Mya, or brings it to the front.
+With a FOLDER, also starts a new chat in it. Use . for the folder you are in.
+
+Options:
+  --version  Print the version and exit.
+  --help     Print this help and exit.
+```
+
+### Rules
+
+- `mya` starts Mya, or brings the open window to the front.
+- `mya <folder>` and `mya .` also start a new chat in that folder. A relative
+  folder is taken from the terminal's folder.
+- If the folder is not the open project, Mya switches to it first, the same as
+  OPEN PROJECT. Then it starts a new chat on the first provider that is signed in:
+  Claude, then Codex, then Gemini.
+- If the folder is already the open project, only the new chat starts. An empty
+  chat on the same provider that is already open is kept, and the window goes to
+  CHAT.
+- An empty chat on another provider is replaced, as NEW CHAT does.
+- While a run is going, nothing changes. The window is raised and the notice shows
+  (see Messages).
+- A second start of Mya, for example from the Start menu, does not open a second
+  window. It passes its folder to the open window, which is raised, and then quits.
+- `--version` prints `Mya <version>` and exits 0. `--help` prints the usage and
+  exits 0. `/?` is the same as `--help`, as cmd users expect.
+- Any other option, anything that starts with `-`, fails. It prints
+  `mya: unknown option "<arg>"`, then the usage, and exits 1.
+- Two or more folders fail. They print `mya: give one folder at most`, then the
+  usage, and exit 1.
+- An empty argument is ignored. `mya ""` is the same as `mya`.
+- A bare drive such as `X:` means the root of that drive, `X:\`.
+- A trailing backslash from cmd is kept in the path. `mya "C:\work\"` opens
+  `C:\work`.
+- In cmd, quote a folder that has spaces, `;`, `=` or `,` in its name.
+- In Windows PowerShell, a folder name with `&` or `^` in it reaches cmd's own
+  parser, because `mya` is a `.cmd` file. Text after `&` can run as a command, and
+  `^` is dropped. `mya --% "<folder>"` avoids this. `mya .` is always safe, because
+  the folder name never goes on the command line.
+- A folder name that starts with `-` needs a path in front of it: `.\-name`.
+- Chromium switches the app receives, such as `--no-sandbox`, are skipped. They
+  never count as a folder.
+- A folder inside WSL's own Linux file system is refused. Nothing starts. The
+  error prints in the terminal and the command exits 1. Other network paths, such as
+  `\\server\share`, are passed on.
+- With Windows interop turned off in WSL, nothing starts. The error prints in the
+  terminal and the command exits 1.
+
+### Messages
+
+| When | Text |
+| --- | --- |
+| The folder is a file, or does not exist | `Could not open <path>. It is not a folder.` |
+| The folder does not answer within 5 seconds | `Could not open <path>. It did not answer in time.` |
+| A run is going | `Wait for the reply, or press STOP.` |
+| No provider is signed in | `Claude isn't signed in, so a chat can't start on it yet. Sign in on LOGINS.` |
+| The folder is inside WSL | `Mya cannot open folders inside WSL. Use a folder under /mnt/c instead.` |
+
+- The first four show in the notice strip. `<path>` is the absolute path.
+- The WSL message prints in the terminal, and Mya does not start.
+- If no provider is signed in and the folder was a different project, the project
+  still switches. Only the new chat is not made.
+
+### Notice strip
+
+The strip shows under the title bar, across the full width, above the screen. With
+no notice it takes no height.
+
+- Fill `--panel`. A 4px bottom border (`--border`) in `--error`. No rounded
+  corners and no shadow. It is not part of the title bar's drag area.
+- 48px tall: a 44px row plus the 4px `--error` line. 12px padding on the left, and
+  12px between its parts.
+- Mark: an 8x8 `--error` square before the text. The square and the text show the
+  status, not colour alone.
+- Text: IBM Plex Mono 13px, line height 1.5, `--error`. One line, cut with an
+  ellipsis when it is long. The full text is in a tooltip, and it can be selected.
+- Dismiss: a 44x44 button with a `--text` X and no fill. Hover shows a `--line`
+  fill. Pressed moves the X down 2px. Keyboard focus shows a 2px `--accent` outline,
+  inset 6px. Its name is "Dismiss".
+- Screen readers: the text has `role="alert"`, so it is read out. The Dismiss label
+  is not part of that. A repeated message is read out again.
+- A notice clears after 8 seconds, or when Dismiss is pressed. The 8 seconds pause
+  while the pointer is over the strip or focus is inside it, and carry on from the
+  time left when the pointer leaves or focus moves out. A new notice replaces the
+  one showing and starts with the full 8 seconds.
+- No transitions.
+
+### As built
+
+- The notice shows the resolved absolute path, not the text typed. From `C:\work`,
+  `mya nope` shows `Could not open C:\work\nope. It is not a folder.`
+- When several requests arrive in one batch, the last folder and the last notice win.
+- Options are case-sensitive. `--Help` is an unknown option.
+- Only one Mya runs at a time. A second start focuses the open window.
+- The development build (`npm run dev`) and the installed Mya share one lock. While
+  one runs, starting the other raises it and quits. To run the development build
+  apart, give it its own `--user-data-dir`.
