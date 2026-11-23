@@ -246,6 +246,138 @@ When you start Mya, click **OPEN** in the sidebar and pick a project folder.
 Mya remembers the folder for next time. Chat runs in that folder, and the
 project's agents are loaded from it.
 
+## Command line
+
+Mya has a `mya` command. It starts Mya from a terminal, and it can open a folder
+as a new chat. It is the same app. The command only passes the folder to Mya.
+
+### Installing the command
+
+The Windows installer adds `<install folder>\resources\bin` to your user PATH. The
+install folder is `%LOCALAPPDATA%\Programs\mya` by default. Uninstalling Mya
+removes that entry again.
+
+Open a **new** terminal after you install. A terminal that was already open does
+not see the change. In VS Code, restart VS Code so its terminals pick it up.
+
+Both `npm run build:win` and `npm run build:unpack` write the command files
+before they package the app.
+
+### Commands
+
+```
+mya                 Start Mya, or bring it to the front
+mya .               Also start a new chat in the folder you are in
+mya <folder>        Also start a new chat in <folder>
+mya --version       Print "Mya <version>" and exit
+mya --help          Print the usage and exit
+```
+
+For example, from `C:\work\my-app` in cmd:
+
+```
+mya .
+```
+
+Mya opens `C:\work\my-app` and starts a new chat in it.
+
+Some rules:
+
+- The only options are `--version` and `--help`. They are case-sensitive, so
+  `--Help` fails.
+- Any other option, anything that starts with `-`, fails. The command prints
+  `mya: unknown option "<arg>"` and the usage, then exits with code 1.
+- Give one folder at most. Two folders print `mya: give one folder at most`, the
+  usage, and exit with code 1.
+- An empty argument is ignored, so `mya ""` is the same as `mya`.
+- A relative folder is taken from the folder your terminal is in.
+
+### What a folder does
+
+When you pass a folder, Mya does one of these things:
+
+- **It is a different project.** Mya switches to it, the same as **OPEN** in the
+  sidebar. Then it starts a new chat on the first provider that is signed in:
+  Claude, then Codex, then Gemini. If none is signed in, the project still
+  switches. The notice then says Claude isn't signed in, so a chat can't start on
+  it yet. Sign in on LOGINS.
+- **It is the open project.** Nothing switches. Mya starts a new chat. If the
+  open chat is already empty and on the same provider, Mya keeps it instead.
+- **A run is going.** Nothing changes. The window comes to the front, and a notice
+  reads `Wait for the reply, or press STOP.`
+- **It is not a folder.** Nothing changes. A notice reads
+  `Could not open <path>. It is not a folder.`, with the full path.
+
+Notices show in a strip under the title bar.
+
+If Mya is already open, a second start (for example from the Start menu) does not
+open a second window. It sends its folder to the open window, brings that window to
+the front, and quits.
+
+### Folder names with special characters
+
+- In cmd, put quotes around a folder whose name has spaces, `;`, `=` or `,`. Unquoted,
+  cmd reads `;`, `=` and `,` as separators:
+
+  ```
+  mya "C:\My Work"
+  ```
+
+- A trailing backslash inside quotes is fine. `mya "C:\work\"` opens `C:\work`.
+- In Windows PowerShell 5.1, a name with `&` needs the `--%` token, so the rest of
+  the line reaches `mya` unchanged:
+
+  ```powershell
+  mya --% "a&b"
+  ```
+
+- A folder whose name starts with `-` needs a path in front of it, such as `mya .\-name`.
+
+### Shells
+
+You can run `mya` from cmd, Windows PowerShell, Git Bash, or WSL.
+
+In WSL:
+
+- A folder under `/mnt/<drive>` works, such as `/mnt/c/Users/you/work`.
+- A folder inside the Linux file system, such as `~/work`, is refused. Mya does not
+  start, and the command prints
+  `Mya cannot open folders inside WSL. Use a folder under /mnt/c instead.` It exits
+  with code 1.
+
+In Git Bash, paths such as `/c/Users/you/work` are converted for you.
+
+### Developer command: `mya-dev`
+
+If you work on Mya itself, the repo has a second command, `mya-dev`. It starts the
+development build. Run `npm install` in the repo first, then link the command from
+the repo folder:
+
+```bash
+npm link
+```
+
+Then, from any folder:
+
+```bash
+mya-dev .
+```
+
+`mya-dev` takes the same arguments as `mya`. It starts `electron-vite dev` in the
+repo, prints the log path, and returns at once. The log is `%TEMP%\mya-dev.log`, and
+it shows the dev server's output. The window can take a little while to open.
+`mya-dev --version` prints `Mya <version> (dev)`.
+
+To remove the link:
+
+```bash
+npm unlink -g mya
+```
+
+The development build and the installed Mya share one single-instance lock. While
+the installed Mya is running, `npm run dev` and `mya-dev` only bring that window to
+the front and quit. Close the installed Mya first.
+
 ## Project structure
 
 ```
