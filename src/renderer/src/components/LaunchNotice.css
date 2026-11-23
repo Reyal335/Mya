@@ -1,0 +1,72 @@
+/* The notice strip from "Command line" in designs/DESIGN.md: under the title bar, full width,
+   --panel with a 4px --error line under it. Square, no shadow, no transitions. It is not part of
+   the title bar's drag area. The button is 44px tall, so the strip is 48px with its line. */
+.launch-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 0 0 12px;
+  background: var(--panel);
+  border-bottom: var(--border) solid var(--error);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* A square beside the text, so the status is not colour alone. */
+.launch-notice__mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--error);
+}
+
+/* One line, cut with an ellipsis. The full text is the tooltip, and it can be selected. */
+.launch-notice__text {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--error);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.launch-notice__dismiss {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.launch-notice__glyph {
+  display: block;
+  position: relative;
+}
+
+.launch-notice__dismiss:hover {
+  background: var(--line);
+}
+
+/* Pressed: the X drops 2px. */
+.launch-notice__dismiss:active .launch-notice__glyph {
+  top: 2px;
+}
+
+/* The same ring as the title bar's buttons: 2px --accent, inset 6px. */
+.launch-notice__dismiss:focus-visible {
+  outline: var(--border-thin) solid var(--accent);
+  outline-offset: -6px;
+}

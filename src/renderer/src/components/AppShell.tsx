@@ -4,14 +4,17 @@ import './AppShell.css'
 type AppShellProps = {
   // The title bar, across the full width above everything else.
   titleBar: ReactNode
+  // The notice strip, or nothing. The slot is always there and takes no height when empty.
+  notice?: ReactNode
   sidebar: ReactNode
   children: ReactNode
 }
 
-function AppShell({ titleBar, sidebar, children }: AppShellProps): React.JSX.Element {
+function AppShell({ titleBar, notice, sidebar, children }: AppShellProps): React.JSX.Element {
   return (
     <div className="app-shell">
       {titleBar}
+      <div className="app-shell__notice">{notice}</div>
       <div className="app-shell__body">
         {sidebar}
         <main className="app-shell__content">{children}</main>

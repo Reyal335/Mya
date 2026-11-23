@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AchievementToast from './components/AchievementToast'
 import AppShell from './components/AppShell'
+import LaunchNotice from './components/LaunchNotice'
 import NoProject from './components/NoProject'
 import Sidebar from './components/Sidebar'
 import TitleBar from './components/TitleBar'
@@ -24,6 +25,7 @@ import { useActiveMascot } from './mascots/useActiveMascot'
 import { useAccount } from './hooks/useAccount'
 import { useChats } from './hooks/useChats'
 import { useConversation, type CallTarget } from './hooks/useConversation'
+import { useLaunches } from './hooks/useLaunches'
 import { usePartyPanelMode } from './hooks/usePartyPanelMode'
 import { useProject } from './hooks/useProject'
 import { useSidebarMode } from './hooks/useSidebarMode'
@@ -34,7 +36,7 @@ import type { LeaveGuard, Screen } from './screens/types'
 
 function App(): React.JSX.Element {
   const [screen, setScreen] = useState<Screen>('chat')
-  const { project, loaded, openProject } = useProject()
+  const { project, loaded, openProject, adoptProject } = useProject()
   // The conversation and the tasks live above the screens, fed by the same agent
   // events, so CHAT and INBOX always agree and leaving CHAT loses nothing.
   const conversation = useConversation()
@@ -74,6 +76,15 @@ function App(): React.JSX.Element {
     if (leaveGuard.current) leaveGuard.current(proceed)
     else proceed()
   }, [])
+
+  // The notice strip under the title bar: what the `mya` command could not do. A new notice takes
+  // the place of the one showing (the tick gives it a new key, so it starts with the full time and
+  // even the same text is announced again). The strip clears itself: it calls dismissNotice.
+  const [notice, setNotice] = useState<{ text: string; tick: number } | null>(null)
+  const showNotice = useCallback((text: string): void => {
+    setNotice((current) => ({ text, tick: (current?.tick ?? 0) + 1 }))
+  }, [])
+  const dismissNotice = useCallback((): void => setNotice(null), [])
 
   // Another chat became the open one (opened, made, forked, or the open one deleted): what is on
   // screen belongs to the old one. Its history loads when CHAT shows the new chat.
@@ -151,6 +162,47 @@ function App(): React.JSX.Element {
     if (runningRef.current) return
     setNewChatOpen(true)
   }, [])
+
+  // A folder the `mya` command asked for. Main switches the project and makes the chat; this follows
+  // what main did. Unsaved changes still ask first, and if the person stays, the request is dropped.
+  // A chat that was refused can still leave the project switched, so the project is taken first.
+  const openLaunchFolder = useCallback(
+    (id: string): void => {
+      confirmLeave(() => {
+        void (async () => {
+          const result = await window.mya.ui.openLaunchFolder(id).catch((err: unknown) => {
+            console.error('Could not open the folder:', err)
+            return null
+          })
+          if (result === null) {
+            showNotice('Something went wrong. Try again.')
+            return
+          }
+          // A different project has its own chats, conversation, and tasks.
+          if (result.projectChanged && result.project) {
+            adoptProject(result.project)
+            setSelectedTaskId(null)
+          }
+          // A new project or a new chat: what is on screen belongs to the old one (as handleSwitched).
+          if (result.projectChanged || (result.ok && result.created)) {
+            clear()
+            setChatEpoch((n) => n + 1)
+            setCall(null)
+            setScrollTarget(null)
+          }
+          if (!result.ok) {
+            showNotice(result.error.message)
+            return
+          }
+          setNewChatOpen(false)
+          setScreen('chat')
+          setFocusRequest((n) => n + 1)
+        })()
+      })
+    },
+    [confirmLeave, showNotice, adoptProject, clear]
+  )
+  useLaunches({ onNotice: showNotice, onOpenFolder: openLaunchFolder })
 
   // START <PROVIDER> CHAT: the chat is made on that provider and opens. An empty chat of the same
   // provider that is already open is kept: it only comes to the front. Returns why it did not work.
@@ -256,6 +308,11 @@ function App(): React.JSX.Element {
           // A pill opens INBOX. INBOX has no status filter, so it opens as it is.
           onOpenInbox={() => handleNavigate('inbox')}
         />
+      }
+      notice={
+        notice ? (
+          <LaunchNotice key={notice.tick} text={notice.text} onDismiss={dismissNotice} />
+        ) : null
       }
       sidebar={
         <Sidebar

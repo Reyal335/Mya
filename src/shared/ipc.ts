@@ -94,6 +94,10 @@ export const IpcChannel = {
   UiSetOpenInEditor: 'ui:set-open-in-editor',
   // Main to the main window: OPEN on a popup, with the screen to show.
   UiOpen: 'ui:open',
+  // Main to the main window: the command line has something for it. The window then asks.
+  UiLaunch: 'ui:launch',
+  UiTakeLaunches: 'ui:take-launches',
+  UiOpenLaunchFolder: 'ui:open-launch-folder',
   // The popup window's own channels. Main answers them only from the popup.
   PopupGetState: 'popup:get-state',
   // Main to the popup: what to show now, or null.
@@ -352,6 +356,16 @@ export type ChatHistory = {
 }
 
 export type PartyPanelMode = 'open' | 'rail'
+
+// What a start of the `mya` command left for the window. The path is for display only: the window
+// names a folder request by id.
+export type LaunchEvent =
+  { id: string; kind: 'open-folder'; path: string } | { id: string; kind: 'notice'; text: string }
+
+// projectChanged can be true on a failure: the project switched but the chat was refused.
+export type LaunchOpenResult =
+  | { ok: true; project: ProjectInfo; projectChanged: boolean; created: boolean }
+  | { ok: false; project: ProjectInfo | null; projectChanged: boolean; error: { message: string } }
 
 // Model and thinking: the models the logged-in account can use (AUTO is not a row),
 // or why the list could not be loaded.
@@ -843,6 +857,13 @@ export type MyaApi = {
     setOpenInEditor: (on: boolean) => Promise<{ ok: boolean }>
     // OPEN on a popup: the screen the main window should show.
     onOpen: (callback: (target: PopupOpenTarget) => void) => () => void
+    // The `mya` command has something for the window: call takeLaunches to get it.
+    onLaunch: (callback: () => void) => () => void
+    // Hands over what the command line left, once: the queue is emptied.
+    takeLaunches: () => Promise<LaunchEvent[]>
+    // Opens the folder of an open-folder event: switches the project if it differs, then makes a
+    // new chat on the first provider that is signed in. Refused during a run.
+    openLaunchFolder: (id: string) => Promise<LaunchOpenResult>
   }
   progression: {
     // The STATUS sheet's numbers for an agent file from the list.

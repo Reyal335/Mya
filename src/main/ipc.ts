@@ -22,7 +22,7 @@ import {
   chatsRename,
   chatsSearch
 } from './chatActions'
-import { openInEditor } from './editor'
+import { openLaunchFolder, takeLaunches } from './launch'
 import {
   cancelProviderInstall,
   cancelProviderLogin,
@@ -33,7 +33,7 @@ import {
   saveProviderApiKey
 } from './providerAuth'
 import { chatChoice, listModels, saveChoice } from './modelChoice'
-import { prefetchModels } from './models'
+import { openProjectFolder } from './projectSwitch'
 import { registerWindowIpc } from './windowControls'
 import {
   addTheme,
@@ -56,8 +56,7 @@ import {
   setOpenInEditor,
   setPartyPanel,
   setTestCommand,
-  setPopups,
-  setProject
+  setPopups
 } from './settings'
 import { setPopupsEnabled, showTestPopup } from './popupWindow'
 import { agentStats, agentsSummary } from './progression'
@@ -110,11 +109,7 @@ export function registerIpc(): void {
       : await dialog.showOpenDialog(options)
     if (result.canceled || result.filePaths.length === 0 || isRunning()) return null
 
-    const opened = await setProject(result.filePaths[0])
-    // The new folder's model list starts loading now.
-    prefetchModels(opened.path)
-    if (await getOpenInEditor()) openInEditor(opened.path)
-    return opened
+    return openProjectFolder(result.filePaths[0])
   })
 
   // `call` is { scope, filePath } of an agent from the list; agent.ts checks it again.
@@ -338,6 +333,13 @@ export function registerIpc(): void {
     }
   })
   ipcMain.handle(IpcChannel.UiTestPopup, () => showTestPopup())
+
+  // What the command line left for the window (the `mya` command). Main answers only the main
+  // window. The window names a folder request by the id it was given; launch.ts checks it.
+  ipcMain.handle(IpcChannel.UiTakeLaunches, (event) => takeLaunches(event.sender))
+  ipcMain.handle(IpcChannel.UiOpenLaunchFolder, (event, id: unknown) =>
+    openLaunchFolder(event.sender, id)
+  )
 
   // Progression. The window names an agent by a listed file path only; progression.ts
   // checks it against the list, and equip checks the reward is unlocked.

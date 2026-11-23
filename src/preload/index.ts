@@ -153,7 +153,16 @@ const api: MyaApi = {
       return () => {
         ipcRenderer.removeListener(IpcChannel.UiOpen, listener)
       }
-    }
+    },
+    onLaunch: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(IpcChannel.UiLaunch, listener)
+      return () => {
+        ipcRenderer.removeListener(IpcChannel.UiLaunch, listener)
+      }
+    },
+    takeLaunches: () => ipcRenderer.invoke(IpcChannel.UiTakeLaunches),
+    openLaunchFolder: (id) => ipcRenderer.invoke(IpcChannel.UiOpenLaunchFolder, id)
   },
   progression: {
     agentStats: (filePath) => ipcRenderer.invoke(IpcChannel.ProgressionAgentStats, filePath),

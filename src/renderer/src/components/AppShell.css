@@ -1,10 +1,16 @@
-/* The title bar on top, full width; the sidebar and the screens fill the rest, and
-   nothing scrolls under the bar. */
+/* The title bar on top, full width; then the notice strip, which is 0 tall when there is no
+   notice; the sidebar and the screens fill the rest, and nothing scrolls under the bar. The
+   column is the window's width exactly, so a long notice is cut off, never stretched. */
 .app-shell {
   display: grid;
-  grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-height) auto minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
+}
+
+.app-shell__notice {
+  min-width: 0;
 }
 
 .app-shell__body {

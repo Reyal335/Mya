@@ -1,9 +1,11 @@
 import { app, shell, BrowserWindow } from 'electron'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { startAccount } from './account'
 import { appIcon, windowIconOptions } from './appIcon'
 import { stopRun } from './agent'
+import { handleLaunch, setLaunchWindow } from './launch'
+import { launchDataOf, launchRequestOf, secondInstanceRequest } from './launchRules'
 import { closePopups, setupPopups } from './popupWindow'
 import { registerIpc } from './ipc'
 import { prefetchModels } from './models'
@@ -97,54 +99,89 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-app.whenReady().then(async () => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron.app')
-
-  // A packaged macOS app gets its icon from the bundle; in development the dock
-  // would otherwise show the default Electron icon.
-  if (is.dev && process.platform === 'darwin') {
-    app.dock?.setIcon(appIcon)
+// One Mya at a time. A second start (the mya command, the Start menu) hands its arguments and
+// its folder to this one and quits.
+const firstLaunch = launchRequestOf(process.argv, process.defaultApp === true, process.cwd())
+if (!app.requestSingleInstanceLock(launchDataOf(firstLaunch))) {
+  app.quit()
+} else {
+  // Packaged: do not hold the folder the command ran in open (Windows would refuse to delete or
+  // rename it while Mya runs). The Start menu starts Mya in its own folder too. The folder was
+  // read above and travels with the launch request.
+  if (app.isPackaged) {
+    try {
+      process.chdir(dirname(process.execPath))
+    } catch {
+      // Keep the folder it started in.
+    }
   }
 
-  // F12 toggles DevTools in development; Ctrl/Cmd+R is ignored in production.
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+  // Another start has something for this one. It may come before the window exists: the raise
+  // then waits for the window, and what it asked is queued (see launch.ts).
+  app.on('second-instance', (_event, argv, workingDirectory, additionalData) =>
+    handleLaunch(
+      secondInstanceRequest(argv, workingDirectory, additionalData, process.defaultApp === true),
+      true
+    )
+  )
+
+  app.whenReady().then(async () => {
+    // Set app user model id for windows
+    electronApp.setAppUserModelId('com.electron.app')
+
+    // A packaged macOS app gets its icon from the bundle; in development the dock
+    // would otherwise show the default Electron icon.
+    if (is.dev && process.platform === 'darwin') {
+      app.dock?.setIcon(appIcon)
+    }
+
+    // F12 toggles DevTools in development; Ctrl/Cmd+R is ignored in production.
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    await loadProject()
+    // Start loading the model list and provider login status now, so both are ready in
+    // memory when the window opens.
+    prefetchModels(getProject()?.path ?? null)
+    void getProvidersStatus()
+    // Tasks cut off when the app last closed become stopped before anything reads them.
+    await loadTasks()
+    // XP and achievements. A corrupt progression.json is kept aside and the app starts.
+    useProjectFrom(() => getProject()?.path ?? null)
+    await loadProgression()
+    // Boss fights, and the user's boss packs (a broken pack is skipped and logged).
+    await loadBosses()
+    watchConversations()
+    // A project with no chat yet makes its first chat on the first provider that is signed in.
+    setFirstChatStart(firstChatStart)
+    // The saved usage numbers come back first; the account is read on its own after that.
+    await loadUsage()
+    registerIpc()
+    startAccount()
+    const window = createWindow()
+    setLaunchWindow(window)
+    setupPopups(window)
+    // What this start was asked, such as a folder. Its window shows itself; nothing is raised.
+    handleLaunch(firstLaunch, false)
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        const reopened = createWindow()
+        setLaunchWindow(reopened)
+        setupPopups(reopened)
+      }
+    })
   })
 
-  await loadProject()
-  // Start loading the model list and provider login status now, so both are ready in
-  // memory when the window opens.
-  prefetchModels(getProject()?.path ?? null)
-  void getProvidersStatus()
-  // Tasks cut off when the app last closed become stopped before anything reads them.
-  await loadTasks()
-  // XP and achievements. A corrupt progression.json is kept aside and the app starts.
-  useProjectFrom(() => getProject()?.path ?? null)
-  await loadProgression()
-  // Boss fights, and the user's boss packs (a broken pack is skipped and logged).
-  await loadBosses()
-  watchConversations()
-  // A project with no chat yet makes its first chat on the first provider that is signed in.
-  setFirstChatStart(firstChatStart)
-  // The saved usage numbers come back first; the account is read on its own after that.
-  await loadUsage()
-  registerIpc()
-  startAccount()
-  setupPopups(createWindow())
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) setupPopups(createWindow())
+  app.on('before-quit', () => {
+    closePopups()
+    stopRun()
   })
-})
 
-app.on('before-quit', () => {
-  closePopups()
-  stopRun()
-})
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
+  })
+}
